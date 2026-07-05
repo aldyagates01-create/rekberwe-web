@@ -37,6 +37,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
   const [bankName, setBankName] = useState("");
   const [bankNumber, setBankNumber] = useState("");
   const [bankHolder, setBankHolder] = useState("");
+  const [editingBank, setEditingBank] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -64,6 +65,13 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     && !transaction.sellerPayoutSent
     && transaction.paymentStatus !== "Selesai",
   );
+  const hasSellerBankDetails = Boolean(
+    transaction?.sellerBankName
+    && transaction?.sellerBankNumber
+    && transaction?.sellerBankHolder,
+  );
+  const showSellerBankEditor = showSellerBankForm && (!hasSellerBankDetails || editingBank);
+  const showSellerBankSummary = showSellerBankForm && hasSellerBankDetails && !editingBank;
 
   const getAvatarUrl = useCallback(
     (senderUserId: string | null, senderTitle: string) => {
@@ -135,7 +143,17 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     setBankName(transaction.sellerBankName || "");
     setBankNumber(transaction.sellerBankNumber || "");
     setBankHolder(transaction.sellerBankHolder || "");
-  }, [transaction?.code, transaction?.sellerBankName, transaction?.sellerBankNumber, transaction?.sellerBankHolder]);
+    if (transaction.sellerPayoutSent || transaction.paymentStatus === "Selesai") {
+      setEditingBank(false);
+    }
+  }, [
+    transaction?.code,
+    transaction?.sellerBankName,
+    transaction?.sellerBankNumber,
+    transaction?.sellerBankHolder,
+    transaction?.sellerPayoutSent,
+    transaction?.paymentStatus,
+  ]);
 
   async function handleSend() {
     const text = message.trim();
@@ -197,6 +215,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
         bankHolder: bankHolder.trim(),
       });
       setTransaction(payload.transaction);
+      setEditingBank(false);
     } catch (bankError) {
       setError(bankError instanceof Error ? bankError.message : "Gagal mengirim data rekening.");
     } finally {
@@ -299,12 +318,44 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
         </p>
       ) : null}
 
-      {showSellerBankForm ? (
+      {showSellerBankSummary ? (
+        <div className="shrink-0 border-t border-border bg-card px-3 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 text-xs">
+              <p className="font-semibold text-white">Rekening pencairan sudah dikirim</p>
+              <p className="truncate text-white/55">
+                {transaction?.sellerBankName} • {transaction?.sellerBankNumber} • {transaction?.sellerBankHolder}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingBank(true)}
+              disabled={sending}
+              className="shrink-0 rounded-full border border-accent-blue/30 px-3 py-1.5 text-[11px] font-semibold text-accent-blue disabled:opacity-50"
+            >
+              Edit rekening
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {showSellerBankEditor ? (
         <form
           onSubmit={handleSellerBankSubmit}
           className="shrink-0 border-t border-border bg-card px-3 py-2"
         >
-          <p className="mb-2 text-xs font-semibold text-white">Data rekening penjual untuk pencairan dana</p>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-white">Data rekening penjual untuk pencairan dana</p>
+            {hasSellerBankDetails ? (
+              <button
+                type="button"
+                onClick={() => setEditingBank(false)}
+                className="text-[11px] text-white/55"
+              >
+                Batal
+              </button>
+            ) : null}
+          </div>
           <div className="grid gap-2">
             <input
               value={bankName}
@@ -332,7 +383,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
               disabled={sending}
               className="h-10 rounded-xl bg-accent-blue text-xs font-semibold text-white disabled:opacity-50"
             >
-              Kirim data rekening ke admin
+              {hasSellerBankDetails ? "Simpan perubahan rekening" : "Kirim data rekening ke admin"}
             </button>
           </div>
         </form>

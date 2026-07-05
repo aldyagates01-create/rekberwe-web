@@ -1541,10 +1541,8 @@ function renderMobileWorkspaceChrome() {
       elements.mobileHeaderProfileAvatar.textContent = getInitials(state.currentUser?.displayName || "R");
     }
   }
-  const unreadNotifications = getTotalUserUnreadCount() + getSupportUnreadCount();
   if (elements.mobileHeaderNotificationsBadge) {
-    elements.mobileHeaderNotificationsBadge.textContent = unreadNotifications > 99 ? "99+" : String(unreadNotifications);
-    elements.mobileHeaderNotificationsBadge.classList.toggle("hidden", unreadNotifications <= 0);
+    elements.mobileHeaderNotificationsBadge.classList.add("hidden");
   }
 }
 
@@ -2110,7 +2108,9 @@ async function handleProfileVerificationSave(event) {
     await refreshDashboard();
     renderAll();
     window.setTimeout(() => hideVerificationUploadProgress(), 1800);
-    setAuthStatus("Data verifikasi sudah dikirim. Status sekarang menunggu admin meninjau data sekitar 2-5 menit.");
+    const verificationPendingMessage = "Data verifikasi sudah masuk ke admin. Silakan tunggu, admin sedang cek. Biasanya memakan waktu 2-5 menit.";
+    setAuthStatus(verificationPendingMessage);
+    window.alert(verificationPendingMessage);
   } catch (error) {
     console.error(error);
     setVerificationUploadProgressState(error.message || "Upload verifikasi gagal.", 100, "error", "Silakan cek file, izin lokasi, lalu coba lagi.");
@@ -2355,6 +2355,13 @@ function isMobileViewport() {
 function openMobileTransactionChat(code) {
   const normalized = String(code || "").trim().toUpperCase();
   if (!normalized) return false;
+  const transaction = state.transactions.find((item) => item.code === normalized)
+    || state.dashboard.activeTransactions?.find((item) => item.code === normalized)
+    || state.activeTransaction;
+  if (transaction?.code === normalized) {
+    markUserTransactionSeen(transaction);
+    updateUserNotificationBadges();
+  }
   window.location.href = `/transaksi/${encodeURIComponent(normalized)}`;
   return true;
 }
@@ -3105,6 +3112,14 @@ function formatDateTime(date) {
   }).format(date);
 }
 
+function formatDate(date) {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
 function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
@@ -3259,9 +3274,7 @@ function updateUserNotificationBadges() {
   setButtonBadge(elements.mobileNavTransactions, unreadTransactions);
   setButtonBadge(elements.mobileNavSupport, unreadSupport);
   if (elements.mobileHeaderNotificationsBadge) {
-    const combined = totalNotifications + unreadSupport;
-    elements.mobileHeaderNotificationsBadge.textContent = combined > 99 ? "99+" : String(combined);
-    elements.mobileHeaderNotificationsBadge.classList.toggle("hidden", combined <= 0);
+    elements.mobileHeaderNotificationsBadge.classList.add("hidden");
   }
 }
 
