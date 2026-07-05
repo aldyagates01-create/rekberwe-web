@@ -1,35 +1,33 @@
 "use client";
 
+import type { TransactionActionButton } from "@/lib/transaction";
+
 type QuickActionChipsProps = {
-  onUpload: () => void;
-  onDetail: () => void;
-  onConfirm?: () => void;
-  confirmLabel?: string;
-  onReport: () => void;
-  confirmDisabled?: boolean;
+  actions: TransactionActionButton[];
+  onAction: (action: TransactionActionButton["action"]) => void;
+  disabled?: boolean;
 };
 
 export function QuickActionChips({
-  onUpload,
-  onDetail,
-  onConfirm,
-  confirmLabel = "Konfirmasi",
-  onReport,
-  confirmDisabled = false,
+  actions,
+  onAction,
+  disabled = false,
 }: QuickActionChipsProps) {
+  if (!actions.length) return null;
+
   return (
-    <div className="shrink-0 border-t border-border bg-bg/95 px-3 py-2">
+    <div className="shrink-0 border-t border-border bg-bg/95 px-3 py-1.5">
       <div className="flex gap-2 overflow-x-auto scrollbar-none">
-        <Chip onClick={onUpload}>Upload Bukti</Chip>
-        <Chip onClick={onDetail}>Detail Pesanan</Chip>
-        {onConfirm ? (
-          <Chip onClick={onConfirm} disabled={confirmDisabled} variant="success">
-            {confirmLabel}
+        {actions.map((item) => (
+          <Chip
+            key={item.action}
+            onClick={() => onAction(item.action)}
+            disabled={disabled}
+            variant={item.variant}
+          >
+            {item.label}
           </Chip>
-        ) : null}
-        <Chip onClick={onReport} variant="danger">
-          Lapor
-        </Chip>
+        ))}
       </div>
     </div>
   );
@@ -51,14 +49,14 @@ function Chip({
       ? "border-success/30 text-success"
       : variant === "danger"
         ? "border-danger/30 text-danger"
-        : "border-border text-white/85";
+        : "border-warning/30 text-warning";
 
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border bg-card px-4 text-xs font-medium disabled:opacity-40 ${colors}`}
+      className={`inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full border bg-card px-3 text-[11px] font-semibold disabled:opacity-40 ${colors}`}
     >
       {children}
     </button>

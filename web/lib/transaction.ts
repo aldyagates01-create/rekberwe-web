@@ -52,6 +52,19 @@ export function getSystemMessageIcon(text: string) {
   return "ℹ️";
 }
 
+export type TransactionActionKey =
+  | "mark_paid"
+  | "account_delivered"
+  | "goods_received"
+  | "open_dispute"
+  | "cancel_transaction";
+
+export type TransactionActionButton = {
+  action: TransactionActionKey;
+  label: string;
+  variant: "default" | "success" | "danger";
+};
+
 export function getConfirmAction(transaction: Transaction, role: "buyer" | "seller" | null) {
   if (role === "buyer" && !transaction.adminFundsReceived) {
     return { action: "mark_paid", label: "Konfirmasi Bayar" };
@@ -63,6 +76,41 @@ export function getConfirmAction(transaction: Transaction, role: "buyer" | "sell
     return { action: "goods_received", label: "Item Diterima" };
   }
   return null;
+}
+
+export function getTransactionActions(transaction: Transaction, role: "buyer" | "seller" | null): TransactionActionButton[] {
+  if (!role || transaction.paymentStatus === "Transaksi dibatalkan" || transaction.paymentStatus === "Selesai") {
+    return [];
+  }
+
+  const actions: TransactionActionButton[] = [];
+  if (role === "buyer" && !transaction.adminFundsReceived) {
+    actions.push({ action: "mark_paid", label: "Konfirmasi Bayar", variant: "success" });
+  }
+
+  if (
+    role === "seller"
+    && transaction.adminFundsReceived
+    && transaction.paymentStatus !== "Akun sudah diserahkan"
+    && !transaction.buyerConfirmedReceived
+    && !transaction.sellerPayoutSent
+  ) {
+    actions.push({ action: "account_delivered", label: "Data / Item Diserahkan", variant: "success" });
+  }
+
+  if (
+    role === "buyer"
+    && transaction.adminFundsReceived
+    && (transaction.paymentStatus === "Akun sudah diserahkan" || transaction.buyerConfirmedReceived || transaction.sellerPayoutSent)
+    && !transaction.buyerConfirmedReceived
+    && !transaction.sellerPayoutSent
+  ) {
+    actions.push({ action: "goods_received", label: "Item Diterima", variant: "success" });
+  }
+
+  actions.push({ action: "open_dispute", label: "Ajukan Sengketa", variant: "danger" });
+  actions.push({ action: "cancel_transaction", label: "Batalkan Transaksi", variant: "default" });
+  return actions;
 }
 
 export type SessionResponse = {

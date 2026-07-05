@@ -9,16 +9,17 @@ import { QuickActionChips } from "@/components/chat/QuickActionChips";
 import { TransactionSummaryCollapse } from "@/components/chat/TransactionSummaryCollapse";
 import {
   buildTimeline,
-  getConfirmAction,
   getSession,
   getSystemMessageIcon,
   getTransaction,
+  getTransactionActions,
   getUserRole,
   isSystemMessage,
   runAction,
   sendMessage,
   uploadProof,
 } from "@/lib/transaction";
+import type { TransactionActionKey } from "@/lib/transaction";
 import type { SessionUser, Transaction, TransactionMessage } from "@/lib/types";
 
 type TransactionChatClientProps = {
@@ -42,8 +43,8 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     [transaction, user?.id],
   );
 
-  const confirmAction = useMemo(
-    () => (transaction ? getConfirmAction(transaction, role) : null),
+  const actionButtons = useMemo(
+    () => (transaction ? getTransactionActions(transaction, role) : []),
     [transaction, role],
   );
 
@@ -148,31 +149,18 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     }
   }
 
-  async function handleConfirm() {
-    if (!confirmAction || sending) return;
+  async function handleTransactionAction(action: TransactionActionKey) {
+    if (sending) return;
+    const confirmation = getActionConfirmation(action);
+    if (confirmation && !window.confirm(confirmation)) return;
+
     setSending(true);
     setError("");
     try {
-      const payload = await runAction(code, confirmAction.action);
+      const payload = await runAction(code, action);
       setTransaction(payload.transaction);
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Aksi gagal.");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function handleReport() {
-    if (sending) return;
-    const confirmed = window.confirm("Ajukan sengketa untuk transaksi ini?");
-    if (!confirmed) return;
-    setSending(true);
-    setError("");
-    try {
-      const payload = await runAction(code, "open_dispute");
-      setTransaction(payload.transaction);
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Gagal membuka sengketa.");
     } finally {
       setSending(false);
     }
@@ -274,12 +262,9 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
       ) : null}
 
       <QuickActionChips
-        onUpload={() => fileInputRef.current?.click()}
-        onDetail={() => router.push(`/transaksi/${code}/detail`)}
-        onConfirm={confirmAction ? handleConfirm : undefined}
-        confirmLabel={confirmAction?.label}
-        onReport={handleReport}
-        confirmDisabled={sending}
+        actions={actionButtons}
+        onAction={handleTransactionAction}
+        disabled={sending}
       />
 
       <ChatInput
@@ -300,4 +285,13 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
       />
     </div>
   );
+}
+
+function getActionConfirmation(action: TransactionActionKey) {
+  if (action === "open_dispute") return "Ajukan sengketa untuk transaksi ini?";
+  if (action === "cancel_transaction") return "Batalkan transaksi ini?";
+  if (action === "account_delivered") return "Konfirmasi bahwa data / item sudah diserahkan ke pembeli?";
+  if (action === "goods_received") return "Konfirmasi bahwa item sudah diterima dan aman?";
+  if (action === "mark_paid") return "Konfirmasi bahwa pembayaran sudah dikirim ke admin?";
+  return "";
 }
