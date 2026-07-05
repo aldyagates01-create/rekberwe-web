@@ -251,14 +251,6 @@ window.addEventListener("keydown", unlockUserNotificationAudio, { once: true });
 
 bootstrap().catch((error) => {
   console.error(error);
-  const pendingCode = new URLSearchParams(window.location.search).get("trx");
-  if (pendingCode) {
-    rememberPendingTransactionRoute(pendingCode);
-    setAuthStatus("Silakan login / daftar terlebih dahulu untuk masuk ke ruang transaksi.", true);
-    renderAll();
-    openLoginModal();
-    return;
-  }
   setAuthStatus("Website belum bisa memuat data login. Silakan coba refresh halaman.", true);
   renderAll();
 });
@@ -279,7 +271,11 @@ async function bootstrap() {
   }
   await Promise.all(initialJobs);
   renderAll();
-  await handleInitialRoute();
+  try {
+    await handleInitialRoute();
+  } catch (routeError) {
+    handleInitialRouteError(routeError);
+  }
   startRoomRefresh();
 }
 
@@ -3106,6 +3102,22 @@ async function handleInitialRoute() {
   state.transactionScreen = "room";
   elements.joinCode.value = code.toUpperCase();
   await handleJoinTransaction();
+}
+
+function handleInitialRouteError(error) {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("trx") || consumePendingTransactionRoute();
+  const message = error instanceof Error ? error.message : "Gagal membuka link transaksi.";
+
+  if (!state.currentUser && code) {
+    rememberPendingTransactionRoute(code);
+    setAuthStatus("Silakan login / daftar terlebih dahulu untuk masuk ke ruang transaksi.", true);
+    openLoginModal();
+    return;
+  }
+
+  console.error(error);
+  setAuthStatus(message || "Gagal membuka link transaksi.", true);
 }
 
 function normalizeProviderName(value) {
