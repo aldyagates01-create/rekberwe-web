@@ -949,7 +949,14 @@ async function handleJoinTransaction() {
       if (isMobileViewport() && openMobileTransactionChat(code)) {
         return;
       }
-      state.activeTransaction = localTransaction;
+      let latestTransaction = localTransaction;
+      try {
+        const current = await fetchJson(`/api/transactions/${code}`);
+        latestTransaction = current.transaction || localTransaction;
+      } catch (error) {
+        console.warn("Gagal mengambil detail transaksi terbaru:", error);
+      }
+      state.activeTransaction = latestTransaction;
       state.transactionScreen = "room";
       openWorkspaceSection("transactions");
       renderAll();

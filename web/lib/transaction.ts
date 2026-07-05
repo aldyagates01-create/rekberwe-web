@@ -168,6 +168,16 @@ export async function runAction(code: string, action: string) {
   });
 }
 
+export async function updateSellerBankDetails(
+  code: string,
+  details: { bankName: string; bankNumber: string; bankHolder: string },
+) {
+  return fetchJson<{ transaction: Transaction }>(`/api/transactions/${encodeURIComponent(code)}/seller-bank`, {
+    method: "POST",
+    body: JSON.stringify(details),
+  });
+}
+
 export async function uploadProof(code: string, files: FileList | File[]) {
   const formData = new FormData();
   Array.from(files).forEach((file) => formData.append("proofFiles", file));

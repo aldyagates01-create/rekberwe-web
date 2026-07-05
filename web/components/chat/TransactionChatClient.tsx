@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ADMIN_AVATAR_URL, ChatBubble, SystemMessage, UploadBubble } from "@/components/chat/ChatBubble";
 import { ChatHeader } from "@/components/chat/ChatHeader";
@@ -17,6 +17,7 @@ import {
   isSystemMessage,
   runAction,
   sendMessage,
+  updateSellerBankDetails,
   uploadProof,
 } from "@/lib/transaction";
 import type { TransactionActionKey } from "@/lib/transaction";
@@ -33,6 +34,9 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [message, setMessage] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [bankNumber, setBankNumber] = useState("");
+  const [bankHolder, setBankHolder] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -51,6 +55,14 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
   const timeline = useMemo(
     () => (transaction ? buildTimeline(transaction) : []),
     [transaction],
+  );
+
+  const showSellerBankForm = Boolean(
+    transaction
+    && role === "seller"
+    && transaction.buyerConfirmedReceived
+    && !transaction.sellerPayoutSent
+    && transaction.paymentStatus !== "Selesai",
   );
 
   const getAvatarUrl = useCallback(
@@ -118,6 +130,13 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [timeline.length, transaction?.paymentStatus]);
 
+  useEffect(() => {
+    if (!transaction) return;
+    setBankName(transaction.sellerBankName || "");
+    setBankNumber(transaction.sellerBankNumber || "");
+    setBankHolder(transaction.sellerBankHolder || "");
+  }, [transaction?.code, transaction?.sellerBankName, transaction?.sellerBankNumber, transaction?.sellerBankHolder]);
+
   async function handleSend() {
     const text = message.trim();
     if (!text || sending) return;
@@ -161,6 +180,25 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
       setTransaction(payload.transaction);
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Aksi gagal.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleSellerBankSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (sending) return;
+    setSending(true);
+    setError("");
+    try {
+      const payload = await updateSellerBankDetails(code, {
+        bankName: bankName.trim(),
+        bankNumber: bankNumber.trim(),
+        bankHolder: bankHolder.trim(),
+      });
+      setTransaction(payload.transaction);
+    } catch (bankError) {
+      setError(bankError instanceof Error ? bankError.message : "Gagal mengirim data rekening.");
     } finally {
       setSending(false);
     }
@@ -259,6 +297,45 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
         <p className="shrink-0 border-t border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
           {error}
         </p>
+      ) : null}
+
+      {showSellerBankForm ? (
+        <form
+          onSubmit={handleSellerBankSubmit}
+          className="shrink-0 border-t border-border bg-card px-3 py-2"
+        >
+          <p className="mb-2 text-xs font-semibold text-white">Data rekening penjual untuk pencairan dana</p>
+          <div className="grid gap-2">
+            <input
+              value={bankName}
+              onChange={(event) => setBankName(event.target.value)}
+              placeholder="Nama bank, contoh: BCA"
+              className="h-10 rounded-xl border border-border bg-bg px-3 text-xs text-white placeholder:text-white/35"
+              required
+            />
+            <input
+              value={bankNumber}
+              onChange={(event) => setBankNumber(event.target.value)}
+              placeholder="Nomor rekening"
+              className="h-10 rounded-xl border border-border bg-bg px-3 text-xs text-white placeholder:text-white/35"
+              required
+            />
+            <input
+              value={bankHolder}
+              onChange={(event) => setBankHolder(event.target.value)}
+              placeholder="Atas nama rekening"
+              className="h-10 rounded-xl border border-border bg-bg px-3 text-xs text-white placeholder:text-white/35"
+              required
+            />
+            <button
+              type="submit"
+              disabled={sending}
+              className="h-10 rounded-xl bg-accent-blue text-xs font-semibold text-white disabled:opacity-50"
+            >
+              Kirim data rekening ke admin
+            </button>
+          </div>
+        </form>
       ) : null}
 
       <QuickActionChips

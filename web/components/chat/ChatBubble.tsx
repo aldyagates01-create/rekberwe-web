@@ -83,13 +83,13 @@ export function ChatBubble({
 }
 
 function MessageText({ text }: { text: string }) {
-  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  const parts = text.split(/(https?:\/\/[^\s]+|\/(?:terms|security-guide)(?:[^\s]*)?)/g);
   const shareUrl = parts.find((part) => /^https?:\/\//.test(part));
   return (
     <div>
       <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
         {parts.map((part, index) => {
-          if (/^https?:\/\//.test(part)) {
+          if (/^(https?:\/\/|\/(?:terms|security-guide))/.test(part)) {
             return (
               <a
                 key={`${part}-${index}`}
