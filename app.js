@@ -195,6 +195,7 @@ const elements = {
   createdTransactionModal: document.getElementById("created-transaction-modal"),
   createdTransactionLink: document.getElementById("created-transaction-link"),
   copyCreatedTransactionLink: document.getElementById("copy-created-transaction-link"),
+  shareCreatedTransactionLink: document.getElementById("share-created-transaction-link"),
   openCreatedTransactionRoom: document.getElementById("open-created-transaction-room"),
   sellerBankForm: document.getElementById("seller-bank-form"),
   sellerBankName: document.getElementById("seller-bank-name"),
@@ -664,6 +665,7 @@ function bindForms() {
   elements.supportWidgetClose?.addEventListener("click", toggleSupportWidget);
   elements.supportWidgetForm?.addEventListener("submit", handleSupportMessageSubmit);
   elements.copyCreatedTransactionLink?.addEventListener("click", copyCreatedTransactionLink);
+  elements.shareCreatedTransactionLink?.addEventListener("click", shareCreatedTransactionLink);
   elements.openCreatedTransactionRoom?.addEventListener("click", openCreatedTransactionRoom);
   elements.closeLoginModal?.addEventListener("click", closeLoginModal);
   elements.closeUserProfileModal?.addEventListener("click", closeUserProfileModal);
@@ -786,11 +788,19 @@ async function handleCreateTransaction(event) {
 
   await refreshTransactions();
   await refreshDashboard();
-  state.activeTransaction = payload.transaction;
-  state.transactionScreen = "room";
-  renderAll();
 
   const shareLink = buildTransactionLink(payload.transaction.code);
+  if (isMobileViewport()) {
+    state.activeTransaction = payload.transaction;
+    state.transactionScreen = "list";
+    state.mobileCreateOpen = false;
+    renderAll();
+  } else {
+    state.activeTransaction = payload.transaction;
+    state.transactionScreen = "room";
+    renderAll();
+  }
+
   showResult(form, `Transaksi ${payload.transaction.code} berhasil dibuat. Bagikan link ini ke lawan transaksi: ${shareLink}`, false);
   openCreatedTransactionModal(shareLink);
   history.replaceState({}, "", `?trx=${payload.transaction.code}`);
@@ -1008,8 +1018,31 @@ async function copyCreatedTransactionLink() {
   }
 }
 
+async function shareCreatedTransactionLink() {
+  const value = elements.createdTransactionLink?.textContent || "";
+  if (!value) return;
+  const shareData = {
+    title: "Link transaksi RekberWe",
+    text: "Silakan buka link transaksi RekberWe ini dan pilih role sesuai posisi Anda.",
+    url: value,
+  };
+
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+
+  await navigator.clipboard.writeText(value);
+  setAuthStatus("Browser tidak mendukung menu bagikan. Link transaksi sudah disalin.");
+}
+
 function openCreatedTransactionRoom() {
   closeCreatedTransactionModal();
+  state.transactionScreen = "room";
   openWorkspaceSection("transactions");
   if (state.activeTransaction) {
     renderRoom(state.activeTransaction);
@@ -3038,9 +3071,6 @@ async function handleInitialRoute() {
   if (!state.currentUser) {
     setAuthStatus("Silakan login / daftar dulu untuk membuka ruang transaksi dari link yang dibagikan.");
     openLoginModal();
-    return;
-  }
-  if (isMobileViewport() && openMobileTransactionChat(code)) {
     return;
   }
   openWorkspaceSection("transactions");

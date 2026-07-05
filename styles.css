@@ -6732,6 +6732,18 @@ a.primary-btn.submit-btn {
     border-radius: 24px !important;
   }
 
+  .created-transaction-actions {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .created-transaction-actions .ghost-btn,
+  .created-transaction-actions .primary-btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
   .user-profile-modal-grid {
     grid-template-columns: 1fr !important;
   }
