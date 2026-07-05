@@ -4,7 +4,7 @@ import { formatCurrency, getInitials } from "@/lib/format";
 import { getShortStatus, getTransactionProgress } from "@/lib/transaction";
 import type { Transaction, User } from "@/lib/types";
 
-const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-header.svg";
+const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-mark.jpg?v=5";
 
 type TransactionSummaryCollapseProps = {
   transaction: Transaction;

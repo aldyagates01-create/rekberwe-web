@@ -231,7 +231,7 @@ app.get("/api/config", async (_req, res) => {
   const feeSettings = await getAdminFeeSettings();
   res.json({
     appBaseUrl,
-    brandLogoUrl: "/assets/rekberwe-logo-main.png?v=4",
+    brandLogoUrl: "/assets/rekberwe-logo-mark.jpg?v=5",
     providers: Object.entries(providers).map(([name, provider]) => ({
       name,
       label: provider.label,

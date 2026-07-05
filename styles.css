@@ -106,12 +106,18 @@ a {
 }
 
 .site-logo {
-  width: 220px;
-  height: 120px;
+  width: auto;
+  height: 64px;
+  max-width: 220px;
   object-fit: contain;
   background: transparent;
-  filter: drop-shadow(0 20px 38px rgba(24, 76, 132, 0.18)) contrast(1.04) saturate(1.08);
-  object-position: center;
+  filter: drop-shadow(0 10px 28px rgba(7, 12, 24, 0.38));
+  object-position: left center;
+}
+
+img.brand-logo-mark {
+  object-fit: cover;
+  object-position: center 24%;
 }
 
 .topbar h1,
@@ -2707,8 +2713,8 @@ select {
   }
 
   .site-logo {
-    width: 170px;
-    height: 96px;
+    height: 50px;
+    max-width: 180px;
   }
 
   .room-content-grid {
@@ -3958,12 +3964,14 @@ a.primary-btn.submit-btn {
 }
 
 .participant-avatar-admin {
-  background: #ffffff;
-  padding: 6px;
+  background: radial-gradient(circle at 50% 32%, rgba(88, 64, 210, 0.35), rgba(8, 12, 24, 0.98));
+  padding: 0;
+  border: 1px solid rgba(120, 140, 200, 0.22);
 }
 
 .participant-avatar-admin img {
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center 24%;
 }
 
 .participant-avatar-seller {
@@ -4552,10 +4560,11 @@ a.primary-btn.submit-btn {
 }
 
 .site-logo.site-logo-brand {
-  width: 180px;
-  height: 72px;
+  width: auto;
+  height: 58px;
+  max-width: 210px;
   object-position: left center;
-  filter: drop-shadow(0 10px 30px rgba(7, 12, 24, 0.32));
+  filter: drop-shadow(0 8px 24px rgba(7, 12, 24, 0.38));
 }
 
 .page-shell {
@@ -4801,8 +4810,8 @@ a.primary-btn.submit-btn {
   }
 
   .site-logo.site-logo-brand {
-    width: 148px;
-    height: 58px;
+    height: 46px;
+    max-width: 168px;
   }
 
   .home-dashboard-shell,
@@ -6057,8 +6066,8 @@ a.primary-btn.submit-btn {
   }
 
   .mobile-workspace-brand-logo {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border-radius: 14px;
     display: grid;
     place-items: center;
@@ -6068,9 +6077,10 @@ a.primary-btn.submit-btn {
   }
 
   .mobile-workspace-brand-logo img {
-    width: 26px;
-    height: 26px;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 24%;
   }
 
   .mobile-workspace-brand-copy {
@@ -6817,9 +6827,10 @@ a.primary-btn.submit-btn {
 }
 
 @media (max-width: 420px) {
-  .site-logo {
-    width: 118px !important;
-    height: 64px !important;
+  .site-logo,
+  .site-logo.site-logo-brand {
+    height: 40px !important;
+    max-width: 140px !important;
   }
 
   .mobile-dashboard-hero-card {

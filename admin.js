@@ -1596,7 +1596,7 @@ function buildAdminTransactionProfileDetails(role, transaction) {
     return normalizeAdminProfileDetails({
       id: state.currentUser?.id || "admin",
       displayName: "RekberWE.id",
-      avatar: "/assets/rekberwe-logo-main.png?v=4",
+      avatar: "/assets/rekberwe-logo-mark.jpg?v=5",
       verificationStatus: "verified",
       verified: true,
       provider: "Admin",
