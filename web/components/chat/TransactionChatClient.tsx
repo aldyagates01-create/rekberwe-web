@@ -573,11 +573,13 @@ function updateTransactionPresence(
 ) {
   if (!transaction) return transaction;
   const next = { ...transaction };
-  if (next.buyer?.id === userId) {
-    next.buyer = { ...next.buyer, presence };
+  const buyer = next.buyer;
+  if (buyer && buyer.id === userId) {
+    next.buyer = { ...buyer, presence };
   }
-  if (next.seller?.id === userId) {
-    next.seller = { ...next.seller, presence };
+  const seller = next.seller;
+  if (seller && seller.id === userId) {
+    next.seller = { ...seller, presence };
   }
   if (adminPresence) {
     next.adminPresence = adminPresence;
