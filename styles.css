@@ -116,8 +116,13 @@ a {
 }
 
 img.brand-logo-mark {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: cover;
   object-position: center 24%;
+  display: block;
 }
 
 .money-value {
@@ -633,10 +638,11 @@ img.brand-logo-mark {
 }
 
 .site-logo-brand {
-  width: min(380px, 100%);
-  height: 170px;
+  width: auto;
+  height: 58px;
+  max-width: 210px;
   object-fit: contain;
-  object-position: center;
+  object-position: left center;
 }
 
 .social-btn-facebook .social-logo {
@@ -3655,6 +3661,11 @@ textarea::placeholder {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.workspace-sidebar-logo img.brand-logo-mark {
+  object-fit: cover !important;
+  object-position: center 24% !important;
 }
 
 .workspace-sidebar-brand-copy {
@@ -8229,6 +8240,35 @@ body.widget-dragging * {
 /* ===== Member workspace header + PC room polish ===== */
 body.is-member-view .topbar {
   display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+}
+
+.mobile-workspace-brand-logo {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(13, 21, 38, 0.96), rgba(14, 25, 44, 0.98));
+  border: 1px solid rgba(122, 139, 176, 0.2);
+}
+
+.mobile-workspace-brand-logo img,
+.mobile-workspace-brand-logo img.brand-logo-mark {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: cover !important;
+  object-position: center 24% !important;
 }
 
 body.is-member-view:not(.in-room-mode) .mobile-workspace-header {
