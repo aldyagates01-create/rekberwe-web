@@ -385,9 +385,13 @@ export async function createTransaction(input) {
   await query(
     `
       INSERT INTO transaction_messages (transaction_code, sender_name, sender_user_id, message_text, created_at)
-      VALUES ($1, 'System', NULL, 'Transaksi dibuat. Bagikan link kepada lawan transaksi untuk bergabung. Wajib baca syarat & ketentuan: /terms dan panduan pengamanan akun: /security-guide', $2)
+      VALUES ($1, 'RekberWE.id', NULL, $2, $3)
     `,
-    [input.code, now],
+    [
+      input.code,
+      `Transaksi ${input.code} berhasil dibuat.\n\nBagikan link ini ke lawan transaksi agar mereka bisa masuk dan memilih role:\n${input.shareLink || `/?trx=${input.code}`}\n\nWajib baca syarat & ketentuan: /terms dan panduan pengamanan akun: /security-guide`,
+      now,
+    ],
   );
   return getTransactionByCode(input.code);
 }

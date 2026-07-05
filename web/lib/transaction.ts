@@ -40,7 +40,7 @@ export function getUserRole(transaction: Transaction, userId?: string | null) {
 
 export function isSystemMessage(item: TransactionMessage) {
   const sender = String(item.sender || "").toLowerCase();
-  return sender === "system" || sender === "rekberwe.id" || !item.senderUserId;
+  return sender === "system";
 }
 
 export function getSystemMessageIcon(text: string) {

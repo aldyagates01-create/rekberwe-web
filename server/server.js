@@ -485,6 +485,7 @@ app.post("/api/transactions", requireAuth, async (req, res) => {
 
   const feeSettings = await getAdminFeeSettings();
   const code = generateTransactionCode();
+  const shareLink = `${appBaseUrl}/?trx=${encodeURIComponent(code)}`;
   const transaction = await createTransaction({
     code,
     title: String(title).trim(),
@@ -501,6 +502,7 @@ app.post("/api/transactions", requireAuth, async (req, res) => {
     createdByRole: String(role).trim(),
     buyerUserId: role === "buyer" ? req.session.user.id : null,
     sellerUserId: role === "seller" ? req.session.user.id : null,
+    shareLink,
   });
 
   await broadcastEvent("transaction_updated", transaction.code, { transaction });

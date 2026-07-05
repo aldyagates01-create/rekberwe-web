@@ -790,19 +790,11 @@ async function handleCreateTransaction(event) {
   await refreshDashboard();
 
   const shareLink = buildTransactionLink(payload.transaction.code);
-  if (isMobileViewport()) {
-    state.activeTransaction = payload.transaction;
-    state.transactionScreen = "list";
-    state.mobileCreateOpen = false;
-    renderAll();
-  } else {
-    state.activeTransaction = payload.transaction;
-    state.transactionScreen = "room";
-    renderAll();
-  }
-
+  state.activeTransaction = payload.transaction;
+  state.transactionScreen = "room";
+  state.mobileCreateOpen = false;
+  renderAll();
   showResult(form, `Transaksi ${payload.transaction.code} berhasil dibuat. Bagikan link ini ke lawan transaksi: ${shareLink}`, false);
-  openCreatedTransactionModal(shareLink);
   history.replaceState({}, "", `?trx=${payload.transaction.code}`);
   form.reset();
   toggleVerificationFieldsForForm(form);

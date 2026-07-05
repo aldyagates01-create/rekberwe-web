@@ -566,9 +566,9 @@ export function createTransaction(input) {
   });
   statements.addMessage.run({
     transaction_code: input.code,
-    sender_name: "System",
+    sender_name: "RekberWE.id",
     sender_user_id: null,
-    message_text: `Transaksi dibuat. Bagikan link kepada lawan transaksi untuk bergabung. Wajib baca syarat & ketentuan: /terms dan panduan pengamanan akun: /security-guide`,
+    message_text: `Transaksi ${input.code} berhasil dibuat.\n\nBagikan link ini ke lawan transaksi agar mereka bisa masuk dan memilih role:\n${input.shareLink || `/?trx=${input.code}`}\n\nWajib baca syarat & ketentuan: /terms dan panduan pengamanan akun: /security-guide`,
     created_at: now,
   });
   return getTransactionByCode(input.code);

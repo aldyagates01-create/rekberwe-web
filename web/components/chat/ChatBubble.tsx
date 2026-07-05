@@ -72,11 +72,35 @@ export function ChatBubble({
             </span>
           )}
         </div>
-        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{text}</p>
+        <MessageText text={text} />
         <p className="mt-1 text-right text-[10px] text-white/40">{formatTime(time)}</p>
       </div>
       {isMine && !isAdmin ? <Avatar name={sender} avatarUrl={avatarUrl} /> : null}
     </div>
+  );
+}
+
+function MessageText({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return (
+    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+      {parts.map((part, index) => {
+        if (/^https?:\/\//.test(part)) {
+          return (
+            <a
+              key={`${part}-${index}`}
+              href={part}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-accent-blue underline"
+            >
+              {part}
+            </a>
+          );
+        }
+        return <span key={`${part}-${index}`}>{part}</span>;
+      })}
+    </p>
   );
 }
 
