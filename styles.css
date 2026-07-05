@@ -120,6 +120,11 @@ img.brand-logo-mark {
   object-position: center 24%;
 }
 
+.money-value {
+  color: #22c55e !important;
+  font-weight: 700;
+}
+
 .topbar h1,
 .hero h2,
 .section-head h3,
@@ -8258,11 +8263,31 @@ body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy span {
     display: none !important;
   }
 
+  body.in-room-mode #ruang-transaksi {
+    position: relative !important;
+    inset: auto !important;
+    height: auto !important;
+    max-height: calc(100vh - 24px);
+    overflow: hidden;
+    display: flex !important;
+    flex-direction: column !important;
+    border-radius: 24px !important;
+  }
+
+  body.in-room-mode #transaction-room {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
   body.in-room-mode .mobile-chat-header {
     display: flex !important;
     position: sticky;
     top: 0;
-    z-index: 30;
+    z-index: 40;
     flex-shrink: 0;
     align-items: center;
     gap: 12px;
@@ -8276,10 +8301,12 @@ body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy span {
     display: flex !important;
   }
 
-  body.in-room-mode #transaction-room {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
+  body.in-room-mode .mobile-room-status-row {
+    display: none !important;
+  }
+
+  body.in-room-mode .room-header {
+    display: flex !important;
   }
 
   body.in-room-mode .transaction-overview-card {
@@ -8287,22 +8314,26 @@ body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy span {
   }
 
   body.in-room-mode .room-content-grid {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.72fr) !important;
+    gap: 18px !important;
+    align-items: start !important;
+    flex-direction: unset !important;
+    overflow: visible !important;
+    padding: 0 0 18px !important;
   }
 
   body.in-room-mode .room-chat-main {
-    flex: 1;
-    min-height: 0 !important;
-    max-height: calc(100vh - 220px);
-    display: flex !important;
-    flex-direction: column !important;
+    min-height: 640px !important;
+    max-height: none !important;
+    height: auto !important;
   }
 
-  body.in-room-mode .room-side-column {
-    display: none;
+  body.in-room-mode .room-summary-panel {
+    display: block !important;
+    position: sticky;
+    top: 72px;
+    align-self: start;
   }
 
   body.in-room-mode .chat-typing-indicator {

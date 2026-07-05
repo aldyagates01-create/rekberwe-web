@@ -1749,7 +1749,7 @@ function renderMobileDashboard() {
           <small>Penjual: ${escapeHtml(transaction.seller?.displayName || "Menunggu seller")}</small>
         </div>
         <div class="mobile-transaction-value">
-          <strong>${formatCurrency(transaction.price)}</strong>
+          <strong>${formatCurrencyHtml(transaction.price)}</strong>
           <small>Dibuat: ${transaction.createdAt ? formatDate(new Date(transaction.createdAt)) : "-"}</small>
         </div>
       </div>
@@ -2357,7 +2357,7 @@ function buildTransactionList(transactions, active) {
           </div>
           <span class="transaction-list-code">${escapeHtml(item.code)}</span>
           <span class="transaction-list-meta">
-            <span>${formatCurrency(item.price)}</span>
+            <span>${formatCurrencyHtml(item.price)}</span>
             <span>${capitalize(item.type)}</span>
             <span>${item.buyer && item.seller ? "Lengkap" : "Menunggu lawan transaksi"}</span>
           </span>
@@ -2521,7 +2521,7 @@ function renderRoom(transaction) {
   elements.joinRoleBox.classList.add("hidden");
   elements.transactionRoomEmpty.classList.add("hidden");
   elements.roomPageTitle.textContent = transaction.title;
-  elements.roomPageSubtitle.textContent = `${transaction.code} | ${capitalize(transaction.type)} | ${formatCurrency(transaction.price)}`;
+  elements.roomPageSubtitle.innerHTML = `${escapeHtml(transaction.code)} | ${escapeHtml(capitalize(transaction.type))} | ${formatCurrencyHtml(transaction.price)}`;
   elements.roomCode.textContent = transaction.code;
   elements.roomPaymentStatus.textContent = transaction.paymentStatus;
   elements.roomBuyer.textContent = transaction.buyer ? transaction.buyer.displayName : "Menunggu pembeli";
@@ -2529,14 +2529,14 @@ function renderRoom(transaction) {
   if (elements.mobileChatHeaderTitle) elements.mobileChatHeaderTitle.textContent = transaction.title || transaction.code;
   if (elements.mobileChatHeaderBadge) elements.mobileChatHeaderBadge.textContent = transaction.paymentStatus || "-";
   if (elements.mobileRoomStatusBadge) elements.mobileRoomStatusBadge.textContent = transaction.paymentStatus || "-";
-  if (elements.mobileRoomPrice) elements.mobileRoomPrice.textContent = formatCurrency(transaction.price);
+  if (elements.mobileRoomPrice) elements.mobileRoomPrice.innerHTML = formatCurrencyHtml(transaction.price);
   enterRoomMode();
   renderRoomParticipantAvatars(transaction);
   renderRoomProgress(transaction);
   renderRoomPresence(transaction);
   elements.roomSummary.innerHTML = buildSummaryItems(transaction).map(renderSummaryItem).join("");
   if (elements.roomTimeline) {
-    elements.roomTimeline.innerHTML = buildTransactionStatusTimeline(transaction).map(renderTimelineItem).join("");
+    elements.roomTimeline.innerHTML = "";
   }
   if (elements.proofList) {
     elements.proofList.innerHTML = "";
@@ -2682,7 +2682,8 @@ function buildTransactionTimeline(transaction) {
 }
 
 function renderSummaryItem(item) {
-  const valueContent = item.htmlValue || escapeHtml(item.value || "-");
+  const valueContent = item.htmlValue
+    || (item.isMoney ? formatCurrencyHtml(item.value) : escapeHtml(item.value || "-"));
   const hintContent = item.hint ? `<small>${escapeHtml(item.hint)}</small>` : "";
   return `
     <div class="summary-item">
@@ -2795,7 +2796,7 @@ function buildSummaryItems(transaction) {
   return [
     { label: "ID TRANSAKSI", value: transaction.code, hint: transaction.title },
     { label: "STATUS", htmlValue: renderSummaryStatusChip(transaction.paymentStatus) },
-    { label: "NILAI TRANSAKSI", value: formatCurrency(transaction.price) },
+    { label: "NILAI TRANSAKSI", value: transaction.price, isMoney: true },
     { label: "PEMBAYAR FEE", value: feePayerLabel(transaction.feePayer) },
     { label: "DIBUAT PADA", value: transaction.createdAt ? formatDateTime(new Date(transaction.createdAt)) : "-" },
     { label: "MASA GARANSI", value: warrantyText, hint: warrantyHint },
@@ -3237,6 +3238,10 @@ function formatCurrency(value) {
     currency: "IDR",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function formatCurrencyHtml(value) {
+  return `<span class="money-value">${escapeHtml(formatCurrency(value))}</span>`;
 }
 
 function formatTime(date) {
