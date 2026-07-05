@@ -83,6 +83,11 @@ const elements = {
   mobileHeaderNotificationsBadge: document.getElementById("mobile-header-notifications-badge"),
   mobileHeaderProfile: document.getElementById("mobile-header-profile"),
   mobileHeaderProfileAvatar: document.getElementById("mobile-header-profile-avatar"),
+  mobileHeaderLogout: document.getElementById("mobile-header-logout"),
+  roomInfoToggle: document.getElementById("room-info-toggle"),
+  roomInfoExpanded: document.getElementById("room-info-expanded"),
+  roomInfoStatusMini: document.getElementById("room-info-status-mini"),
+  roomInfoPriceMini: document.getElementById("room-info-price-mini"),
   sampleLink: document.getElementById("sample-link"),
   transactionRoomSection: document.getElementById("ruang-transaksi"),
   transactionRoom: document.getElementById("transaction-room"),
@@ -525,6 +530,8 @@ function bindForms() {
   elements.heroLoginButtonAlt?.addEventListener("click", openLoginModal);
   elements.homeLoginShortcut?.addEventListener("click", openLoginModal);
   elements.logoutButton?.addEventListener("click", handleLogout);
+  elements.mobileHeaderLogout?.addEventListener("click", handleLogout);
+  elements.roomInfoToggle?.addEventListener("click", toggleRoomInfoCollapse);
   elements.transactionsNavButton?.addEventListener("click", () => {
     state.transactionScreen = "list";
     openWorkspaceSection("transactions");
@@ -1270,8 +1277,20 @@ function renderTermsAndConditions() {
   });
 }
 
+function toggleRoomInfoCollapse() {
+  const expanded = elements.roomInfoExpanded;
+  const toggle = elements.roomInfoToggle;
+  if (!expanded || !toggle) return;
+  const isExpanded = !expanded.classList.contains("hidden");
+  expanded.classList.toggle("hidden", isExpanded);
+  toggle.setAttribute("aria-expanded", String(!isExpanded));
+  const label = toggle.querySelector(".room-info-toggle-label");
+  if (label) label.textContent = isExpanded ? "Lihat Detail" : "Sembunyikan";
+}
+
 function renderAuthButtons() {
   elements.logoutButton?.classList.toggle("hidden", !state.currentUser);
+  elements.mobileHeaderLogout?.classList.toggle("hidden", !state.currentUser);
   elements.openLogin?.classList.toggle("hidden", Boolean(state.currentUser));
   elements.heroLoginButton?.classList.toggle("hidden", Boolean(state.currentUser));
   elements.adminLink?.classList.toggle("hidden", !state.currentUser?.isAdmin);
@@ -2190,6 +2209,14 @@ function renderRoom(transaction) {
   elements.roomPaymentStatus.textContent = transaction.paymentStatus;
   elements.roomBuyer.textContent = transaction.buyer ? transaction.buyer.displayName : "Menunggu pembeli";
   elements.roomSeller.textContent = transaction.seller ? transaction.seller.displayName : "Menunggu penjual";
+  if (elements.roomInfoStatusMini) elements.roomInfoStatusMini.textContent = transaction.paymentStatus || "-";
+  if (elements.roomInfoPriceMini) elements.roomInfoPriceMini.textContent = formatCurrency(transaction.price);
+  if (elements.roomInfoExpanded && !elements.roomInfoExpanded.classList.contains("hidden")) {
+    elements.roomInfoExpanded.classList.add("hidden");
+    elements.roomInfoToggle?.setAttribute("aria-expanded", "false");
+    const label = elements.roomInfoToggle?.querySelector(".room-info-toggle-label");
+    if (label) label.textContent = "Lihat Detail";
+  }
   renderRoomParticipantAvatars(transaction);
   renderRoomProgress(transaction);
   elements.roomSummary.innerHTML = buildSummaryItems(transaction).map(renderSummaryItem).join("");
