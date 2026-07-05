@@ -1,0 +1,10 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="livechatGradient" x1="16" y1="16" x2="112" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF7A1A"/>
+      <stop offset="1" stop-color="#E0B232"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 18C35.8335 18 14 38.4934 14 64.0464C14 77.5733 20.0247 89.8244 30.0875 98.3823V114L47.1797 103.471C52.4231 104.962 58.0485 105.764 64 105.764C92.1665 105.764 114 85.2703 114 59.7172C114 34.1641 92.1665 18 64 18Z" fill="url(#livechatGradient)"/>
+  <path d="M39 44.5C39 36.4919 45.4919 30 53.5 30H74.5C82.5081 30 89 36.4919 89 44.5V63.5C89 71.5081 82.5081 78 74.5 78H62.5L47 92V78H53.5C45.4919 78 39 71.5081 39 63.5V44.5Z" fill="white"/>
+</svg>

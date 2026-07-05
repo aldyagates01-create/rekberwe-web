@@ -1,0 +1,68 @@
+export type User = {
+  id: string;
+  displayName: string;
+  legalName?: string;
+  email?: string;
+  whatsapp?: string;
+  avatar?: string;
+  verified?: boolean;
+  verificationStatus?: string;
+  provider?: string;
+  socialId?: string;
+};
+
+export type TransactionMessage = {
+  id: number;
+  sender: string;
+  senderUserId: string | null;
+  senderTitle: string;
+  senderVerified: boolean;
+  text: string;
+  time: string;
+  kind: "message";
+};
+
+export type TransactionUpload = {
+  id: number;
+  name: string;
+  url: string;
+  sender: string;
+  senderUserId: string | null;
+  senderTitle: string;
+  senderVerified: boolean;
+  time: string;
+  kind: "upload";
+};
+
+export type TimelineItem = TransactionMessage | TransactionUpload;
+
+export type Transaction = {
+  code: string;
+  title: string;
+  price: number;
+  type: string;
+  warranty: string;
+  paymentStatus: string;
+  feePayer: string;
+  feeAmount: number;
+  adminFundsReceived: boolean;
+  buyerConfirmedReceived: boolean;
+  sellerPayoutSent: boolean;
+  createdAt: string;
+  adminPayoutAccount?: string;
+  sellerBankName?: string;
+  sellerBankNumber?: string;
+  sellerBankHolder?: string;
+  buyer: User | null;
+  seller: User | null;
+  messages: TransactionMessage[];
+  uploads: TransactionUpload[];
+  settlement?: {
+    buyerTransferAmount: number;
+    sellerReceiveAmount: number;
+  };
+};
+
+export type SessionUser = User & {
+  isAdmin?: boolean;
+};

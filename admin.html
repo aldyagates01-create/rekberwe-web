@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RekberWE.id Admin</title>
+  <link rel="icon" type="image/png" href="assets/rekberwe-logo-header.png?v=2" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-orb bg-orb-a"></div>
+  <div class="bg-orb bg-orb-b"></div>
+
+  <header class="topbar">
+    <div class="brand-block brand-block-logo-only">
+      <img src="assets/rekberwe-logo-main.png?v=4" alt="Logo RekberWE.id" class="site-logo site-logo-brand" />
+    </div>
+  </header>
+
+  <main class="page-shell admin-shell">
+    <aside class="card admin-sidebar">
+      <div class="admin-sidebar-top">
+        <div class="current-user" id="admin-user-card">
+          <p class="mini-label">Memeriksa session admin...</p>
+        </div>
+        <div class="telegram-status hidden" id="admin-status"></div>
+      </div>
+      <div class="admin-nav-list">
+        <button type="button" class="admin-nav-btn active-admin-nav" data-admin-page="overview"><span class="workspace-menu-icon">◫</span><span>Ringkasan</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="transactions-new"><span class="workspace-menu-icon">▣</span><span>Transaksi Baru Masuk</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="transactions-completed"><span class="workspace-menu-icon">✓</span><span>Transaksi Selesai</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="transactions-transfer-queue"><span class="workspace-menu-icon">⇄</span><span>Antrian Transfer</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="transactions-cancelled"><span class="workspace-menu-icon">×</span><span>Transaksi Dibatalkan</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="transactions-dispute"><span class="workspace-menu-icon">!</span><span>Transaksi Sengketa</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="support"><span class="workspace-menu-icon">✉</span><span>Live Chat</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="verification"><span class="workspace-menu-icon">⌁</span><span>Verifikasi Pengguna</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="users"><span class="workspace-menu-icon">◎</span><span>Semua Pengguna</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="settings"><span class="workspace-menu-icon">⚙</span><span>Pengaturan</span></button>
+      </div>
+    </aside>
+
+    <section class="admin-content">
+      <section class="card admin-page active-admin-page" data-admin-page-content="overview">
+        <div class="section-head">
+          <p class="eyebrow">Dashboard</p>
+          <h3>Ringkasan aktivitas admin</h3>
+        </div>
+        <div class="admin-summary" id="admin-summary"></div>
+        <div class="card admin-profit-card">
+          <div class="section-head">
+            <p class="eyebrow">Profit transaksi</p>
+            <h3>Pantau fee masuk, hold garansi, dan transaksi batal</h3>
+          </div>
+          <div class="admin-toolbar admin-profit-toolbar">
+            <label>
+              Dari tanggal
+              <input type="date" id="profit-date-from" />
+            </label>
+            <label>
+              Sampai tanggal
+              <input type="date" id="profit-date-to" />
+            </label>
+          </div>
+          <div class="admin-summary" id="admin-profit-summary"></div>
+          <div class="admin-list" id="admin-profit-list"></div>
+        </div>
+      </section>
+
+      <section class="card admin-page" data-admin-page-content="users">
+        <div class="section-head">
+          <p class="eyebrow">Pengguna</p>
+          <h3>Semua pengguna RekberWE.id</h3>
+        </div>
+        <div class="admin-toolbar">
+          <input type="search" id="admin-user-search" placeholder="Cari nama, email, WhatsApp, provider, atau ID..." />
+        </div>
+        <div class="admin-list" id="admin-user-list"></div>
+      </section>
+
+      <section class="card admin-page" data-admin-page-content="verification">
+        <div class="section-head">
+          <p class="eyebrow">Verifikasi</p>
+          <h3>Pengguna menunggu review admin</h3>
+        </div>
+        <div class="admin-toolbar">
+          <input type="search" id="admin-verification-search" placeholder="Cari antrian verifikasi..." />
+        </div>
+        <div class="admin-list" id="admin-verification-list"></div>
+      </section>
+
+      <section class="card admin-page" data-admin-page-content="support">
+        <div class="section-head">
+          <p class="eyebrow">Live Chat</p>
+          <h3>Dukungan pengguna ke admin</h3>
+        </div>
+        <div class="support-admin-layout">
+          <div class="admin-list" id="admin-support-list"></div>
+          <div class="support-admin-room">
+            <div class="support-admin-room-head" id="admin-support-room-head">
+              <div>
+                <p class="eyebrow">Live chat aktif</p>
+                <h4 id="admin-support-room-title">Pilih live chat</h4>
+                <p class="mini-note" id="admin-support-room-subtitle">Klik percakapan di panel kiri untuk mulai membalas.</p>
+              </div>
+              <span class="admin-tag" id="admin-support-room-status">open</span>
+            </div>
+            <div class="support-widget-messages support-admin-messages" id="admin-support-messages"></div>
+            <form class="support-widget-form" id="admin-support-form">
+              <label class="chat-file-picker">
+                <input type="file" id="admin-support-upload" multiple />
+                <span class="attach-icon" aria-hidden="true">+</span>
+                <span class="sr-only">Lampirkan file live chat admin</span>
+              </label>
+              <input type="text" id="admin-support-input" placeholder="Balas live chat pengguna..." />
+              <button type="submit" class="primary-btn">Kirim</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="card admin-page" data-admin-page-content="settings">
+        <div class="section-head">
+          <p class="eyebrow">Pengaturan website</p>
+          <h3>Fee, syarat ketentuan, pengamanan akun, dan suara notif</h3>
+        </div>
+        <div class="settings-section-card">
+          <h4>Pengaturan fee</h4>
+        <form id="admin-fee-form" class="profile-form">
+          <label>
+            Rekening admin untuk transfer pembeli
+            <input type="text" id="admin-payout-account" placeholder="Contoh: BCA 1234567890 a.n Qhead Gold" />
+          </label>
+          <label>
+            Telegram customer care
+            <input type="text" id="customer-care-telegram" placeholder="@rekberadmin atau link Telegram" />
+          </label>
+          <label>
+            Gmail customer care
+            <input type="email" id="customer-care-gmail" placeholder="admin@rekberwe.id" />
+          </label>
+          <label>
+            Alamat kantor RekberWE.id
+            <textarea id="office-address" rows="3" placeholder="Contoh: Ruko ABC Lt.2, Jl. Contoh No. 123, Jakarta"></textarea>
+          </label>
+          <label>
+            Fee tetap rekber gold
+            <input type="number" id="gold-flat-fee" min="0" placeholder="10000" />
+          </label>
+          <div class="history-split">
+            <label>
+              Maks nominal tier 1
+              <input type="number" id="tier-1-max" min="1" placeholder="500000" />
+            </label>
+            <label>
+              Fee tier 1
+              <input type="number" id="tier-1-fee" min="0" placeholder="25000" />
+            </label>
+            <label>
+              Maks nominal tier 2
+              <input type="number" id="tier-2-max" min="1" placeholder="1000000" />
+            </label>
+            <label>
+              Fee tier 2
+              <input type="number" id="tier-2-fee" min="0" placeholder="50000" />
+            </label>
+            <label>
+              Maks nominal tier 3
+              <input type="number" id="tier-3-max" min="1" placeholder="5000000" />
+            </label>
+            <label>
+              Fee tier 3
+              <input type="number" id="tier-3-fee" min="0" placeholder="100000" />
+            </label>
+            <label>
+              Maks nominal tier 4
+              <input type="number" id="tier-4-max" min="1" placeholder="999999999999" />
+            </label>
+            <label>
+              Fee tier 4
+              <input type="number" id="tier-4-fee" min="0" placeholder="150000" />
+            </label>
+          </div>
+          <button type="submit" class="primary-btn">Simpan Pengaturan Fee</button>
+        </form>
+        </div>
+        <div class="settings-section-card">
+          <h4>Syarat dan ketentuan</h4>
+          <label>
+            Isi syarat dan ketentuan website
+            <textarea id="terms-and-conditions" rows="8" placeholder="Satu baris satu ketentuan"></textarea>
+          </label>
+        </div>
+        <div class="settings-section-card">
+          <h4>Panduan pengamanan akun</h4>
+          <label>
+            Isi panduan pengamanan akun / rekber gold
+            <textarea id="account-security-guide" rows="8" placeholder="Tulis panduan pengamanan akun di sini"></textarea>
+          </label>
+        </div>
+        <div class="settings-section-card">
+          <h4>Suara notifikasi</h4>
+          <label>
+            Suara notif untuk pengguna
+            <input type="file" id="user-notification-sound" accept="audio/*" />
+          </label>
+          <label>
+            Suara notif untuk admin
+            <input type="file" id="admin-notification-sound" accept="audio/*" />
+          </label>
+          <div class="storage-link-list" id="notification-sound-status"></div>
+        </div>
+        <div class="topbar-actions">
+          <button type="submit" form="admin-fee-form" class="primary-btn">Simpan Semua Pengaturan</button>
+        </div>
+        <div class="card storage-info-card" id="admin-storage-info"></div>
+      </section>
+
+      <section class="admin-page admin-transactions-page" data-admin-page-content="transactions">
+        <div class="workspace-page-head">
+          <div>
+            <p class="eyebrow" id="admin-page-eyebrow">Transaksi</p>
+            <h3 id="admin-page-title">Transaksi Baru Masuk</h3>
+          </div>
+        </div>
+
+        <section class="transactions-shell workspace-shell admin-workspace" id="admin-transactions-workspace" style="--sidebar-width: 420px;">
+          <aside class="card transactions-sidebar workspace-sidebar">
+            <div class="workspace-sidebar-brand">
+              <div class="workspace-sidebar-logo">
+                <img src="assets/rekberwe-logo-main.png?v=4" alt="RekberWE.id" />
+              </div>
+              <div class="workspace-sidebar-brand-copy">
+                <strong>RekberWe</strong>
+                <span>Admin Panel</span>
+              </div>
+            </div>
+            <button type="button" class="primary-btn sidebar-create-btn">Daftar Transaksi</button>
+            <div class="workspace-sidebar-menu admin-sidebar-menu">
+              <p class="workspace-sidebar-label">Menu</p>
+              <button type="button" class="workspace-menu-btn is-active">Transaksi Masuk</button>
+              <button type="button" class="workspace-menu-btn">Monitoring Admin</button>
+              <button type="button" class="workspace-menu-btn">Sengketa</button>
+              <button type="button" class="workspace-menu-btn">Verifikasi</button>
+            </div>
+            <div class="section-head">
+              <p class="eyebrow">Daftar transaksi</p>
+              <h3 id="admin-sidebar-title">Transaksi Baru Masuk</h3>
+            </div>
+            <div class="activity-list telegram-list" id="admin-transaction-list"></div>
+            <div class="workspace-sidebar-support admin-workspace-support">
+              <p class="workspace-sidebar-label">Butuh bantuan?</p>
+              <h4>Panel admin memantau semua chat, verifikasi, dan payout.</h4>
+            </div>
+          </aside>
+
+          <div class="panel-resizer" data-resizer="admin-transactions-workspace" aria-label="Resize panel"></div>
+
+          <section class="card telegram-room-shell workspace-room">
+            <div class="section-head room-shell-head">
+              <div class="room-page-head room-page-head-premium">
+                <div class="room-page-copy">
+                  <p class="eyebrow">Ruang chat admin</p>
+                  <h3 id="admin-room-title">Pilih transaksi</h3>
+                  <p class="mini-note" id="admin-room-subtitle">Klik transaksi di panel kiri untuk membuka ruang chat dan kontrol admin.</p>
+                </div>
+                <div class="room-page-meta">
+                  <div class="room-protection-badge">
+                    <strong>RekberWE Protection</strong>
+                    <span>Panel pengawasan transaksi</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="room-empty-state" id="admin-transaction-empty">
+              <div class="empty-chat-icon">💬</div>
+              <h4>Belum ada transaksi dipilih</h4>
+              <p>Pilih transaksi dari panel kiri untuk melihat detail, chat admin, dan aksi pencairan dana.</p>
+            </div>
+
+            <div class="room hidden" id="admin-transaction-room">
+              <div class="room-header">
+                <div>
+                  <p class="mini-label">Status transaksi</p>
+                  <h4 id="admin-room-status-title">Panel admin transaksi</h4>
+                </div>
+                <span class="status-pill" id="admin-room-status">-</span>
+              </div>
+
+              <section class="transaction-participants-strip admin-participants-strip">
+                <article class="participant-card participant-buyer-card">
+                  <div class="participant-avatar-shell participant-avatar-buyer" id="admin-room-buyer-avatar">B</div>
+                  <div class="participant-copy">
+                    <span class="participant-label">Pembeli</span>
+                    <strong id="admin-room-buyer-name">-</strong>
+                    <span class="participant-state online">Online</span>
+                  </div>
+                </article>
+                <article class="participant-card participant-admin-card">
+                  <div class="participant-avatar-shell participant-avatar-admin">
+                    <img src="assets/rekberwe-logo-main.png?v=4" alt="Admin RekberWE.id" />
+                  </div>
+                  <div class="participant-copy">
+                    <span class="participant-label">Admin Rekber</span>
+                    <strong>RekberWE.id</strong>
+                    <span class="participant-role-badge admin">ADMIN</span>
+                  </div>
+                </article>
+                <article class="participant-card participant-seller-card">
+                  <div class="participant-avatar-shell participant-avatar-seller" id="admin-room-seller-avatar">S</div>
+                  <div class="participant-copy">
+                    <span class="participant-label">Penjual</span>
+                    <strong id="admin-room-seller-name">-</strong>
+                    <span class="participant-state online">Online</span>
+                  </div>
+                </article>
+              </section>
+
+              <section class="transaction-progress-strip" id="admin-room-progress-strip">
+                <article class="progress-step is-active" id="admin-progress-created">
+                  <div class="progress-step-icon progress-step-icon-created" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M9 4h6l1 2h3a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a1 1 0 0 1 1-1h3l1-2Z" stroke="currentColor" stroke-width="1.8"/><path d="M9 11h6M9 15h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                  </div>
+                  <div class="progress-step-copy">
+                    <strong>Pesanan dibuat</strong>
+                    <span id="admin-progress-created-time">-</span>
+                  </div>
+                </article>
+                <article class="progress-step" id="admin-progress-funded">
+                  <div class="progress-step-icon progress-step-icon-funded" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V8a4 4 0 1 1 8 0v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                  </div>
+                  <div class="progress-step-copy">
+                    <strong>Dana diamankan</strong>
+                    <span id="admin-progress-funded-time">-</span>
+                  </div>
+                </article>
+                <article class="progress-step" id="admin-progress-reviewed">
+                  <div class="progress-step-icon progress-step-icon-reviewed" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="5.5" stroke="currentColor" stroke-width="1.8"/><path d="m15.5 15.5 3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                  </div>
+                  <div class="progress-step-copy">
+                    <strong>Akun diperiksa</strong>
+                    <span id="admin-progress-reviewed-time">-</span>
+                  </div>
+                </article>
+                <article class="progress-step" id="admin-progress-complete">
+                  <div class="progress-step-icon progress-step-icon-complete" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="m7 12 3.2 3.2L17 8.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div class="progress-step-copy">
+                    <strong>Selesai</strong>
+                    <span id="admin-progress-complete-time">-</span>
+                  </div>
+                </article>
+              </section>
+
+              <div class="room-content-grid">
+                <section class="chat-room-card room-chat-main">
+                  <div class="panel-top telegram-chat-head">
+                    <div>
+                      <h5>Chat transaksi</h5>
+                      <span class="mini-label">Panel komunikasi utama admin transaksi</span>
+                    </div>
+                  </div>
+                  <div class="chat-room-alert">
+                    <span class="chat-room-alert-icon">i</span>
+                    <p>Semua chat, bukti transfer, dan tindakan admin terekam di ruang transaksi ini untuk kebutuhan sengketa.</p>
+                  </div>
+                  <div class="chat-box" id="admin-chat-box"></div>
+                  <div class="room-summary-actions room-chat-actions-top room-chat-actions-inline">
+                    <button type="button" class="ghost-btn" id="admin-request-payment">Minta transfer ke admin</button>
+                    <button type="button" class="ghost-btn" id="admin-funds-received">Dana sudah diterima</button>
+                    <button type="button" class="primary-btn" id="admin-send-payout">Segera di transfer</button>
+                    <button type="button" class="ghost-btn" id="admin-complete-transaction">Tandai Selesai</button>
+                    <button type="button" class="danger-btn" id="admin-cancel-transaction">Batalkan transaksi</button>
+                  </div>
+                  <form id="admin-chat-form" class="chat-form">
+                    <label class="chat-file-picker">
+                      <input type="file" id="admin-proof-upload" multiple />
+                      <span class="attach-icon" aria-hidden="true">+</span>
+                      <span class="sr-only">Lampirkan file admin</span>
+                    </label>
+                    <div class="pending-attachments hidden" id="admin-pending-attachments"></div>
+                    <input type="text" id="admin-chat-input" placeholder="Kirim pesan sebagai RekberWE.id / Admin..." />
+                    <button type="submit" class="primary-btn chat-send-btn" aria-label="Kirim chat admin">➤</button>
+                    <div class="upload-progress hidden" id="admin-upload-progress" aria-live="polite">
+                      <div class="upload-progress-top">
+                        <strong id="admin-upload-progress-label"><span class="upload-spinner"></span>Sedang upload file...</strong>
+                        <span id="admin-upload-progress-value">0%</span>
+                      </div>
+                      <p class="upload-progress-detail" id="admin-upload-progress-detail">Menyiapkan file admin...</p>
+                      <div class="upload-progress-track">
+                        <span id="admin-upload-progress-bar"></span>
+                      </div>
+                    </div>
+                  </form>
+                </section>
+
+                <aside class="panel room-summary-panel">
+                  <section class="summary-card-block">
+                    <h5>Ringkasan transaksi</h5>
+                    <div class="summary-list" id="admin-room-summary"></div>
+                  </section>
+                  <section class="summary-card-block room-timeline-panel">
+                    <h5>Timeline transaksi</h5>
+                    <div class="timeline-list room-timeline-list" id="admin-room-timeline"></div>
+                  </section>
+                </aside>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
+
+      <section class="admin-page admin-transfer-queue-page" data-admin-page-content="transfer-queue">
+        <div class="workspace-page-head">
+          <div>
+            <p class="eyebrow">Transfer ke penjual</p>
+            <h3>Antrian transfer admin</h3>
+            <p class="mini-note">Halaman ini khusus untuk memantau antrian pencairan dana tanpa gangguan ruang chat transaksi.</p>
+          </div>
+        </div>
+
+        <section class="transactions-shell workspace-shell admin-workspace" id="admin-transfer-queue-workspace" style="--sidebar-width: 400px;">
+          <aside class="card transactions-sidebar workspace-sidebar">
+            <div class="section-head">
+              <p class="eyebrow">Daftar antrian</p>
+              <h3>Transaksi siap ditransfer</h3>
+            </div>
+            <div class="activity-list telegram-list" id="admin-transfer-queue-list"></div>
+          </aside>
+
+          <div class="panel-resizer" data-resizer="admin-transfer-queue-workspace" aria-label="Resize panel antrian transfer"></div>
+
+          <section class="card telegram-room-shell workspace-room queue-room-shell">
+            <div class="section-head room-shell-head">
+              <div class="room-page-head room-page-head-premium">
+                <div class="room-page-copy">
+                  <p class="eyebrow">Detail antrian transfer</p>
+                  <h3 id="admin-transfer-queue-title">Pilih transaksi</h3>
+                  <p class="mini-note" id="admin-transfer-queue-subtitle">Klik judul transaksi di panel kiri untuk melihat detail transfer.</p>
+                </div>
+                <div class="room-page-meta">
+                  <div class="room-protection-badge">
+                    <strong>Transfer Queue</strong>
+                    <span>Payout admin terpusat</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="room-empty-state" id="admin-transfer-queue-empty">
+              <div class="empty-chat-icon">💸</div>
+              <h4>Belum ada antrian transfer dipilih</h4>
+              <p>Pilih transaksi dari panel kiri untuk melihat tujuan transfer, bukti TF, dan menandai transaksi selesai.</p>
+            </div>
+
+            <div class="queue-room hidden" id="admin-transfer-queue-detail">
+              <div class="room-content-grid queue-content-grid">
+                <section class="chat-room-card room-chat-main queue-detail-main">
+                  <div class="panel-top telegram-chat-head">
+                    <div>
+                      <h5>Ringkasan transfer</h5>
+                      <span class="mini-label">Fokus ke pencairan dana penjual</span>
+                    </div>
+                  </div>
+                  <div class="guide-points transfer-queue-summary" id="admin-transfer-queue-summary"></div>
+                  <section class="queue-proof-panel">
+                    <div class="queue-proof-panel-head">
+                      <div>
+                        <h5>Upload bukti transfer</h5>
+                        <p class="mini-note">Lampiran akan ikut terkirim ke chat transaksi penjual.</p>
+                      </div>
+                    </div>
+                    <form id="admin-transfer-proof-form" class="chat-form queue-proof-form">
+                      <label class="chat-file-picker">
+                        <input type="file" id="admin-transfer-proof-upload" />
+                        <span class="attach-icon" aria-hidden="true">+</span>
+                        <span class="sr-only">Upload bukti transfer</span>
+                      </label>
+                      <button type="submit" class="primary-btn">Upload bukti TF</button>
+                    </form>
+                    <div class="pending-attachments hidden queue-pending-attachments" id="admin-transfer-proof-pending"></div>
+                    <div class="upload-progress hidden queue-upload-progress" id="admin-transfer-proof-progress">
+                      <div class="upload-progress-top">
+                        <strong><span class="upload-spinner" aria-hidden="true"></span><span id="admin-transfer-proof-progress-label">Sedang upload bukti transfer...</span></strong>
+                        <span id="admin-transfer-proof-progress-value">0%</span>
+                      </div>
+                      <p class="upload-progress-detail" id="admin-transfer-proof-progress-detail">Menyiapkan file transfer...</p>
+                      <div class="upload-progress-track">
+                        <span id="admin-transfer-proof-progress-bar"></span>
+                      </div>
+                    </div>
+                  </section>
+                  <div class="room-summary-actions queue-action-row">
+                    <button type="button" class="ghost-btn" id="admin-transfer-complete-inline">Tandai selesai</button>
+                  </div>
+                </section>
+
+                <aside class="panel room-summary-panel queue-side-panel">
+                  <h5>Riwayat bukti transfer</h5>
+                  <p class="mini-note">Semua bukti TF dari admin akan tampil di sini.</p>
+                  <div class="upload-list" id="admin-transfer-queue-uploads"></div>
+                </aside>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <div class="modal hidden" id="admin-note-modal">
+    <div class="modal-card modal-card-compact">
+      <p class="eyebrow" id="admin-note-eyebrow">Aksi admin</p>
+      <h3 id="admin-note-title">Masukkan alasan</h3>
+      <textarea id="admin-note-input" rows="5" placeholder="Tulis alasan di sini..."></textarea>
+      <div class="topbar-actions">
+        <button class="ghost-btn" id="admin-note-cancel">Batal</button>
+        <button class="primary-btn" id="admin-note-confirm">Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="admin-user-profile-modal">
+    <div class="modal-card modal-card-wide">
+      <div class="user-profile-modal-head">
+        <div class="user-profile-modal-avatar" id="admin-user-profile-modal-avatar"></div>
+        <div>
+          <p class="eyebrow" id="admin-user-profile-modal-role">Profil transaksi</p>
+          <h3 id="admin-user-profile-modal-name">Informasi pengguna</h3>
+          <p class="mini-note" id="admin-user-profile-modal-badge">Verified ✓</p>
+        </div>
+      </div>
+      <div class="user-profile-modal-grid" id="admin-user-profile-modal-grid"></div>
+      <div class="topbar-actions modal-actions-end">
+        <button class="ghost-btn" id="close-admin-user-profile-modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+  <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,885 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RekberWE.id - Rekber Aman</title>
+  <link rel="icon" type="image/png" href="assets/rekberwe-logo-header.png?v=2" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-orb bg-orb-a"></div>
+  <div class="bg-orb bg-orb-b"></div>
+
+  <header class="topbar">
+    <div class="brand-block brand-block-logo-only">
+      <img src="assets/rekberwe-logo-main.png?v=4" alt="Logo RekberWE.id" class="site-logo site-logo-brand" />
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <div id="home-area" class="home-area">
+      <section class="home-dashboard-shell">
+        <aside class="card home-sidebar">
+          <div class="workspace-sidebar-brand">
+            <div class="workspace-sidebar-logo">
+              <img src="assets/rekberwe-logo-main.png?v=4" alt="RekberWE.id" />
+            </div>
+            <div class="workspace-sidebar-brand-copy">
+              <strong>RekberWe</strong>
+              <span>Buyer Protection</span>
+            </div>
+          </div>
+          <button type="button" class="primary-btn sidebar-create-btn" id="hero-login-button">Masuk / Daftar</button>
+          <div class="workspace-sidebar-menu">
+            <p class="workspace-sidebar-label">Menu</p>
+            <button type="button" class="workspace-menu-btn is-active">Dashboard</button>
+            <button type="button" class="workspace-menu-btn" data-scroll-target="cara-kerja">Panduan Transaksi</button>
+            <button type="button" class="workspace-menu-btn" onclick="window.location.href='/security-guide'">Panduan Pengamanan</button>
+            <button type="button" class="workspace-menu-btn" id="home-live-chat-shortcut">Live Chat Support</button>
+          </div>
+          <div class="workspace-sidebar-support">
+            <p class="workspace-sidebar-label">Butuh bantuan?</p>
+            <h4>Support kami siap membantu buyer dan seller selama 24/7.</h4>
+            <button type="button" class="primary-btn sidebar-support-btn" id="home-login-shortcut">Login / Daftar</button>
+          </div>
+          <div class="workspace-sidebar-user">
+            <div class="current-user" id="current-user-card">
+              <p class="mini-label">Belum login</p>
+              <strong>Silakan login agar bisa membuat atau join transaksi.</strong>
+            </div>
+          </div>
+        </aside>
+
+        <section class="home-main-stack">
+          <section class="hero card">
+            <div class="hero-copy">
+              <p class="badge">Buyer & seller protection</p>
+              <h2>Website MidMAN untuk Jual beli Akun, dan item game dengan transaksi cepat, fee murah, profil terbuka, dan ruang sengketa.</h2>
+              <p class="hero-text">
+                Pembeli atau penjual bisa membuat transaksi, membagikan link kode transaksi,
+                lalu masuk ke ruang transaksi untuk chat, kirim bukti, dan menyelesaikan order dengan aman.
+              </p>
+              <p class="hero-highlight">
+                Tidak perlu isi pendaftaran manual, cukup login atau daftar memakai Telegram, Google, Facebook, atau Discord, lalu akun langsung siap dipakai.
+              </p>
+              <div class="hero-actions">
+                <button class="primary-btn" id="hero-login-button-alt">Mulai Login</button>
+                <button class="ghost-btn" data-scroll-target="cara-kerja">Lihat Panduan</button>
+                <a class="ghost-btn" href="/security-guide" target="_blank" rel="noreferrer">Panduan Pengamanan Akun</a>
+              </div>
+            </div>
+          </section>
+
+          <section class="home-content-grid">
+            <div class="home-content-main">
+              <section class="card" id="inline-transaction-panel">
+                <div class="section-head">
+                  <p class="eyebrow">Buat transaksi</p>
+                  <h3>Buat rekber baru langsung dari homepage</h3>
+                </div>
+                <form id="transaction-form" class="form-grid">
+                  <label>
+                    Judul transaksi
+                    <input type="text" name="title" placeholder="Contoh: Jual akun game rank mythic" required />
+                  </label>
+                  <label>
+                    Harga
+                    <input type="text" name="price" inputmode="numeric" placeholder="1.500.000" required />
+                    <span class="mini-note fee-preview" id="transaction-fee-preview">Fee rekber akan otomatis dihitung setelah harga diisi.</span>
+                  </label>
+                  <label>
+                    Peran Anda
+                    <select name="role" required>
+                      <option value="buyer">Sebagai Pembeli</option>
+                      <option value="seller">Sebagai Penjual</option>
+                    </select>
+                  </label>
+                  <label class="hidden" id="seller-payout-account-group">
+                    No. rekening penjual
+                    <input type="text" name="sellerPayoutAccount" placeholder="Contoh: BCA 1234567890 a.n Nama Penjual" />
+                  </label>
+                  <label>
+                    Jenis rekber
+                    <select name="type" required>
+                      <option value="akun">Akun</option>
+                      <option value="gold">Gold</option>
+                      <option value="power leveling">Power Leveling</option>
+                    </select>
+                  </label>
+                  <label>
+                    Masa garansi
+                    <input type="text" name="warranty" placeholder="Contoh: 3 hari (optional)" />
+                  </label>
+                  <label>
+                    Siapa bayar fee
+                    <select name="feePayer" required>
+                      <option value="buyer">Pembeli</option>
+                      <option value="seller">Penjual</option>
+                      <option value="split">Bagi dua</option>
+                    </select>
+                  </label>
+                  <button type="submit" class="primary-btn submit-btn">Buat & bagikan link transaksi</button>
+                </form>
+                <p class="mini-note">Catatan: penjual wajib verifikasi KTP dan WhatsApp di panel Profil. Pembeli tidak wajib.</p>
+                <div class="result-box hidden" id="transaction-result"></div>
+              </section>
+
+              <section id="cara-kerja" class="card">
+                <div class="section-head">
+                  <p class="eyebrow">Alur rekber</p>
+                  <h3>Langkah transaksi</h3>
+                </div>
+                <div class="steps">
+                  <article class="step-item">
+                    <strong>1</strong>
+                    <div>
+                      <h4>Buat transaksi</h4>
+                      <p>Pilih peran, isi judul, harga, jenis rekber, masa garansi, dan pembayar fee.</p>
+                    </div>
+                  </article>
+                  <article class="step-item">
+                    <strong>2</strong>
+                    <div>
+                      <h4>Verifikasi identitas</h4>
+                      <p>Jika belum pernah verifikasi, pengguna wajib isi nomor KTP dan nomor WhatsApp aktif.</p>
+                    </div>
+                  </article>
+                  <article class="step-item">
+                    <strong>3</strong>
+                    <div>
+                      <h4>Bagikan link transaksi</h4>
+                      <p>Pembeli kirim link seperti <span id="sample-link">contohnamasitus.com/t/RW-2026-000128</span> ke lawan transaksi.</p>
+                    </div>
+                  </article>
+                  <article class="step-item">
+                    <strong>4</strong>
+                    <div>
+                      <h4>Masuk ruang transaksi</h4>
+                      <p>Penjual login, join transaksi, lalu chat, upload bukti, dan update status hingga selesai.</p>
+                    </div>
+                  </article>
+                </div>
+              </section>
+            </div>
+
+            <aside class="home-content-side">
+              <section class="card login-card" id="account-section">
+                <div class="section-head">
+                  <p class="eyebrow">Daftar fee rekber</p>
+                  <h3>Biaya layanan saat ini</h3>
+                </div>
+                <div class="fee-list" id="public-fee-list">
+                  <article class="fee-item">
+                    <strong>Memuat fee rekber...</strong>
+                    <p>Daftar biaya akan tampil otomatis dari pengaturan admin.</p>
+                  </article>
+                </div>
+                <div class="telegram-status hidden" id="telegram-status"></div>
+                <div class="office-box hidden" id="office-box">
+                  <p class="mini-label">Alamat kantor RekberWE.id</p>
+                  <strong id="office-address">Alamat kantor belum diatur admin.</strong>
+                </div>
+              </section>
+
+              <section class="card terms-box">
+                <h4>Syarat dan ketentuan</h4>
+                <ol id="terms-list">
+                  <li>Untuk transaksi gold, gametime, topup, dan sejenisnya, fee rekber tetap 10.000 dengan nominal transaksi berapapun.</li>
+                  <li>Bank selain BCA kena fee 2.500.</li>
+                  <li>Khusus penjual, verifikasi identitas di profil dengan foto dan video menggunakan KTP, NIK disarankan di-blur.</li>
+                  <li>Video seller wajib memperlihatkan seller memegang KTP.</li>
+                  <li>Jika ada data akun yang tidak bisa di-remove / diganti, buyer berhak membatalkan transaksi.</li>
+                  <li>Garansi bersifat personal antara seller dan buyer, admin tidak bertanggung jawab setelah transaksi selesai.</li>
+                  <li>Jika terjadi hackback oleh penjual, buyer berhak mendapatkan identitas penjual berikut semua kontak social media-nya melalui admin, Ajukan Sengketa, atau Live Chat.</li>
+                </ol>
+              </section>
+            </aside>
+          </section>
+        </section>
+      </section>
+
+    </div>
+
+    <div id="member-area" class="hidden page-shell member-area">
+      <div id="profile-panel" class="tab-panel">
+        <section class="card member-tab-shell" id="transactions-intro-section">
+          <div class="section-head">
+            <p class="eyebrow">Profil pengguna</p>
+            <h3>Identitas, verifikasi, dan social media</h3>
+          </div>
+          <div class="profile-layout">
+            <div class="profile-card" id="profile-card">
+              <p class="mini-label">Belum ada pengguna aktif</p>
+              <strong>Login dulu untuk melihat data profil.</strong>
+            </div>
+            <div class="check-card">
+              <label>
+                Cek profil dari kode transaksi
+                <input type="text" id="profile-lookup" placeholder="RW-2026-000128" />
+              </label>
+              <button class="ghost-btn" id="lookup-profile">Tampilkan pembeli & penjual</button>
+              <div class="lookup-result" id="lookup-result"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="transactions-panel" class="tab-panel">
+        <section class="transactions-shell workspace-shell" id="member-transactions-workspace" style="--sidebar-width: 400px;">
+          <aside class="card transactions-sidebar workspace-sidebar">
+            <div class="workspace-sidebar-brand">
+              <div class="workspace-sidebar-logo">
+                <img src="assets/rekberwe-logo-main.png?v=4" alt="RekberWE.id" />
+              </div>
+              <div class="workspace-sidebar-brand-copy">
+                <strong>RekberWe</strong>
+                <span>Transaksi Aman</span>
+              </div>
+            </div>
+            <button type="button" class="primary-btn sidebar-create-btn" id="sidebar-create-transaction">
+              <span>＋</span>
+              <span>Buat Transaksi</span>
+            </button>
+            <div class="workspace-sidebar-menu">
+              <p class="workspace-sidebar-label">Menu</p>
+              <button type="button" class="workspace-menu-btn" id="sidebar-home-button"><span class="workspace-menu-icon">⌂</span><span>Dashboard</span></button>
+              <button type="button" class="workspace-menu-btn is-active" id="sidebar-transactions-button"><span class="workspace-menu-icon">▣</span><span>Transaksi Saya</span></button>
+              <button type="button" class="workspace-menu-btn" id="sidebar-profile-button"><span class="workspace-menu-icon">◉</span><span>Akun Saya</span></button>
+              <button type="button" class="workspace-menu-btn" id="sidebar-notifications-button"><span class="workspace-menu-icon">◎</span><span>Notifikasi</span></button>
+            </div>
+            <div class="toolbar telegram-join-toolbar">
+              <label class="join-label">
+                Masukkan kode transaksi
+                <input type="text" id="join-code" placeholder="RW-2026-000128" />
+              </label>
+              <button class="primary-btn" id="join-transaction">Masuk transaksi</button>
+            </div>
+            <div class="sidebar-section" id="active-rekber-section">
+              <div class="section-head sidebar-head">
+                <p class="eyebrow">Rekber aktif</p>
+                <h3>Transaksi berjalan</h3>
+              </div>
+              <div class="activity-list telegram-list" id="active-rekber-list"></div>
+            </div>
+            <div class="sidebar-section" id="history-rekber-section">
+              <div class="section-head sidebar-head">
+                <p class="eyebrow">Histori rekber</p>
+                <h3>Transaksi selesai</h3>
+              </div>
+              <div class="activity-list telegram-list" id="history-rekber-list"></div>
+            </div>
+            <div class="workspace-sidebar-support">
+              <p class="workspace-sidebar-label">Butuh bantuan?</p>
+              <h4>Tim support kami siap membantu 24/7</h4>
+              <button type="button" class="primary-btn sidebar-support-btn" id="sidebar-live-chat-button">Live Chat Support</button>
+              <button type="button" class="ghost-btn sidebar-guide-btn" id="sidebar-security-guide-button">Panduan Penggunaan</button>
+            </div>
+            <div class="workspace-sidebar-user" id="workspace-user-card">
+              <p class="mini-label">Memuat akun...</p>
+            </div>
+          </aside>
+
+          <div class="panel-resizer" data-resizer="member-transactions-workspace" aria-label="Resize panel"></div>
+
+          <section id="ruang-transaksi" class="card telegram-room-shell workspace-room">
+            <div class="section-head room-shell-head">
+              <div class="room-page-head room-page-head-premium">
+                <div class="room-page-copy">
+                  <button type="button" class="workspace-back-btn hidden workspace-back-inline" id="back-to-transaction-list">
+                    <span aria-hidden="true">←</span>
+                    <span>Kembali ke daftar transaksi</span>
+                  </button>
+                  <p class="eyebrow">Ruang chat transaksi</p>
+                  <h3 id="room-page-title">Pilih transaksi</h3>
+                  <p class="mini-note" id="room-page-subtitle">Klik judul transaksi di panel kiri untuk membuka ruang chat.</p>
+                </div>
+                <div class="room-page-meta">
+                  <div class="room-protection-badge">
+                    <strong>RekberWE Protection</strong>
+                    <span>Aman, cepat, terpercaya</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mobile-workspace-header">
+              <div class="mobile-workspace-brand">
+                <div class="mobile-workspace-brand-logo">
+                  <img src="assets/rekberwe-logo-main.png?v=4" alt="RekberWE.id" />
+                </div>
+                <div class="mobile-workspace-brand-copy">
+                  <strong>RekberWe</strong>
+                  <span>Transaksi aman</span>
+                </div>
+              </div>
+              <div class="mobile-workspace-actions">
+                <button type="button" class="mobile-header-icon-btn" id="mobile-header-notifications" aria-label="Buka notifikasi">
+                  <span aria-hidden="true">🔔</span>
+                  <span class="notif-badge hidden" id="mobile-header-notifications-badge">0</span>
+                </button>
+                <button type="button" class="mobile-header-avatar-btn" id="mobile-header-profile" aria-label="Buka akun saya">
+                  <span id="mobile-header-profile-avatar">A</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="workspace-center-view hidden" id="workspace-dashboard-view">
+              <section class="mobile-dashboard-shell">
+                <article class="mobile-dashboard-hero-card">
+                  <div class="mobile-dashboard-hero-copy">
+                    <p class="mobile-dashboard-hero-eyebrow">Transaksi aman</p>
+                    <h3>Semua lebih tenang bersama RekberWe.</h3>
+                    <p>Kelola transaksi, cek status, dan hubungi admin langsung dari dashboard mobile.</p>
+                    <div class="mobile-dashboard-hero-actions">
+                      <button type="button" class="ghost-btn mobile-dashboard-hero-btn" id="mobile-dashboard-learn-more">Pelajari lebih lanjut</button>
+                    </div>
+                  </div>
+                  <div class="mobile-dashboard-hero-visual" aria-hidden="true">
+                    <span>🛡️</span>
+                  </div>
+                </article>
+
+                <section class="mobile-quick-actions-card">
+                  <div class="mobile-section-head">
+                    <h4>Aksi cepat</h4>
+                  </div>
+                  <div class="mobile-quick-actions-grid">
+                    <button type="button" class="mobile-quick-action-btn" id="mobile-quick-create">
+                      <span class="mobile-quick-action-icon">＋</span>
+                      <strong>Buat Transaksi</strong>
+                      <small>Mulai transaksi baru</small>
+                    </button>
+                    <button type="button" class="mobile-quick-action-btn" id="mobile-quick-transactions">
+                      <span class="mobile-quick-action-icon">☰</span>
+                      <strong>Cek Transaksi</strong>
+                      <small>Lihat status transaksi</small>
+                    </button>
+                    <button type="button" class="mobile-quick-action-btn" id="mobile-quick-guide">
+                      <span class="mobile-quick-action-icon">✓</span>
+                      <strong>Jaminan Rekber</strong>
+                      <small>Aturan perlindungan</small>
+                    </button>
+                    <button type="button" class="mobile-quick-action-btn" id="mobile-quick-security">
+                      <span class="mobile-quick-action-icon">?</span>
+                      <strong>Cara Penggunaan</strong>
+                      <small>Panduan pengguna</small>
+                    </button>
+                  </div>
+                </section>
+
+                <section class="mobile-dashboard-summary-card" id="mobile-dashboard-summary">
+                  <div class="mobile-section-head">
+                    <h4>Ringkasan saya</h4>
+                  </div>
+                  <div class="mobile-dashboard-summary-grid">
+                    <article>
+                      <span>Total transaksi</span>
+                      <strong>0</strong>
+                    </article>
+                    <article>
+                      <span>Transaksi selesai</span>
+                      <strong>0</strong>
+                    </article>
+                    <article>
+                      <span>Dana diproses</span>
+                      <strong>Rp 0</strong>
+                    </article>
+                  </div>
+                </section>
+
+                <section class="mobile-dashboard-active-card">
+                  <div class="mobile-section-head">
+                    <h4>Transaksi aktif</h4>
+                  </div>
+                  <div class="mobile-dashboard-transaction-list" id="mobile-dashboard-transactions">
+                    <article class="mobile-dashboard-transaction-item empty">
+                      <strong>Belum ada transaksi aktif.</strong>
+                    </article>
+                  </div>
+                </section>
+              </section>
+
+              <section class="workspace-dashboard-shell">
+                <div class="workspace-dashboard-main">
+                  <section class="workspace-content-card" id="workspace-inline-transaction-panel">
+                    <div class="section-head">
+                      <p class="eyebrow">Buat transaksi</p>
+                      <h3>Buat rekber baru langsung dari dashboard</h3>
+                    </div>
+                    <form id="workspace-transaction-form" class="form-grid">
+                      <label>
+                        Judul transaksi
+                        <input type="text" name="title" placeholder="Contoh: Jual akun game rank mythic" required />
+                      </label>
+                      <label>
+                        Harga
+                        <input type="text" name="price" inputmode="numeric" placeholder="1.500.000" required />
+                        <span class="mini-note fee-preview" id="workspace-transaction-fee-preview">Fee rekber akan otomatis dihitung setelah harga diisi.</span>
+                      </label>
+                      <label>
+                        Peran Anda
+                        <select name="role" required>
+                          <option value="buyer">Sebagai Pembeli</option>
+                          <option value="seller">Sebagai Penjual</option>
+                        </select>
+                      </label>
+                      <label class="hidden seller-payout-account-group" id="workspace-seller-payout-account-group">
+                        No. rekening penjual
+                        <input type="text" name="sellerPayoutAccount" placeholder="Contoh: BCA 1234567890 a.n Nama Penjual" />
+                      </label>
+                      <label>
+                        Jenis rekber
+                        <select name="type" required>
+                          <option value="akun">Akun</option>
+                          <option value="gold">Gold</option>
+                          <option value="power leveling">Power Leveling</option>
+                        </select>
+                      </label>
+                      <label>
+                        Masa garansi
+                        <input type="text" name="warranty" placeholder="Contoh: 3 hari (optional)" />
+                      </label>
+                      <label>
+                        Siapa bayar fee
+                        <select name="feePayer" required>
+                          <option value="buyer">Pembeli</option>
+                          <option value="seller">Penjual</option>
+                          <option value="split">Bagi dua</option>
+                        </select>
+                      </label>
+                      <button type="submit" class="primary-btn submit-btn">Buat & bagikan link transaksi</button>
+                    </form>
+                    <p class="mini-note">Catatan: penjual wajib verifikasi KTP dan WhatsApp di panel Profil. Pembeli tidak wajib.</p>
+                    <div class="result-box hidden" id="workspace-transaction-result"></div>
+                  </section>
+                </div>
+                <aside class="workspace-dashboard-side">
+                  <section class="workspace-content-card">
+                    <div class="section-head">
+                      <p class="eyebrow">Daftar fee rekber</p>
+                      <h3>Biaya layanan saat ini</h3>
+                    </div>
+                    <div class="fee-list" id="workspace-public-fee-list">
+                      <article class="fee-item">
+                        <strong>Memuat fee rekber...</strong>
+                        <p>Daftar biaya akan tampil otomatis dari pengaturan admin.</p>
+                      </article>
+                    </div>
+                    <div class="office-box hidden" id="workspace-office-box">
+                      <p class="mini-label">Alamat kantor RekberWE.id</p>
+                      <strong id="workspace-office-address">Alamat kantor belum diatur admin.</strong>
+                    </div>
+                  </section>
+                  <section class="workspace-content-card terms-box">
+                    <h4>Syarat dan ketentuan</h4>
+                    <ol id="workspace-terms-list"></ol>
+                  </section>
+                </aside>
+              </section>
+            </div>
+
+            <div class="workspace-center-view hidden" id="workspace-profile-view">
+              <section class="workspace-content-card">
+                <div class="section-head">
+                  <p class="eyebrow">Akun saya</p>
+                  <h3>Profil, verifikasi, dan social media</h3>
+                </div>
+                <div class="profile-layout">
+                  <div class="profile-card" id="profile-card-workspace">
+                    <p class="mini-label">Memuat profil...</p>
+                  </div>
+                  <div class="check-card">
+                    <label>
+                      Cek profil dari kode transaksi
+                      <input type="text" id="profile-lookup-workspace" placeholder="RW-2026-000128" />
+                    </label>
+                    <button class="ghost-btn" id="lookup-profile-workspace">Tampilkan pembeli & penjual</button>
+                    <div class="lookup-result" id="lookup-result-workspace"></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="workspace-center-view hidden" id="workspace-notifications-view">
+              <section class="workspace-content-card notifications-shell">
+                <div class="section-head">
+                  <p class="eyebrow">Pusat notifikasi</p>
+                  <h3>Notifikasi akun & transaksi</h3>
+                </div>
+                <div class="notifications-list" id="notifications-list">
+                  <article class="notification-card">
+                    <strong>Belum ada notifikasi</strong>
+                    <p>Notifikasi transaksi, live chat, dan update status akan tampil di sini.</p>
+                  </article>
+                </div>
+              </section>
+            </div>
+
+            <div class="workspace-center-view hidden" id="workspace-mobile-transactions-view">
+              <section class="mobile-transactions-view-shell">
+                <section class="mobile-transactions-section-card">
+                  <div class="mobile-section-head">
+                    <h4>Transaksi aktif</h4>
+                  </div>
+                  <div class="mobile-dashboard-transaction-list" id="mobile-active-rekber-list"></div>
+                </section>
+                <section class="mobile-transactions-section-card">
+                  <div class="mobile-section-head">
+                    <h4>Riwayat transaksi</h4>
+                  </div>
+                  <div class="mobile-dashboard-transaction-list" id="mobile-history-rekber-list"></div>
+                </section>
+              </section>
+            </div>
+
+            <div class="room-empty-state" id="transaction-room-empty">
+              <div class="empty-chat-icon">ðŸ’¬</div>
+              <h4>Belum ada ruang chat yang dibuka</h4>
+              <p>Pilih transaksi aktif atau histori di panel kiri, atau masukkan kode transaksi untuk masuk ke ruang rekber.</p>
+            </div>
+
+            <div class="join-role-box hidden" id="join-role-box"></div>
+
+            <div class="room hidden" id="transaction-room">
+              <section class="transaction-overview-card">
+                <div class="room-header">
+                  <div>
+                    <p class="mini-label">Kode transaksi</p>
+                    <h4 id="room-code">-</h4>
+                  </div>
+                  <span class="status-pill" id="room-payment-status">Belum dibayar</span>
+                </div>
+
+                <section class="transaction-participants-strip">
+                  <article class="participant-card participant-buyer-card">
+                    <div class="participant-avatar-shell participant-avatar-buyer" id="room-buyer-avatar">B</div>
+                    <div class="participant-copy">
+                      <span class="participant-label">Pembeli</span>
+                      <strong id="room-buyer">-</strong>
+                      <span class="participant-state online">Online</span>
+                    </div>
+                  </article>
+                  <article class="participant-card participant-admin-card">
+                    <div class="participant-avatar-shell participant-avatar-admin">
+                      <img src="assets/rekberwe-logo-main.png?v=4" alt="Admin RekberWE.id" />
+                    </div>
+                    <div class="participant-copy">
+                      <span class="participant-label">Admin Rekber</span>
+                      <strong>RekberWE.id</strong>
+                      <span class="participant-role-badge admin">ADMIN</span>
+                    </div>
+                  </article>
+                  <article class="participant-card participant-seller-card">
+                    <div class="participant-avatar-shell participant-avatar-seller" id="room-seller-avatar">S</div>
+                    <div class="participant-copy">
+                      <span class="participant-label">Penjual</span>
+                      <strong id="room-seller">-</strong>
+                      <span class="participant-state online">Online</span>
+                    </div>
+                  </article>
+                </section>
+
+                <section class="transaction-progress-strip" id="room-progress-strip">
+                  <article class="progress-step is-active" id="room-progress-created">
+                    <div class="progress-step-icon progress-step-icon-created" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none"><path d="M9 4h6l1 2h3a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a1 1 0 0 1 1-1h3l1-2Z" stroke="currentColor" stroke-width="1.8"/><path d="M9 11h6M9 15h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="progress-step-copy">
+                      <strong>Pesanan dibuat</strong>
+                      <span id="room-progress-created-time">-</span>
+                    </div>
+                  </article>
+                  <article class="progress-step" id="room-progress-funded">
+                    <div class="progress-step-icon progress-step-icon-funded" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V8a4 4 0 1 1 8 0v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="progress-step-copy">
+                      <strong>Dana diamankan</strong>
+                      <span id="room-progress-funded-time">-</span>
+                    </div>
+                  </article>
+                  <article class="progress-step" id="room-progress-reviewed">
+                    <div class="progress-step-icon progress-step-icon-reviewed" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="5.5" stroke="currentColor" stroke-width="1.8"/><path d="m15.5 15.5 3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="progress-step-copy">
+                      <strong>Akun diperiksa</strong>
+                      <span id="room-progress-reviewed-time">-</span>
+                    </div>
+                  </article>
+                  <article class="progress-step" id="room-progress-complete">
+                    <div class="progress-step-icon progress-step-icon-complete" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none"><path d="m7 12 3.2 3.2L17 8.7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="progress-step-copy">
+                      <strong>Selesai</strong>
+                      <span id="room-progress-complete-time">-</span>
+                    </div>
+                  </article>
+                </section>
+              </section>
+
+              <div class="room-content-grid">
+                <section class="chat-room-card room-chat-main">
+                  <div class="panel-top telegram-chat-head">
+                    <div>
+                      <h5>Chat transaksi</h5>
+                      <span class="mini-label">Semua komunikasi terlindungi di RekberWE.id</span>
+                    </div>
+                  </div>
+                  <div class="chat-room-alert">
+                    <span class="chat-room-alert-icon">i</span>
+                    <p>Jangan pernah melakukan transaksi di luar platform. Semua bukti dan percakapan akan disimpan di ruang ini.</p>
+                  </div>
+                  <div class="chat-box" id="chat-box"></div>
+                  <form class="seller-bank-form hidden" id="seller-bank-form">
+                    <label>
+                      Nama bank
+                      <select id="seller-bank-name">
+                        <option value="">Pilih bank</option>
+                        <option value="BCA">BCA</option>
+                        <option value="BRI">BRI</option>
+                        <option value="BNI">BNI</option>
+                        <option value="Mandiri">Mandiri</option>
+                        <option value="CIMB Niaga">CIMB Niaga</option>
+                        <option value="Permata">Permata</option>
+                        <option value="Danamon">Danamon</option>
+                        <option value="SeaBank">SeaBank</option>
+                        <option value="Jago">Jago</option>
+                        <option value="OVO / Bank Nobu">OVO / Bank Nobu</option>
+                        <option value="Lainnya">Lainnya</option>
+                      </select>
+                    </label>
+                    <label>
+                      No rekening
+                      <input type="text" id="seller-bank-number" placeholder="Masukkan nomor rekening" />
+                    </label>
+                    <label>
+                      Atas nama
+                      <input type="text" id="seller-bank-holder" placeholder="Nama pemilik rekening" />
+                    </label>
+                    <p class="mini-note">Khusus penjual: isi rekening tujuan agar admin bisa meneruskan dana setelah pembeli konfirmasi item diterima.</p>
+                    <button type="submit" class="primary-btn" id="save-seller-bank-details">Kirim data rekening ke admin</button>
+                  </form>
+                  <div class="room-summary-actions room-chat-actions-top room-chat-actions-inline">
+                    <button class="primary-btn" id="account-delivered">Data / Item Diserahkan</button>
+                    <button class="primary-btn" id="goods-received">Item Diterima</button>
+                    <button class="danger-btn" id="open-dispute">Ajukan Sengketa</button>
+                    <button class="ghost-btn" id="cancel-transaction">Batalkan transaksi</button>
+                  </div>
+                  <form id="chat-form" class="chat-form">
+                    <label class="chat-file-picker">
+                      <input type="file" id="proof-upload" multiple />
+                      <span class="attach-icon" aria-hidden="true">+</span>
+                      <span class="sr-only">Lampirkan foto / video / file</span>
+                    </label>
+                    <div class="pending-attachments hidden" id="pending-attachments"></div>
+                    <input type="text" id="chat-input" placeholder="Tulis pesan untuk pembeli, penjual, atau admin..." />
+                    <button type="submit" class="primary-btn chat-send-btn" aria-label="Kirim pesan">➤</button>
+                    <div class="upload-progress hidden" id="upload-progress" aria-live="polite">
+                      <div class="upload-progress-top">
+                        <strong id="upload-progress-label"><span class="upload-spinner"></span>Sedang upload file...</strong>
+                        <span id="upload-progress-value">0%</span>
+                      </div>
+                      <p class="upload-progress-detail" id="upload-progress-detail">Menyiapkan file...</p>
+                      <div class="upload-progress-track">
+                        <span id="upload-progress-bar"></span>
+                      </div>
+                    </div>
+                  </form>
+                  <div class="mobile-room-shortcuts">
+                    <button type="button" class="mobile-room-shortcut-btn" id="mobile-room-detail-button">Detail Transaksi</button>
+                    <button type="button" class="mobile-room-shortcut-btn" id="mobile-room-upload-button">Bukti Transfer</button>
+                    <button type="button" class="mobile-room-shortcut-btn" id="mobile-room-guide-button">Panduan</button>
+                    <button type="button" class="mobile-room-shortcut-btn danger" id="mobile-room-dispute-button">Laporkan</button>
+                  </div>
+                </section>
+
+                <aside class="panel room-summary-panel">
+                  <section class="summary-card-block">
+                    <h5>Ringkasan transaksi</h5>
+                    <div class="summary-list" id="room-summary"></div>
+                  </section>
+                  <section class="summary-card-block room-timeline-panel">
+                    <h5>Timeline transaksi</h5>
+                    <div class="timeline-list room-timeline-list" id="room-timeline"></div>
+                  </section>
+                </aside>
+              </div>
+            </div>
+          </section>
+        </section>
+      </div>
+
+      <nav class="mobile-bottom-nav hidden" id="mobile-bottom-nav" aria-label="Navigasi mobile workspace">
+        <button type="button" class="mobile-bottom-nav-btn" id="mobile-nav-dashboard">
+          <span aria-hidden="true">⌂</span>
+          <strong>Beranda</strong>
+        </button>
+        <button type="button" class="mobile-bottom-nav-btn" id="mobile-nav-transactions">
+          <span aria-hidden="true">▣</span>
+          <strong>Transaksi</strong>
+        </button>
+        <button type="button" class="mobile-bottom-nav-btn mobile-bottom-nav-btn-primary" id="mobile-nav-create">
+          <span aria-hidden="true">＋</span>
+          <strong>Buat</strong>
+        </button>
+        <button type="button" class="mobile-bottom-nav-btn" id="mobile-nav-support">
+          <span aria-hidden="true">💬</span>
+          <strong>Pesan</strong>
+        </button>
+        <button type="button" class="mobile-bottom-nav-btn" id="mobile-nav-account">
+          <span aria-hidden="true">◉</span>
+          <strong>Akun</strong>
+        </button>
+      </nav>
+    </div>
+  </main>
+
+  <div class="modal hidden" id="verification-modal">
+    <div class="modal-card">
+      <p class="eyebrow">Verifikasi diperlukan</p>
+      <h3>Penjual wajib verifikasi KTP dulu</h3>
+      <p id="verification-modal-text">Silakan buka tab Profil untuk melengkapi nama sesuai KTP, nomor KTP, dan WhatsApp aktif.</p>
+      <div class="topbar-actions">
+        <button class="primary-btn" id="open-profile-tab">Buka Tab Profil</button>
+        <button class="ghost-btn" id="close-verification-modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="location-consent-modal">
+    <div class="modal-card">
+      <p class="eyebrow">Persetujuan lokasi</p>
+      <h3>Aktifkan lokasi untuk verifikasi penjual</h3>
+      <p id="location-consent-text">RekberWe meminta akses lokasi saat pendaftaran untuk keamanan transaksi, pencegahan penipuan, dan verifikasi risiko akun. Data lokasi tidak akan ditampilkan ke pengguna lain dan hanya dapat dilihat admin untuk keperluan investigasi sengketa.</p>
+      <div class="topbar-actions">
+        <button class="ghost-btn" id="close-location-consent-modal">Batal</button>
+        <button class="primary-btn" id="approve-location-consent-modal">Setuju & Ambil Lokasi</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="confirm-modal">
+    <div class="modal-card">
+      <p class="eyebrow" id="confirm-modal-eyebrow">Konfirmasi</p>
+      <h3 id="confirm-modal-title">Lanjutkan aksi?</h3>
+      <p id="confirm-modal-text">Pastikan tindakan ini memang benar.</p>
+      <div class="topbar-actions">
+        <button class="ghost-btn" id="confirm-modal-cancel">Batal</button>
+        <button class="primary-btn" id="confirm-modal-approve">Ya, lanjutkan</button>
+      </div>
+    </div>
+    </div>
+
+  <div class="support-widget hidden" id="support-widget">
+    <div class="support-widget-hint" id="support-widget-hint">Klik di sini untuk menghubungi admin via live chat.</div>
+    <button type="button" class="support-widget-toggle" id="support-widget-toggle" aria-label="Buka live chat admin">
+      <span class="support-widget-icon" aria-hidden="true">
+        <img src="assets/livechat-icon.svg?v=1" alt="" />
+      </span>
+      <span class="notif-badge hidden" id="support-widget-badge">0</span>
+    </button>
+    <div class="support-widget-panel hidden" id="support-widget-panel">
+      <div class="support-widget-head" id="support-widget-drag">
+        <strong>Live Chat Admin</strong>
+        <button type="button" class="ghost-btn" id="support-widget-close">Tutup</button>
+      </div>
+      <div class="support-widget-messages" id="support-widget-messages"></div>
+      <form class="support-widget-form" id="support-widget-form">
+        <label class="chat-file-picker">
+          <input type="file" id="support-widget-upload" multiple />
+          <span class="attach-icon" aria-hidden="true">+</span>
+          <span class="sr-only">Lampirkan file live chat</span>
+        </label>
+        <input type="text" id="support-widget-input" placeholder="Tulis pesan ke admin..." />
+        <button type="submit" class="primary-btn">Kirim</button>
+      </form>
+    </div>
+  </div>
+
+<div class="modal hidden" id="created-transaction-modal">
+    <div class="modal-card created-transaction-card">
+      <p class="eyebrow">Link transaksi siap dibagikan</p>
+      <h3>Bagikan link ini ke lawan transaksi</h3>
+      <p class="mini-note">Lawan transaksi cukup buka link ini, login, pilih role yang tersedia, lalu langsung masuk ke ruang transaksi.</p>
+      <div class="share-link-box created-share-link-box" id="created-transaction-link">-</div>
+      <div class="topbar-actions created-transaction-actions">
+        <button class="ghost-btn" id="copy-created-transaction-link">Copy Link</button>
+        <button class="primary-btn" id="open-created-transaction-room">Masuk ke ruang transaksi</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="join-role-modal">
+    <div class="modal-card">
+      <p class="eyebrow">Pilih role</p>
+      <h3>Masuk ke transaksi sebagai</h3>
+      <div class="join-role-box join-role-box-modal">
+        <div class="action-row" id="join-role-actions">
+          <button type="button" class="ghost-btn join-role-btn" id="join-as-buyer" data-role="buyer">Masuk sebagai Pembeli</button>
+          <button type="button" class="primary-btn join-role-btn" id="join-as-seller" data-role="seller">Masuk sebagai Penjual</button>
+        </div>
+        <p class="mini-note" id="join-role-note">Pilih role yang tersedia untuk melanjutkan ke ruang transaksi.</p>
+      </div>
+    </div>
+  </div>
+  <div class="modal hidden" id="login-modal">
+    <div class="modal-card">
+      <p class="eyebrow">Login sosial cepat</p>
+      <h3>Pilih social media untuk masuk</h3>
+      <p class="mini-note">Tidak perlu isi formulir manual. Login selesai, akun langsung siap digunakan.</p>
+      <div class="quick-provider-grid login-modal-grid">
+        <button class="primary-btn social-btn social-btn-telegram" id="telegram-direct-login" data-provider="Telegram">
+          <span class="social-logo social-logo-svg" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.7 4.3c.6-.2 1.2.3 1 .9l-3 14.2c-.1.5-.7.8-1.2.5l-4.3-3.2-2.1 2.1c-.3.3-.9.1-.9-.4v-3.1l7.7-7.2-9.6 6.1-4-1.2c-.8-.2-.8-1.3 0-1.6z"/></svg>
+          </span>
+          <span>Telegram</span>
+        </button>
+        <button class="provider-btn social-btn social-btn-google" id="google-direct-login" data-provider="Google">
+          <span class="social-logo social-logo-image" aria-hidden="true"><img src="assets/google-g-logo.svg?v=1" alt="" /></span>
+          <span>Google / Gmail</span>
+        </button>
+        <button class="provider-btn social-btn social-btn-facebook" id="facebook-direct-login" data-provider="Facebook">
+          <span class="social-logo social-logo-svg" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 21v-7.6H16l.4-3h-2.9V8.5c0-.9.3-1.5 1.6-1.5h1.5V4.3c-.3 0-1.2-.1-2.4-.1-2.4 0-4 1.4-4 4.1v2.3H8v3h2.2V21z"/></svg>
+          </span>
+          <span>Facebook</span>
+        </button>
+        <button class="provider-btn social-btn social-btn-discord" id="discord-direct-login" data-provider="Discord">
+          <span class="social-logo social-logo-svg" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 5.3A15 15 0 0 0 15.2 4l-.2.4a10.2 10.2 0 0 1 3 1.5c-2.8-1.3-5.8-1.3-8 0a10.2 10.2 0 0 1 3-1.5L12.8 4a15 15 0 0 0-3.7 1.3C6.8 8.7 6.2 12 6.4 15.1A15 15 0 0 0 11 17l.6-1a9.2 9.2 0 0 1-1.9-.9l.5-.3c1.8.8 3.8.8 5.6 0l.5.3c-.6.4-1.2.7-1.9.9l.6 1a15 15 0 0 0 4.6-1.9c.3-3.6-.5-6.9-1.7-9.8M10.4 13.1c-.6 0-1.1-.6-1.1-1.3s.5-1.3 1.1-1.3 1.1.6 1.1 1.3-.5 1.3-1.1 1.3m3.2 0c-.6 0-1.1-.6-1.1-1.3s.5-1.3 1.1-1.3 1.1.6 1.1 1.3-.5 1.3-1.1 1.3"/></svg>
+          </span>
+          <span>Discord</span>
+        </button>
+      </div>
+      <div class="topbar-actions modal-actions-end">
+        <button class="ghost-btn" id="close-login-modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal hidden" id="user-profile-modal">
+    <div class="modal-card modal-card-wide">
+      <div class="user-profile-modal-head">
+        <div class="user-profile-modal-avatar" id="user-profile-modal-avatar"></div>
+        <div>
+          <p class="eyebrow" id="user-profile-modal-role">Profil transaksi</p>
+          <h3 id="user-profile-modal-name">Informasi pengguna</h3>
+          <p class="mini-note" id="user-profile-modal-badge">Verified ✓</p>
+        </div>
+      </div>
+      <div class="user-profile-modal-grid" id="user-profile-modal-grid"></div>
+      <div class="topbar-actions modal-actions-end">
+        <button class="ghost-btn" id="close-user-profile-modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
+
+
