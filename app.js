@@ -251,7 +251,15 @@ window.addEventListener("keydown", unlockUserNotificationAudio, { once: true });
 
 bootstrap().catch((error) => {
   console.error(error);
-  setAuthStatus("Website tidak bisa menjangkau backend auth. Jalankan server Node.js lebih dulu.", true);
+  const pendingCode = new URLSearchParams(window.location.search).get("trx");
+  if (pendingCode) {
+    rememberPendingTransactionRoute(pendingCode);
+    setAuthStatus("Silakan login / daftar terlebih dahulu untuk masuk ke ruang transaksi.", true);
+    renderAll();
+    openLoginModal();
+    return;
+  }
+  setAuthStatus("Website belum bisa memuat data login. Silakan coba refresh halaman.", true);
   renderAll();
 });
 
@@ -854,6 +862,24 @@ function buildTransactionLink(code) {
   const path = `${window.location.origin}/?trx=${code}`;
   elements.sampleLink.textContent = `${window.location.host || "contohnamasitus.com"}/t/${code}`;
   return path;
+}
+
+function rememberPendingTransactionRoute(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (!normalized) return;
+  try {
+    sessionStorage.setItem("rekberwe-pending-trx", normalized);
+  } catch {}
+}
+
+function consumePendingTransactionRoute() {
+  try {
+    const value = sessionStorage.getItem("rekberwe-pending-trx") || "";
+    sessionStorage.removeItem("rekberwe-pending-trx");
+    return value;
+  } catch {
+    return "";
+  }
 }
 
 function buildJoinRoleInstruction(allowedRole) {
@@ -3068,9 +3094,10 @@ function capitalize(text) {
 
 async function handleInitialRoute() {
   const params = new URLSearchParams(window.location.search);
-  const code = params.get("trx");
+  const code = params.get("trx") || consumePendingTransactionRoute();
   if (!code) return;
   if (!state.currentUser) {
+    rememberPendingTransactionRoute(code);
     setAuthStatus("Silakan login / daftar dulu untuk membuka ruang transaksi dari link yang dibagikan.");
     openLoginModal();
     return;

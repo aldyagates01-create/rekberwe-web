@@ -1,3 +1,5 @@
+"use client";
+
 import { getInitials, formatTime } from "@/lib/format";
 
 export const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-header.svg";
@@ -82,25 +84,66 @@ export function ChatBubble({
 
 function MessageText({ text }: { text: string }) {
   const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  const shareUrl = parts.find((part) => /^https?:\/\//.test(part));
   return (
-    <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-      {parts.map((part, index) => {
-        if (/^https?:\/\//.test(part)) {
-          return (
-            <a
-              key={`${part}-${index}`}
-              href={part}
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold text-accent-blue underline"
-            >
-              {part}
-            </a>
-          );
-        }
-        return <span key={`${part}-${index}`}>{part}</span>;
-      })}
-    </p>
+    <div>
+      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+        {parts.map((part, index) => {
+          if (/^https?:\/\//.test(part)) {
+            return (
+              <a
+                key={`${part}-${index}`}
+                href={part}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-accent-blue underline"
+              >
+                {part}
+              </a>
+            );
+          }
+          return <span key={`${part}-${index}`}>{part}</span>;
+        })}
+      </p>
+      {shareUrl ? <ShareLinkActions url={shareUrl} /> : null}
+    </div>
+  );
+}
+
+function ShareLinkActions({ url }: { url: string }) {
+  const encodedUrl = encodeURIComponent(url);
+  const encodedText = encodeURIComponent(`Silakan buka link transaksi RekberWe ini: ${url}`);
+  const links = [
+    { label: "WA", href: `https://wa.me/?text=${encodedText}` },
+    { label: "FB", href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}` },
+    { label: "Telegram", href: `https://t.me/share/url?url=${encodedUrl}&text=${encodeURIComponent("Link transaksi RekberWe")}` },
+  ];
+
+  async function copyLink() {
+    await navigator.clipboard?.writeText(url);
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      <button
+        type="button"
+        onClick={copyLink}
+        className="rounded-full border border-border bg-bg/70 px-2.5 py-1 text-[10px] font-semibold text-white/80"
+      >
+        Copy
+      </button>
+      {links.map((item) => (
+        <a
+          key={item.label}
+          href={item.href}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-full border border-accent-blue/25 bg-accent-blue/10 px-2.5 py-1 text-[10px] font-semibold text-accent-blue"
+        >
+          {item.label}
+        </a>
+      ))}
+    </div>
   );
 }
 
