@@ -20,6 +20,10 @@ const adminNotificationState = {
 let adminRoomRefreshTimer = null;
 let adminChatScrollState = null;
 let adminEventSource = null;
+let adminPresenceTimer = null;
+let adminPresenceTickTimer = null;
+let adminTypingStopTimer = null;
+let adminRoomPresenceTickTimer = null;
 
 const elements = {
   adminUserCard: document.getElementById("admin-user-card"),
@@ -55,6 +59,8 @@ const elements = {
   adminRoomStatus: document.getElementById("admin-room-status"),
   adminRoomBuyerName: document.getElementById("admin-room-buyer-name"),
   adminRoomSellerName: document.getElementById("admin-room-seller-name"),
+  adminRoomBuyerState: document.getElementById("admin-room-buyer-state"),
+  adminRoomSellerState: document.getElementById("admin-room-seller-state"),
   adminRoomBuyerAvatar: document.getElementById("admin-room-buyer-avatar"),
   adminRoomSellerAvatar: document.getElementById("admin-room-seller-avatar"),
   adminProgressCreated: document.getElementById("admin-progress-created"),
@@ -86,6 +92,7 @@ const elements = {
   adminTransferQueueUploads: document.getElementById("admin-transfer-queue-uploads"),
   adminProofList: document.getElementById("admin-proof-list"),
   adminChatBox: document.getElementById("admin-chat-box"),
+  adminChatTypingIndicator: document.getElementById("admin-chat-typing-indicator"),
   adminChatForm: document.getElementById("admin-chat-form"),
   adminChatInput: document.getElementById("admin-chat-input"),
   adminProofUpload: document.getElementById("admin-proof-upload"),
@@ -145,6 +152,19 @@ elements.adminLogout?.addEventListener("click", async () => {
 
 elements.adminFeeForm.addEventListener("submit", handleSaveFeeSettings);
 elements.adminChatForm.addEventListener("submit", handleAdminSendMessage);
+elements.adminChatInput?.addEventListener("input", () => {
+  if (!state.activeTransaction?.code) return;
+  if (adminTypingStopTimer) window.clearTimeout(adminTypingStopTimer);
+  const value = String(elements.adminChatInput?.value || "").trim();
+  if (!value) {
+    sendAdminTypingState(state.activeTransaction.code, false);
+    return;
+  }
+  sendAdminTypingState(state.activeTransaction.code, true);
+  adminTypingStopTimer = window.setTimeout(() => {
+    if (state.activeTransaction?.code) sendAdminTypingState(state.activeTransaction.code, false);
+  }, 1600);
+});
 elements.adminProofUpload?.addEventListener("change", renderAdminPendingAttachments);
 elements.adminPendingAttachments?.addEventListener("click", handleAdminPendingAttachmentRemove);
 elements.adminTransferProofUpload?.addEventListener("change", renderAdminTransferProofPendingAttachments);
@@ -197,6 +217,11 @@ async function bootstrap() {
   await refreshDashboardData();
   openAdminPage("overview");
   startAdminRoomRefresh();
+  if (adminPresenceTickTimer) window.clearInterval(adminPresenceTickTimer);
+  adminPresenceTickTimer = window.setInterval(() => {
+    renderUsers(state.users);
+    renderVerificationQueue(state.users);
+  }, 15000);
 }
 
 async function refreshDashboardData() {
@@ -344,6 +369,9 @@ function setAdminButtonBadge(button, count) {
 
 function unlockAdminNotificationAudio() {
   adminNotificationState.audioUnlocked = true;
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
   window.removeEventListener("pointerdown", unlockAdminNotificationAudio);
   window.removeEventListener("keydown", unlockAdminNotificationAudio);
 }
@@ -665,6 +693,7 @@ function renderVerificationQueue(users) {
 }
 
 function renderUserCard(user) {
+  const presence = formatPresenceLabel(user.presence);
   const locationRow = user.locationVerified
     ? `
       <p>Lokasi terverifikasi: Ya</p>
@@ -679,6 +708,7 @@ function renderUserCard(user) {
       <div class="admin-item-top">
         <h4>${escapeHtml(user.displayName)}</h4>
         <div class="admin-item-actions">
+          <span class="admin-tag ${isPresenceOnline(user.presence) ? "" : "admin-tag-muted"}">${escapeHtml(presence)}</span>
           <span class="admin-tag ${user.interestedInRekber ? "" : "admin-tag-muted"}">${user.interestedInRekber ? "Calon pengguna rekber" : "Belum transaksi"}</span>
           <div class="admin-user-menu-wrap">
             <button type="button" class="ghost-btn admin-user-menu-btn" data-user-id="${escapeHtml(user.id)}" title="Kelola user">â‹¯</button>
@@ -693,6 +723,7 @@ function renderUserCard(user) {
       <p>${escapeHtml(user.provider)}: ${escapeHtml(user.socialId)}</p>
       <p>Email: ${escapeHtml(user.email || "-")}</p>
       <p>WhatsApp: ${escapeHtml(user.whatsapp || "-")}</p>
+      <p>Status aktivitas: ${escapeHtml(presence)}</p>
       ${locationRow}
       <p>Status verifikasi: ${verificationStatusLabel(user.verificationStatus, user.verified)}</p>
       ${user.banned ? `<p class="danger-text">Status akun: Diblokir admin${user.bannedReason ? ` - ${escapeHtml(user.bannedReason)}` : ""}</p>` : ""}
@@ -968,6 +999,7 @@ function renderActiveTransaction() {
   if (elements.adminRoomSellerName) elements.adminRoomSellerName.textContent = transaction.seller?.displayName || "Menunggu penjual";
   renderAdminParticipantAvatars(transaction);
   renderAdminRoomProgress(transaction);
+  renderAdminRoomPresence(transaction);
   elements.adminRoomSummary.innerHTML = buildSummaryItems(transaction).map(renderSummaryItem).join("");
   if (elements.adminRoomTimeline) {
     elements.adminRoomTimeline.innerHTML = buildAdminTransactionStatusTimeline(transaction).map(renderAdminTimelineItem).join("");
@@ -1257,6 +1289,7 @@ async function handleAdminSendMessage(event) {
     }
 
     state.activeTransaction = latestTransaction;
+    await sendAdminTypingState(state.activeTransaction.code, false);
     adminChatScrollState = { wasNearBottom: true, distanceFromBottom: 0 };
     await refreshDashboardData();
     elements.adminChatForm.reset();
@@ -1906,6 +1939,87 @@ function verificationStatusLabel(status, verified) {
   return "Belum verifikasi";
 }
 
+function formatPresenceLabel(presence) {
+  if (isPresenceOnline(presence)) return "Online";
+  if (!presence?.lastSeenAt) return "Offline";
+  return `Aktif ${formatRelativeTime(presence.lastSeenAt)}`;
+}
+
+function isPresenceOnline(presence) {
+  if (!presence?.lastSeenAt) return false;
+  return Date.now() - new Date(presence.lastSeenAt).getTime() <= 45000;
+}
+
+function getAdminPresenceStateClass(presence, isTyping = false) {
+  if (isTyping) return "typing";
+  return isPresenceOnline(presence) ? "online" : "offline";
+}
+
+async function sendAdminTypingState(code, isTyping) {
+  if (!state.currentUser || !code) return;
+  await fetchJson(`/api/transactions/${encodeURIComponent(code)}/typing`, {
+    method: "POST",
+    body: JSON.stringify({ isTyping }),
+  }).catch(() => {});
+}
+
+function applyAdminPresenceToTransaction(transaction, userId, presence) {
+  if (!transaction) return transaction;
+  const next = { ...transaction };
+  if (next.buyer?.id === userId) {
+    next.buyer = { ...next.buyer, presence };
+  }
+  if (next.seller?.id === userId) {
+    next.seller = { ...next.seller, presence };
+  }
+  return next;
+}
+
+function renderAdminRoomPresence(transaction) {
+  if (!transaction) return;
+  const typing = transaction.typing || {};
+  const buyerTyping = Boolean(transaction.buyer?.id && typing[transaction.buyer.id]);
+  const sellerTyping = Boolean(transaction.seller?.id && typing[transaction.seller.id]);
+  const anyoneTyping = Object.keys(typing).some((userId) => userId !== state.currentUser?.id);
+
+  if (elements.adminRoomBuyerState) {
+    elements.adminRoomBuyerState.textContent = buyerTyping ? "Sedang mengetik..." : formatPresenceLabel(transaction.buyer?.presence);
+    elements.adminRoomBuyerState.className = `participant-state ${getAdminPresenceStateClass(transaction.buyer?.presence, buyerTyping)}`;
+  }
+  if (elements.adminRoomSellerState) {
+    elements.adminRoomSellerState.textContent = sellerTyping ? "Sedang mengetik..." : formatPresenceLabel(transaction.seller?.presence);
+    elements.adminRoomSellerState.className = `participant-state ${getAdminPresenceStateClass(transaction.seller?.presence, sellerTyping)}`;
+  }
+  if (elements.adminChatTypingIndicator) {
+    const typingLabels = [];
+    if (buyerTyping) typingLabels.push("Pembeli");
+    if (sellerTyping) typingLabels.push("Penjual");
+    elements.adminChatTypingIndicator.classList.toggle("hidden", !anyoneTyping);
+    elements.adminChatTypingIndicator.textContent = typingLabels.length
+      ? `${typingLabels.join(" & ")} sedang mengetik...`
+      : anyoneTyping
+        ? "Sedang mengetik..."
+        : "";
+  }
+}
+
+function startAdminRoomPresenceTick() {
+  if (adminRoomPresenceTickTimer) window.clearInterval(adminRoomPresenceTickTimer);
+  adminRoomPresenceTickTimer = window.setInterval(() => {
+    if (state.activeTransaction) renderAdminRoomPresence(state.activeTransaction);
+  }, 15000);
+}
+
+function formatRelativeTime(value) {
+  const diffSeconds = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+  if (diffSeconds < 60) return `${diffSeconds} detik lalu`;
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} menit lalu`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} jam lalu`;
+  return `${Math.floor(diffHours / 24)} hari lalu`;
+}
+
 function getAdminActionConfirmation(action) {
   const confirmations = {
     request_buyer_payment: "Kirim instruksi transfer ke pembeli menggunakan rekening admin yang tersimpan?",
@@ -2199,7 +2313,16 @@ function setupAdminLiveEvents() {
     adminEventSource.close();
     adminEventSource = null;
   }
+  if (adminPresenceTimer) {
+    window.clearInterval(adminPresenceTimer);
+    adminPresenceTimer = null;
+  }
   adminEventSource = new EventSource("/api/events");
+  fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify({ activeTransactionCode: state.activeTransaction?.code || "" }) }).catch(() => {});
+  adminPresenceTimer = window.setInterval(() => {
+    fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify({ activeTransactionCode: state.activeTransaction?.code || "" }) }).catch(() => {});
+  }, 20000);
+  startAdminRoomPresenceTick();
   adminEventSource.onmessage = async (event) => {
     try {
       const payload = JSON.parse(event.data || "{}");
@@ -2208,6 +2331,27 @@ function setupAdminLiveEvents() {
       const previousTransaction = previousTransactions.find((item) => item.code === payload.code);
       let shouldPlayChatSound = false;
       let shouldPlayTransactionSound = false;
+
+      if (payload.type === "typing_updated" && payload.code) {
+        state.transactions = state.transactions.map((item) => (
+          item.code === payload.code ? { ...item, typing: payload.typing || {} } : item
+        ));
+        if (state.activeTransaction?.code === payload.code) {
+          state.activeTransaction = { ...state.activeTransaction, typing: payload.typing || {} };
+          renderAdminRoomPresence(state.activeTransaction);
+        }
+      }
+
+      if (payload.type === "presence_updated" && payload.userId) {
+        state.users = (state.users || []).map((user) => user.id === payload.userId ? { ...user, presence: payload.presence } : user);
+        state.transactions = state.transactions.map((item) => applyAdminPresenceToTransaction(item, payload.userId, payload.presence));
+        if (state.activeTransaction) {
+          state.activeTransaction = applyAdminPresenceToTransaction(state.activeTransaction, payload.userId, payload.presence);
+          renderAdminRoomPresence(state.activeTransaction);
+        }
+        renderUsers(state.users);
+        renderVerificationQueue(state.users);
+      }
 
       if (payload.type === "transaction_updated" && payload.transaction) {
         if (!previousTransaction) {
@@ -2274,6 +2418,10 @@ function setupAdminLiveEvents() {
       console.error("Event stream admin gagal:", error);
     }
   };
+  adminEventSource.addEventListener("error", () => {
+    if (adminPresenceTimer) window.clearInterval(adminPresenceTimer);
+    adminPresenceTimer = null;
+  });
 }
 
 function updateAdminNotificationBadges() {

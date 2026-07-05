@@ -95,6 +95,10 @@ const googleJwks = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2
 const uploadStorage = multer.memoryStorage();
 const upload = multer({ storage: uploadStorage, limits: { fileSize: 10 * 1024 * 1024, files: 5 } });
 const eventClients = new Set();
+const presenceState = new Map();
+const typingState = new Map();
+const PRESENCE_ONLINE_MS = 45000;
+const TYPING_ACTIVE_MS = 5000;
 
 const providers = {
   Telegram: {
@@ -265,6 +269,34 @@ app.post("/api/logout", (req, res) => {
 
 app.get("/api/events", requireAuth, (req, res) => {
   setupEventStream(req, res, req.session.user.isAdmin ? "admin" : "user", req.session.user.id);
+});
+
+app.post("/api/presence/heartbeat", requireAuth, async (req, res) => {
+  const activeTransactionCode = String(req.body.activeTransactionCode || "").trim().toUpperCase();
+  setUserPresence(req.session.user.id, req.session.user.isAdmin ? "admin" : "user", activeTransactionCode);
+  await broadcastPresenceUpdate(req.session.user.id);
+  res.json({ presence: getUserPresence(req.session.user.id) });
+});
+
+app.post("/api/transactions/:code/typing", requireAuth, async (req, res) => {
+  const code = String(req.params.code || "").toUpperCase();
+  const isTyping = Boolean(req.body.isTyping);
+  const current = await getTransactionByCode(code);
+  if (!current) {
+    res.status(404).json({ message: "Transaksi tidak ditemukan." });
+    return;
+  }
+  const isParticipant = current.buyer?.id === req.session.user.id || current.seller?.id === req.session.user.id || req.session.user.isAdmin;
+  if (!isParticipant) {
+    res.status(403).json({ message: "Tidak punya akses ke transaksi ini." });
+    return;
+  }
+  setUserPresence(req.session.user.id, req.session.user.isAdmin ? "admin" : "user", code);
+  setTypingState(code, req.session.user.id, isTyping);
+  await broadcastEvent("typing_updated", code, {
+    typing: buildTypingPayload(code),
+  });
+  res.json({ ok: true });
 });
 
 app.get("/api/me/dashboard", requireAuth, async (req, res) => {
@@ -472,7 +504,7 @@ app.get("/api/transactions/:code", async (req, res) => {
     res.status(404).json({ message: "Transaksi tidak ditemukan." });
     return;
   }
-  res.json({ transaction });
+  res.json({ transaction: enrichTransactionPresence(transaction) });
 });
 
 app.post("/api/transactions", requireAuth, async (req, res) => {
@@ -744,7 +776,7 @@ app.post("/api/transactions/:code/actions", requireAuth, async (req, res) => {
 
 app.get("/api/admin/transactions", requireAdmin, async (_req, res) => {
   const transactions = (await getAllTransactions()).map((transaction) => ({
-    ...transaction,
+    ...enrichTransactionPresence(transaction),
     hasDispute: transaction.paymentStatus === "Sengketa dibuka",
   }));
   res.json({ transactions });
@@ -810,6 +842,7 @@ app.get("/api/admin/users", requireAdmin, async (_req, res) => {
     ).length;
     return {
       ...user,
+      presence: getUserPresence(user.id),
       transactionCount,
       interestedInRekber: transactionCount > 0,
       needsVerificationReview: user.verificationStatus === "pending",
@@ -1486,6 +1519,8 @@ function setupEventStream(req, res, audience, userId) {
 
   const client = { res, audience, userId };
   eventClients.add(client);
+  setUserPresence(userId, audience, "");
+  broadcastPresenceUpdate(userId).catch(() => {});
   res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
 
   const heartbeat = setInterval(() => {
@@ -1495,11 +1530,103 @@ function setupEventStream(req, res, audience, userId) {
   req.on("close", () => {
     clearInterval(heartbeat);
     eventClients.delete(client);
+    setUserPresence(userId, audience, "");
+    broadcastPresenceUpdate(userId).catch(() => {});
+  });
+}
+
+function setUserPresence(userId, role = "user", activeTransactionCode = "") {
+  if (!userId) return;
+  const previous = presenceState.get(userId) || {};
+  presenceState.set(userId, {
+    ...previous,
+    userId,
+    role,
+    activeTransactionCode,
+    lastSeenAt: new Date().toISOString(),
+  });
+}
+
+function getUserPresence(userId) {
+  const item = presenceState.get(userId);
+  if (!item?.lastSeenAt) {
+    return { isOnline: false, lastSeenAt: "" };
+  }
+  const lastSeenTime = new Date(item.lastSeenAt).getTime();
+  return {
+    ...item,
+    isOnline: Date.now() - lastSeenTime <= PRESENCE_ONLINE_MS,
+  };
+}
+
+function getAdminPresence() {
+  const adminEntries = Array.from(presenceState.values()).filter((item) => item.role === "admin");
+  const latest = adminEntries
+    .map((item) => getUserPresence(item.userId))
+    .sort((left, right) => new Date(right.lastSeenAt || 0).getTime() - new Date(left.lastSeenAt || 0).getTime())[0];
+  return latest || { isOnline: false, lastSeenAt: "" };
+}
+
+function setTypingState(code, userId, isTyping) {
+  const key = String(code || "").toUpperCase();
+  if (!key || !userId) return;
+  const users = typingState.get(key) || {};
+  if (isTyping) {
+    users[userId] = new Date().toISOString();
+  } else {
+    delete users[userId];
+  }
+  typingState.set(key, users);
+}
+
+function buildTypingPayload(code) {
+  const users = typingState.get(String(code || "").toUpperCase()) || {};
+  const now = Date.now();
+  return Object.fromEntries(
+    Object.entries(users).filter(([, value]) => now - new Date(value).getTime() <= TYPING_ACTIVE_MS),
+  );
+}
+
+function enrichUserPresence(user) {
+  if (!user) return user;
+  return {
+    ...user,
+    presence: getUserPresence(user.id),
+  };
+}
+
+function enrichTransactionPresence(transaction) {
+  if (!transaction) return transaction;
+  return {
+    ...transaction,
+    buyer: enrichUserPresence(transaction.buyer),
+    seller: enrichUserPresence(transaction.seller),
+    adminPresence: getAdminPresence(),
+    typing: buildTypingPayload(transaction.code),
+  };
+}
+
+async function broadcastPresenceUpdate(userId) {
+  const presence = getUserPresence(userId);
+  await broadcastEvent("presence_updated", presence.activeTransactionCode || null, {
+    userId,
+    presence,
+    adminPresence: getAdminPresence(),
   });
 }
 
 async function broadcastEvent(type, code, payload = {}) {
-  const transaction = payload.transaction || (code ? await getTransactionByCode(code) : null);
+  let transaction = payload.transaction || null;
+  if (!transaction && code) {
+    transaction = await getTransactionByCode(code);
+  }
+  if (!transaction && type === "presence_updated" && payload.presence?.activeTransactionCode) {
+    transaction = await getTransactionByCode(payload.presence.activeTransactionCode);
+  }
+  const eventPayload = {
+    ...payload,
+    transaction: payload.transaction ? enrichTransactionPresence(payload.transaction) : payload.transaction,
+  };
   for (const client of eventClients) {
     if (type === "support_updated") {
       const supportVisible = client.audience === "admin" || client.userId === payload.userId;
@@ -1507,11 +1634,21 @@ async function broadcastEvent(type, code, payload = {}) {
     } else if (type === "verification_updated") {
       const verificationVisible = client.audience === "admin" || client.userId === payload.userId;
       if (!verificationVisible) continue;
+    } else if (type === "presence_updated") {
+      const visiblePresence = client.audience === "admin"
+        || client.userId === payload.userId
+        || (transaction && (transaction.buyer?.id === client.userId || transaction.seller?.id === client.userId));
+      if (!visiblePresence) continue;
+    } else if (type === "typing_updated") {
+      if (client.audience !== "admin" && transaction) {
+        const visibleToUser = transaction.buyer?.id === client.userId || transaction.seller?.id === client.userId;
+        if (!visibleToUser) continue;
+      }
     } else if (client.audience !== "admin" && transaction) {
       const visibleToUser = transaction.buyer?.id === client.userId || transaction.seller?.id === client.userId;
       if (!visibleToUser) continue;
     }
-    client.res.write(`data: ${JSON.stringify({ type, code, ...payload })}\n\n`);
+    client.res.write(`data: ${JSON.stringify({ type, code, ...eventPayload })}\n\n`);
   }
 }
 

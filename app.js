@@ -35,6 +35,8 @@ const notificationState = {
   lastSoundAt: 0,
 };
 
+const PRESENCE_ONLINE_MS = 45000;
+
 const sellerBankUiState = {
   dirty: false,
   lastLoadedSnapshot: "",
@@ -76,6 +78,7 @@ const elements = {
   mobileActiveRekberList: document.getElementById("mobile-active-rekber-list"),
   mobileHistoryRekberList: document.getElementById("mobile-history-rekber-list"),
   mobileDashboardLearnMore: document.getElementById("mobile-dashboard-learn-more"),
+  mobileDashboardSeeAll: document.getElementById("mobile-dashboard-see-all"),
   mobileQuickCreate: document.getElementById("mobile-quick-create"),
   mobileQuickTransactions: document.getElementById("mobile-quick-transactions"),
   mobileQuickGuide: document.getElementById("mobile-quick-guide"),
@@ -89,6 +92,7 @@ const elements = {
   mobileChatHeader: document.getElementById("mobile-chat-header"),
   mobileChatBack: document.getElementById("mobile-chat-back"),
   mobileChatHeaderTitle: document.getElementById("mobile-chat-header-title"),
+  mobileChatHeaderOnline: document.getElementById("mobile-chat-header-online"),
   mobileChatHeaderBadge: document.getElementById("mobile-chat-header-badge"),
   mobileRoomStatusBadge: document.getElementById("mobile-room-status-badge"),
   mobileRoomPrice: document.getElementById("mobile-room-price"),
@@ -102,6 +106,10 @@ const elements = {
   roomPaymentStatus: document.getElementById("room-payment-status"),
   roomBuyer: document.getElementById("room-buyer"),
   roomSeller: document.getElementById("room-seller"),
+  roomBuyerState: document.getElementById("room-buyer-state"),
+  roomSellerState: document.getElementById("room-seller-state"),
+  roomAdminState: document.getElementById("room-admin-state"),
+  chatTypingIndicator: document.getElementById("chat-typing-indicator"),
   roomBuyerAvatar: document.getElementById("room-buyer-avatar"),
   roomSellerAvatar: document.getElementById("room-seller-avatar"),
   roomProgressCreated: document.getElementById("room-progress-created"),
@@ -235,6 +243,9 @@ const elements = {
 let roomRefreshTimer = null;
 let roomChatScrollState = null;
 let liveEventSource = null;
+let userPresenceTimer = null;
+let presenceTickTimer = null;
+let typingStopTimer = null;
 let confirmModalResolver = null;
 let supportThreadTimer = null;
 let locationConsentResolver = null;
@@ -248,6 +259,7 @@ bindScrollButtons();
 bindForms();
 window.addEventListener("pointerdown", unlockUserNotificationAudio, { once: true });
 window.addEventListener("keydown", unlockUserNotificationAudio, { once: true });
+window.addEventListener("touchstart", unlockUserNotificationAudio, { once: true, passive: true });
 
 bootstrap().catch((error) => {
   console.error(error);
@@ -499,6 +511,9 @@ function setButtonBadge(button, count) {
 
 function unlockUserNotificationAudio() {
   notificationState.audioUnlocked = true;
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
   window.removeEventListener("pointerdown", unlockUserNotificationAudio);
   window.removeEventListener("keydown", unlockUserNotificationAudio);
 }
@@ -508,6 +523,7 @@ function playUserNotificationSound(kind = "chat") {
   const now = Date.now();
   if (now - notificationState.lastSoundAt < 1200) return;
   notificationState.lastSoundAt = now;
+  if (navigator.vibrate) navigator.vibrate([80, 40, 120]);
   const customSound = state.providerConfig?.notificationSounds?.user?.url || state.providerConfig?.notificationSounds?.admin?.url || "";
   if (customSound) {
     const audio = new Audio(customSound);
@@ -518,6 +534,7 @@ function playUserNotificationSound(kind = "chat") {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) return;
   const context = new AudioContextClass();
+  context.resume?.().catch(() => {});
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   oscillator.type = "sine";
@@ -531,6 +548,103 @@ function playUserNotificationSound(kind = "chat") {
   oscillator.start(start);
   oscillator.stop(start + (kind === "transaction" ? 0.34 : 0.26));
   oscillator.onended = () => context.close().catch(() => {});
+}
+
+function isPresenceOnline(presence) {
+  if (!presence?.lastSeenAt) return false;
+  return Date.now() - new Date(presence.lastSeenAt).getTime() <= PRESENCE_ONLINE_MS;
+}
+
+function formatRelativeLastSeen(value) {
+  const diffSeconds = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+  if (diffSeconds < 60) return `${diffSeconds} detik lalu`;
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} menit lalu`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} jam lalu`;
+  return `${Math.floor(diffHours / 24)} hari lalu`;
+}
+
+function formatPresenceLabel(presence) {
+  if (isPresenceOnline(presence)) return "Online";
+  if (!presence?.lastSeenAt) return "Offline";
+  return `Aktif ${formatRelativeLastSeen(presence.lastSeenAt)}`;
+}
+
+function getPresenceStateClass(presence, isTyping = false) {
+  if (isTyping) return "typing";
+  return isPresenceOnline(presence) ? "online" : "offline";
+}
+
+async function sendTypingState(code, isTyping) {
+  if (!state.currentUser || !code) return;
+  await fetchJson(`/api/transactions/${encodeURIComponent(code)}/typing`, {
+    method: "POST",
+    body: JSON.stringify({ isTyping }),
+  }).catch(() => {});
+}
+
+function applyPresenceToTransaction(transaction, userId, presence, adminPresence) {
+  if (!transaction) return transaction;
+  const next = { ...transaction };
+  if (next.buyer?.id === userId) {
+    next.buyer = { ...next.buyer, presence };
+  }
+  if (next.seller?.id === userId) {
+    next.seller = { ...next.seller, presence };
+  }
+  if (adminPresence) {
+    next.adminPresence = adminPresence;
+  }
+  return next;
+}
+
+function renderRoomPresence(transaction) {
+  if (!transaction) return;
+  const role = getCurrentUserTransactionRole(transaction);
+  const counterparty = role === "buyer" ? transaction.seller : role === "seller" ? transaction.buyer : null;
+  const typing = transaction.typing || {};
+  const counterpartyTyping = Boolean(counterparty?.id && typing[counterparty.id]);
+  const anyoneTyping = Object.keys(typing).some((userId) => userId !== state.currentUser?.id);
+
+  if (elements.roomBuyerState) {
+    const buyerTyping = Boolean(transaction.buyer?.id && typing[transaction.buyer.id]);
+    elements.roomBuyerState.textContent = buyerTyping ? "Sedang mengetik..." : formatPresenceLabel(transaction.buyer?.presence);
+    elements.roomBuyerState.className = `participant-state ${getPresenceStateClass(transaction.buyer?.presence, buyerTyping)}`;
+  }
+  if (elements.roomSellerState) {
+    const sellerTyping = Boolean(transaction.seller?.id && typing[transaction.seller.id]);
+    elements.roomSellerState.textContent = sellerTyping ? "Sedang mengetik..." : formatPresenceLabel(transaction.seller?.presence);
+    elements.roomSellerState.className = `participant-state ${getPresenceStateClass(transaction.seller?.presence, sellerTyping)}`;
+  }
+  if (elements.roomAdminState) {
+    elements.roomAdminState.textContent = formatPresenceLabel(transaction.adminPresence);
+    elements.roomAdminState.className = `participant-state ${getPresenceStateClass(transaction.adminPresence)}`;
+  }
+
+  const headerLabel = counterpartyTyping
+    ? "Sedang mengetik..."
+    : formatPresenceLabel(counterparty?.presence || transaction.adminPresence);
+  const headerOnline = counterpartyTyping || isPresenceOnline(counterparty?.presence) || isPresenceOnline(transaction.adminPresence);
+  if (elements.mobileChatHeaderOnline) {
+    elements.mobileChatHeaderOnline.textContent = counterpartyTyping ? "Sedang mengetik..." : `● ${headerLabel}`;
+    elements.mobileChatHeaderOnline.style.color = headerOnline ? "#22c55e" : "#93a4c3";
+  }
+  if (elements.chatTypingIndicator) {
+    elements.chatTypingIndicator.classList.toggle("hidden", !anyoneTyping);
+    elements.chatTypingIndicator.textContent = counterpartyTyping
+      ? "Lawannya sedang mengetik..."
+      : anyoneTyping
+        ? "Sedang mengetik..."
+        : "";
+  }
+}
+
+function startPresenceTick() {
+  if (presenceTickTimer) window.clearInterval(presenceTickTimer);
+  presenceTickTimer = window.setInterval(() => {
+    if (state.activeTransaction) renderRoomPresence(state.activeTransaction);
+  }, 15000);
 }
 
 function bindProviderButtons() {
@@ -598,11 +712,15 @@ function bindForms() {
     state.transactionScreen = "list";
     openWorkspaceSection("transactions");
   });
+  elements.mobileDashboardSeeAll?.addEventListener("click", () => {
+    state.transactionScreen = "list";
+    openWorkspaceSection("transactions");
+  });
   elements.mobileQuickGuide?.addEventListener("click", () => {
-    openMobileDashboardDetail("workspace-terms-list");
+    window.location.href = "/security-guide";
   });
   elements.mobileQuickSecurity?.addEventListener("click", () => {
-    window.location.href = "/security-guide";
+    openMobileDashboardDetail("workspace-terms-list");
   });
   elements.mobileDashboardLearnMore?.addEventListener("click", () => {
     openMobileDashboardDetail("workspace-public-fee-list");
@@ -661,6 +779,19 @@ function bindForms() {
   elements.joinAsSeller.addEventListener("click", () => handleRoleJoin("seller"));
   elements.backToTransactionList?.addEventListener("click", handleWorkspaceBackNavigation);
   elements.chatForm.addEventListener("submit", handleSendMessage);
+  elements.chatInput?.addEventListener("input", () => {
+    if (!state.activeTransaction?.code) return;
+    if (typingStopTimer) window.clearTimeout(typingStopTimer);
+    const value = String(elements.chatInput?.value || "").trim();
+    if (!value) {
+      sendTypingState(state.activeTransaction.code, false);
+      return;
+    }
+    sendTypingState(state.activeTransaction.code, true);
+    typingStopTimer = window.setTimeout(() => {
+      if (state.activeTransaction?.code) sendTypingState(state.activeTransaction.code, false);
+    }, 1600);
+  });
   elements.proofUpload?.addEventListener("change", renderPendingAttachments);
   elements.pendingAttachments?.addEventListener("click", handlePendingAttachmentRemove);
   elements.markPaid?.addEventListener("click", () => handleTransactionAction("mark_paid"));
@@ -758,6 +889,14 @@ async function handleLogout() {
   if (liveEventSource) {
     liveEventSource.close();
     liveEventSource = null;
+  }
+  if (userPresenceTimer) {
+    window.clearInterval(userPresenceTimer);
+    userPresenceTimer = null;
+  }
+  if (presenceTickTimer) {
+    window.clearInterval(presenceTickTimer);
+    presenceTickTimer = null;
   }
   await fetchJson("/api/logout", { method: "POST" });
   state.currentUser = null;
@@ -1141,6 +1280,7 @@ async function handleSendMessage(event) {
     }
 
     state.activeTransaction = latestTransaction;
+    await sendTypingState(state.activeTransaction.code, false);
     roomChatScrollState = { wasNearBottom: true, distanceFromBottom: 0 };
     await refreshTransactions();
     await refreshDashboard();
@@ -2388,6 +2528,7 @@ function renderRoom(transaction) {
   enterRoomMode();
   renderRoomParticipantAvatars(transaction);
   renderRoomProgress(transaction);
+  renderRoomPresence(transaction);
   elements.roomSummary.innerHTML = buildSummaryItems(transaction).map(renderSummaryItem).join("");
   if (elements.roomTimeline) {
     elements.roomTimeline.innerHTML = buildTransactionStatusTimeline(transaction).map(renderTimelineItem).join("");
@@ -3473,9 +3614,22 @@ function setupLiveEvents() {
     liveEventSource.close();
     liveEventSource = null;
   }
+  if (userPresenceTimer) {
+    window.clearInterval(userPresenceTimer);
+    userPresenceTimer = null;
+  }
+  if (presenceTickTimer) {
+    window.clearInterval(presenceTickTimer);
+    presenceTickTimer = null;
+  }
   if (!state.currentUser) return;
 
   liveEventSource = new EventSource("/api/events");
+  fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify({ activeTransactionCode: state.activeTransaction?.code || "" }) }).catch(() => {});
+  userPresenceTimer = window.setInterval(() => {
+    fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify({ activeTransactionCode: state.activeTransaction?.code || "" }) }).catch(() => {});
+  }, 20000);
+  startPresenceTick();
   liveEventSource.onmessage = async (event) => {
     try {
       const payload = JSON.parse(event.data || "{}");
@@ -3485,6 +3639,23 @@ function setupLiveEvents() {
       let shouldPlayChatSound = false;
       let shouldPlayTransactionSound = false;
 
+      if (payload.type === "typing_updated" && payload.code) {
+        state.transactions = state.transactions.map((item) => (
+          item.code === payload.code ? { ...item, typing: payload.typing || {} } : item
+        ));
+        if (state.activeTransaction?.code === payload.code) {
+          state.activeTransaction = { ...state.activeTransaction, typing: payload.typing || {} };
+          renderRoomPresence(state.activeTransaction);
+        }
+      }
+
+      if (payload.type === "presence_updated" && payload.userId) {
+        state.transactions = state.transactions.map((item) => applyPresenceToTransaction(item, payload.userId, payload.presence, payload.adminPresence));
+        if (state.activeTransaction) {
+          state.activeTransaction = applyPresenceToTransaction(state.activeTransaction, payload.userId, payload.presence, payload.adminPresence);
+          renderRoomPresence(state.activeTransaction);
+        }
+      }
       if (payload.type === "transaction_updated" && payload.transaction) {
         if (!previousTransaction) {
           shouldPlayTransactionSound = true;
@@ -3517,9 +3688,11 @@ function setupLiveEvents() {
         renderProfile();
         renderCurrentUser();
         if (payload.user.verificationStatus === "verified" && previousStatus !== "verified") {
+          playUserNotificationSound("transaction");
           window.alert("Verifikasi Anda sudah disetujui admin. Akun sekarang sudah terverifikasi.");
         }
         if (payload.user.verificationStatus === "revision_required" && previousStatus !== "revision_required") {
+          playUserNotificationSound("chat");
           window.alert(`Admin meminta perbaikan verifikasi:\n\n${payload.user.verificationNote || "Silakan perbaiki data verifikasi Anda."}`);
         }
         if (payload.user.banned && !previousBanned) {
@@ -3551,6 +3724,10 @@ function setupLiveEvents() {
       console.error("Event stream user gagal:", error);
     }
   };
+  liveEventSource.addEventListener("error", () => {
+    if (userPresenceTimer) window.clearInterval(userPresenceTimer);
+    userPresenceTimer = null;
+  });
 }
 
 

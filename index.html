@@ -338,40 +338,48 @@
               <section class="mobile-dashboard-shell">
                 <article class="mobile-dashboard-hero-card">
                   <div class="mobile-dashboard-hero-copy">
-                    <p class="mobile-dashboard-hero-eyebrow">Transaksi aman</p>
-                    <h3>Semua lebih tenang bersama RekberWe.</h3>
-                    <p>Kelola transaksi, cek status, dan hubungi admin langsung dari dashboard mobile.</p>
+                    <h3>Transaksi Aman,<br />Semua Lebih Tenang</h3>
+                    <p>RekberWe melindungi setiap transaksi anda dari awal sampai selesai.</p>
                     <div class="mobile-dashboard-hero-actions">
-                      <button type="button" class="ghost-btn mobile-dashboard-hero-btn" id="mobile-dashboard-learn-more">Pelajari lebih lanjut</button>
+                      <button type="button" class="ghost-btn mobile-dashboard-hero-btn" id="mobile-dashboard-learn-more">Pelajari Lebih Lanjut ›</button>
                     </div>
                   </div>
                   <div class="mobile-dashboard-hero-visual" aria-hidden="true">
-                    <span>🛡️</span>
+                    <span class="mobile-hero-shield">✓</span>
                   </div>
                 </article>
 
                 <section class="mobile-quick-actions-card">
                   <div class="mobile-section-head">
                     <h4>Aksi cepat</h4>
+                    <button type="button" class="mobile-section-link" id="mobile-dashboard-see-all">Lihat Semua</button>
                   </div>
                   <div class="mobile-quick-actions-grid">
                     <button type="button" class="mobile-quick-action-btn" id="mobile-quick-create">
-                      <span class="mobile-quick-action-icon">＋</span>
+                      <span class="mobile-quick-action-icon icon-purple" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                      </span>
                       <strong>Buat Transaksi</strong>
                       <small>Mulai transaksi baru</small>
                     </button>
                     <button type="button" class="mobile-quick-action-btn" id="mobile-quick-transactions">
-                      <span class="mobile-quick-action-icon">☰</span>
+                      <span class="mobile-quick-action-icon icon-blue" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="12" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                      </span>
                       <strong>Cek Transaksi</strong>
                       <small>Lihat status transaksi</small>
                     </button>
                     <button type="button" class="mobile-quick-action-btn" id="mobile-quick-guide">
-                      <span class="mobile-quick-action-icon">✓</span>
+                      <span class="mobile-quick-action-icon icon-green" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 4 6.5V11c0 4.2 3.1 7.9 8 9 4.9-1.1 8-4.8 8-9V6.5L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                      </span>
                       <strong>Jaminan Rekber</strong>
-                      <small>Aturan perlindungan</small>
+                      <small>Tentang perlindungan</small>
                     </button>
                     <button type="button" class="mobile-quick-action-btn" id="mobile-quick-security">
-                      <span class="mobile-quick-action-icon">?</span>
+                      <span class="mobile-quick-action-icon icon-orange" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9.2a2.5 2.5 0 1 1 4.2 1.8c-.7.6-1.2 1-1.2 1.8v.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17.2" r="1" fill="currentColor"/></svg>
+                      </span>
                       <strong>Cara Penggunaan</strong>
                       <small>Panduan pengguna</small>
                     </button>
@@ -562,7 +570,7 @@
                 </button>
                 <div class="mobile-chat-header-info">
                   <span class="mobile-chat-header-title" id="mobile-chat-header-title">Transaksi</span>
-                  <span class="mobile-chat-header-online">● Online</span>
+                  <span class="mobile-chat-header-online" id="mobile-chat-header-online">● Offline</span>
                 </div>
                 <span class="mobile-chat-header-badge" id="mobile-chat-header-badge">Memuat</span>
                 <button type="button" class="mobile-chat-header-menu" aria-label="Menu lainnya">⋮</button>
@@ -598,7 +606,7 @@
                     <div class="participant-copy">
                       <span class="participant-label">Pembeli</span>
                       <strong id="room-buyer">-</strong>
-                      <span class="participant-state online">Online</span>
+                      <span class="participant-state offline" id="room-buyer-state">Offline</span>
                     </div>
                   </article>
                   <article class="participant-card participant-admin-card">
@@ -608,7 +616,7 @@
                     <div class="participant-copy">
                       <span class="participant-label">Admin Rekber</span>
                       <strong>RekberWE.id</strong>
-                      <span class="participant-role-badge admin">ADMIN</span>
+                      <span class="participant-state offline" id="room-admin-state">Offline</span>
                     </div>
                   </article>
                   <article class="participant-card participant-seller-card">
@@ -616,7 +624,7 @@
                     <div class="participant-copy">
                       <span class="participant-label">Penjual</span>
                       <strong id="room-seller">-</strong>
-                      <span class="participant-state online">Online</span>
+                      <span class="participant-state offline" id="room-seller-state">Offline</span>
                     </div>
                   </article>
                 </section>
@@ -674,6 +682,7 @@
                     <span class="chat-room-alert-icon">i</span>
                     <p>Jangan pernah melakukan transaksi di luar platform. Semua bukti dan percakapan akan disimpan di ruang ini.</p>
                   </div>
+                  <div class="chat-typing-indicator hidden" id="chat-typing-indicator">Sedang mengetik...</div>
                   <div class="chat-box" id="chat-box"></div>
                   <form class="seller-bank-form hidden" id="seller-bank-form">
                     <label>

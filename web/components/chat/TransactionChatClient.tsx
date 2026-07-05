@@ -17,6 +17,8 @@ import {
   isSystemMessage,
   runAction,
   sendMessage,
+  sendPresenceHeartbeat,
+  sendTypingState,
   updateSellerBankDetails,
   uploadProof,
 } from "@/lib/transaction";
@@ -31,6 +33,10 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
   const router = useRouter();
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const notificationUnlockedRef = useRef(false);
+  const lastMessageCountRef = useRef(0);
+  const userRef = useRef<SessionUser | null>(null);
+  const typingStopRef = useRef<number | null>(null);
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [message, setMessage] = useState("");
@@ -42,6 +48,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [presenceTick, setPresenceTick] = useState(0);
 
   const role = useMemo(
     () => (transaction ? getUserRole(transaction, user?.id) : null),
@@ -72,6 +79,12 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
   );
   const showSellerBankEditor = showSellerBankForm && (!hasSellerBankDetails || editingBank);
   const showSellerBankSummary = showSellerBankForm && hasSellerBankDetails && !editingBank;
+  const typingUserIds = Object.keys(transaction?.typing || {}).filter((userId) => userId !== user?.id);
+  const isCounterpartyTyping = typingUserIds.length > 0;
+  const presenceText = useMemo(
+    () => getTransactionPresenceText(transaction, role),
+    [transaction, role, presenceTick],
+  );
 
   const getAvatarUrl = useCallback(
     (senderUserId: string | null, senderTitle: string) => {
@@ -116,16 +129,64 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
   }, [code, refresh, router]);
 
   useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    lastMessageCountRef.current = transaction?.messages?.length || 0;
+  }, [transaction?.messages?.length]);
+
+  useEffect(() => {
+    const unlock = () => {
+      notificationUnlockedRef.current = true;
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    window.addEventListener("touchstart", unlock, { once: true, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    sendPresenceHeartbeat(code).catch(() => {});
+    const timer = window.setInterval(() => {
+      sendPresenceHeartbeat(code).catch(() => {});
+      setPresenceTick((value) => value + 1);
+    }, 20000);
+    const presenceTimer = window.setInterval(() => {
+      setPresenceTick((value) => value + 1);
+    }, 15000);
+    return () => {
+      window.clearInterval(timer);
+      window.clearInterval(presenceTimer);
+    };
+  }, [code, user]);
+
+  useEffect(() => {
     const source = new EventSource("/api/events", { withCredentials: true });
     source.onmessage = async (event) => {
       try {
         const payload = JSON.parse(event.data);
         if (payload.type === "transaction_updated" && payload.code === code) {
           if (payload.transaction) {
+            maybePlayIncomingNotification(payload.transaction);
             setTransaction(payload.transaction);
           } else {
             await refresh();
           }
+        }
+        if (payload.type === "typing_updated" && payload.code === code) {
+          setTransaction((current) => current ? { ...current, typing: payload.typing || {} } : current);
+        }
+        if (payload.type === "presence_updated") {
+          setTransaction((current) => updateTransactionPresence(current, payload.userId, payload.presence, payload.adminPresence));
         }
       } catch {
         // ignore malformed events
@@ -133,6 +194,22 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     };
     return () => source.close();
   }, [code, refresh]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (typingStopRef.current) window.clearTimeout(typingStopRef.current);
+    if (!message.trim()) {
+      sendTypingState(code, false).catch(() => {});
+      return;
+    }
+    sendTypingState(code, true).catch(() => {});
+    typingStopRef.current = window.setTimeout(() => {
+      sendTypingState(code, false).catch(() => {});
+    }, 1600);
+    return () => {
+      if (typingStopRef.current) window.clearTimeout(typingStopRef.current);
+    };
+  }, [code, message, user]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -162,6 +239,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     setError("");
     try {
       const payload = await sendMessage(code, text);
+      await sendTypingState(code, false).catch(() => {});
       setTransaction(payload.transaction);
       setMessage("");
     } catch (sendError) {
@@ -169,6 +247,41 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     } finally {
       setSending(false);
     }
+  }
+
+  function maybePlayIncomingNotification(nextTransaction: Transaction) {
+    const previousCount = lastMessageCountRef.current;
+    const nextCount = nextTransaction.messages?.length || 0;
+    const lastMessage = nextTransaction.messages?.[nextCount - 1];
+    if (nextCount <= previousCount || !lastMessage || lastMessage.senderUserId === userRef.current?.id) return;
+    playMobileNotificationSound();
+    if (document.hidden && "Notification" in window && Notification.permission === "granted") {
+      new Notification("Pesan baru RekberWE", {
+        body: `${lastMessage.sender}: ${lastMessage.text || "Mengirim pesan baru."}`,
+      });
+    }
+  }
+
+  function playMobileNotificationSound() {
+    if (!notificationUnlockedRef.current) return;
+    if (navigator.vibrate) navigator.vibrate([80, 40, 120]);
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const context = new AudioContextClass();
+    context.resume?.().catch(() => {});
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = 920;
+    gain.gain.value = 0.001;
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    const start = context.currentTime;
+    gain.gain.exponentialRampToValueAtTime(0.08, start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.32);
+    oscillator.start(start);
+    oscillator.stop(start + 0.34);
+    oscillator.onended = () => context.close().catch(() => {});
   }
 
   async function handleUpload(files: FileList | null) {
@@ -251,6 +364,8 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
       <ChatHeader
         code={transaction.code}
         status={transaction.paymentStatus}
+        presenceText={presenceText}
+        isTyping={isCounterpartyTyping}
         onBack={() => router.push("/")}
       />
 
@@ -422,4 +537,50 @@ function getActionConfirmation(action: TransactionActionKey) {
   if (action === "goods_received") return "Konfirmasi bahwa item sudah diterima dan aman?";
   if (action === "mark_paid") return "Konfirmasi bahwa pembayaran sudah dikirim ke admin?";
   return "";
+}
+
+function getTransactionPresenceText(transaction: Transaction | null, role: "buyer" | "seller" | null) {
+  if (!transaction) return "Offline";
+  const counterparty = role === "buyer" ? transaction.seller : role === "seller" ? transaction.buyer : null;
+  if (isPresenceOnline(counterparty?.presence)) return "Online";
+  if (isPresenceOnline(transaction.adminPresence)) return "Admin online";
+  const lastSeenAt = counterparty?.presence?.lastSeenAt || transaction.adminPresence?.lastSeenAt || "";
+  if (!lastSeenAt) return "Offline";
+  return `Aktif ${formatRelativeLastSeen(lastSeenAt)}`;
+}
+
+function isPresenceOnline(presence?: Transaction["adminPresence"]) {
+  if (!presence?.lastSeenAt) return false;
+  return Date.now() - new Date(presence.lastSeenAt).getTime() <= 45000;
+}
+
+function formatRelativeLastSeen(value: string) {
+  const diffSeconds = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+  if (diffSeconds < 60) return `${diffSeconds} detik lalu`;
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} menit lalu`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} jam lalu`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} hari lalu`;
+}
+
+function updateTransactionPresence(
+  transaction: Transaction | null,
+  userId?: string,
+  presence?: Transaction["adminPresence"],
+  adminPresence?: Transaction["adminPresence"],
+) {
+  if (!transaction) return transaction;
+  const next = { ...transaction };
+  if (next.buyer?.id === userId) {
+    next.buyer = { ...next.buyer, presence };
+  }
+  if (next.seller?.id === userId) {
+    next.seller = { ...next.seller, presence };
+  }
+  if (adminPresence) {
+    next.adminPresence = adminPresence;
+  }
+  return next;
 }

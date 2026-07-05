@@ -296,7 +296,7 @@
                   <div class="participant-copy">
                     <span class="participant-label">Pembeli</span>
                     <strong id="admin-room-buyer-name">-</strong>
-                    <span class="participant-state online">Online</span>
+                    <span class="participant-state offline" id="admin-room-buyer-state">Offline</span>
                   </div>
                 </article>
                 <article class="participant-card participant-admin-card">
@@ -314,7 +314,7 @@
                   <div class="participant-copy">
                     <span class="participant-label">Penjual</span>
                     <strong id="admin-room-seller-name">-</strong>
-                    <span class="participant-state online">Online</span>
+                    <span class="participant-state offline" id="admin-room-seller-state">Offline</span>
                   </div>
                 </article>
               </section>
@@ -370,6 +370,7 @@
                     <span class="chat-room-alert-icon">i</span>
                     <p>Semua chat, bukti transfer, dan tindakan admin terekam di ruang transaksi ini untuk kebutuhan sengketa.</p>
                   </div>
+                  <div class="chat-typing-indicator hidden" id="admin-chat-typing-indicator">Sedang mengetik...</div>
                   <div class="chat-box" id="admin-chat-box"></div>
                   <div class="room-summary-actions room-chat-actions-top room-chat-actions-inline">
                     <button type="button" class="ghost-btn" id="admin-request-payment">Minta transfer ke admin</button>

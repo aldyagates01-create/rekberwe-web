@@ -4002,6 +4002,30 @@ a.primary-btn.submit-btn {
   box-shadow: 0 0 10px rgba(53, 212, 136, 0.65);
 }
 
+.participant-state.offline::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: #6d7894;
+}
+
+.participant-state.typing {
+  color: #79a8ff;
+}
+
+.chat-typing-indicator {
+  padding: 6px 14px 0;
+  font-size: 0.72rem;
+  color: #79a8ff;
+}
+
+.chat-typing-indicator.hidden {
+  display: none !important;
+}
+
 .participant-role-badge {
   width: fit-content;
   font-size: 0.68rem;
@@ -6139,11 +6163,16 @@ a.primary-btn.submit-btn {
 
   .mobile-dashboard-hero-card {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 118px;
-    gap: 14px;
-    padding: 18px;
+    grid-template-columns: minmax(0, 1fr) clamp(88px, 24vw, 108px);
+    gap: 8px;
+    min-height: 0;
+    padding: 14px 16px;
     overflow: hidden;
     position: relative;
+    align-items: center;
+    background:
+      radial-gradient(circle at 80% 40%, rgba(107, 75, 255, 0.38), transparent 34%),
+      linear-gradient(135deg, #141a48 0%, #121936 54%, #10162b 100%);
   }
 
   .mobile-dashboard-hero-card::after {
@@ -6151,8 +6180,8 @@ a.primary-btn.submit-btn {
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(circle at 82% 38%, rgba(129, 93, 255, 0.38), transparent 30%),
-      linear-gradient(135deg, rgba(77, 48, 173, 0.18), rgba(13, 18, 36, 0));
+      radial-gradient(circle at 82% 72%, rgba(126, 87, 255, 0.28), transparent 22%),
+      linear-gradient(135deg, rgba(77, 48, 173, 0.12), rgba(13, 18, 36, 0));
     pointer-events: none;
   }
 
@@ -6162,52 +6191,57 @@ a.primary-btn.submit-btn {
     z-index: 1;
   }
 
-  .mobile-dashboard-hero-eyebrow {
-    margin: 0 0 8px;
-    font-size: 0.74rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #aa92ff;
-    font-weight: 700;
-  }
-
   .mobile-dashboard-hero-card h3 {
     margin: 0;
-    font-size: 1.7rem;
-    line-height: 1.15;
+    font-size: clamp(0.98rem, 4.6vw, 1.22rem);
+    line-height: 1.16;
     color: #ffffff;
     font-family: "Space Grotesk", sans-serif;
   }
 
   .mobile-dashboard-hero-card p {
-    margin: 10px 0 0;
-    font-size: 0.88rem;
-    line-height: 1.55;
+    margin: 6px 0 0;
+    max-width: 190px;
+    font-size: clamp(0.64rem, 2.8vw, 0.74rem);
+    line-height: 1.34;
     color: #bac7e1;
   }
 
   .mobile-dashboard-hero-visual {
     display: grid;
     place-items: center;
-    align-self: stretch;
+    align-self: center;
     justify-self: end;
     width: 100%;
-    min-height: 132px;
-    border-radius: 20px;
-    background: radial-gradient(circle at center, rgba(121, 83, 255, 0.28), transparent 58%);
+    min-height: 0;
+    border-radius: 18px;
+    background: radial-gradient(circle at center, rgba(121, 83, 255, 0.34), transparent 62%);
     color: #8e6dff;
-    font-size: 4rem;
+  }
+
+  .mobile-hero-shield {
+    width: clamp(58px, 18vw, 78px);
+    height: clamp(58px, 18vw, 78px);
+    display: grid;
+    place-items: center;
+    border-radius: 22px 22px 28px 28px;
+    background: linear-gradient(145deg, #8f6bff, #4c35c9);
+    color: #ffffff;
+    font-size: clamp(1.55rem, 6vw, 2.2rem);
+    font-weight: 900;
+    box-shadow: 0 18px 28px rgba(92, 64, 220, 0.38), inset 0 2px 8px rgba(255,255,255,0.24);
   }
 
   .mobile-dashboard-hero-btn {
-    min-height: 42px !important;
-    padding: 0 16px !important;
-    margin-top: 14px;
-    border-radius: 14px !important;
+    min-height: 30px !important;
+    padding: 0 11px !important;
+    margin-top: 8px;
+    border-radius: 9px !important;
     background: rgba(255, 255, 255, 0.96) !important;
     color: #141c31 !important;
     border: 0 !important;
     box-shadow: none !important;
+    font-size: 0.72rem !important;
   }
 
   .mobile-section-head {
@@ -6222,6 +6256,15 @@ a.primary-btn.submit-btn {
     color: #f8fbff;
     font-size: 1.02rem;
     font-family: "Space Grotesk", sans-serif;
+  }
+
+  .mobile-section-link {
+    border: 0;
+    background: transparent;
+    color: #b16dff;
+    font-size: 0.74rem;
+    font-weight: 800;
+    padding: 4px 0;
   }
 
   .mobile-quick-actions-card,
@@ -6240,9 +6283,9 @@ a.primary-btn.submit-btn {
   .mobile-quick-action-btn {
     border: 1px solid rgba(120, 137, 173, 0.16);
     background: linear-gradient(180deg, rgba(20, 29, 49, 0.98), rgba(14, 21, 37, 0.98));
-    border-radius: 18px;
-    min-height: 104px;
-    padding: 12px 8px;
+    border-radius: 12px;
+    min-height: 96px;
+    padding: 10px 7px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -6254,15 +6297,35 @@ a.primary-btn.submit-btn {
   }
 
   .mobile-quick-action-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 14px;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
     display: grid;
     place-items: center;
     font-size: 1.25rem;
     color: #ffffff;
-    background: linear-gradient(135deg, #6d4cff 0%, #3f5dff 100%);
     box-shadow: 0 14px 24px rgba(63, 93, 255, 0.22);
+  }
+
+  .mobile-quick-action-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .mobile-quick-action-icon.icon-purple {
+    background: linear-gradient(135deg, #8a4dff 0%, #5b35dd 100%);
+  }
+
+  .mobile-quick-action-icon.icon-blue {
+    background: linear-gradient(135deg, #3f7cff 0%, #2749d8 100%);
+  }
+
+  .mobile-quick-action-icon.icon-green {
+    background: linear-gradient(135deg, #43b56f 0%, #247d4d 100%);
+  }
+
+  .mobile-quick-action-icon.icon-orange {
+    background: linear-gradient(135deg, #ffad4f 0%, #f18a28 100%);
   }
 
   .mobile-quick-action-btn strong {
@@ -6760,17 +6823,20 @@ a.primary-btn.submit-btn {
   }
 
   .mobile-dashboard-hero-card {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) clamp(78px, 22vw, 96px) !important;
+    padding: 12px 14px !important;
   }
 
   .mobile-dashboard-hero-visual {
-    min-height: 92px !important;
-    justify-self: stretch !important;
-    font-size: 3.2rem !important;
+    min-height: 0 !important;
   }
 
   .mobile-dashboard-hero-card h3 {
-    font-size: 1.48rem !important;
+    font-size: 1rem !important;
+  }
+
+  .mobile-dashboard-hero-card p {
+    max-width: 170px;
   }
 
   .transaction-progress-strip,
