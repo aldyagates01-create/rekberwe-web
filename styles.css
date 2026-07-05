@@ -7175,76 +7175,438 @@ body.widget-dragging * {
     padding: 14px 10px !important;
   }
 
-  /* Logout button di mobile header */
+  /* ─── Logout button di mobile header ─── */
   .mobile-header-logout-btn {
     color: #ef4444 !important;
     border-color: rgba(239, 68, 68, 0.25) !important;
   }
 
-  /* Collapsible room info bar */
-  .room-info-collapse-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(120,137,173,0.14);
+  /* ─── Mobile Chat Header (hidden by default, shown in room mode) ─── */
+  .mobile-chat-header {
+    display: none;
   }
 
-  .room-info-collapse-summary {
+  /* ─── Mobile compact status row (hidden by default) ─── */
+  .mobile-room-status-row {
+    display: none;
+  }
+
+  /* ─── FULL SCREEN ROOM MODE ─── */
+  /* Applied when body has class in-room-mode */
+
+  body.in-room-mode .mobile-workspace-header {
+    display: none !important;
+  }
+
+  body.in-room-mode .mobile-bottom-nav {
+    display: none !important;
+  }
+
+  body.in-room-mode #ruang-transaksi {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 300 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    background: #0b1120 !important;
+    box-shadow: none !important;
+  }
+
+  body.in-room-mode .section-head.room-shell-head {
+    display: none !important;
+  }
+
+  body.in-room-mode #transaction-room {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Show mobile chat header */
+  body.in-room-mode .mobile-chat-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 10px 16px !important;
+    background: #111827 !important;
+    border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+    flex-shrink: 0 !important;
+    min-height: 62px !important;
+  }
+
+  .mobile-chat-back {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .mobile-chat-header-info {
+    flex: 1;
     min-width: 0;
   }
 
-  .room-info-status-mini {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #60a5fa;
+  .mobile-chat-header-title {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-chat-header-online {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #22c55e;
+    margin-top: 1px;
+  }
+
+  .mobile-chat-header-badge {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #93c5fd;
+    background: rgba(96,165,250,0.12);
+    border: 1px solid rgba(96,165,250,0.22);
+    border-radius: 99px;
+    padding: 3px 10px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .room-info-price-mini {
-    font-size: 0.78rem;
+  .mobile-chat-header-menu {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.7);
+    font-size: 1.2rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Transaction overview compact in room mode */
+  body.in-room-mode .transaction-overview-card {
+    padding: 12px 16px !important;
+    gap: 10px !important;
+    flex-shrink: 0 !important;
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+  }
+
+  body.in-room-mode .room-header {
+    display: none !important;
+  }
+
+  /* Show compact status+price row */
+  body.in-room-mode .mobile-room-status-row {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .mobile-room-label {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 4px;
+  }
+
+  .mobile-room-status-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #93c5fd;
+    background: rgba(96,165,250,0.12);
+    border: 1px solid rgba(96,165,250,0.22);
+    border-radius: 99px;
+    padding: 3px 10px;
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-room-price {
+    display: block;
+    font-size: 0.92rem;
     font-weight: 700;
     color: #22c55e;
-    white-space: nowrap;
   }
 
-  .room-info-toggle-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    flex-shrink: 0;
-    padding: 6px 12px;
-    border-radius: 99px;
-    border: 1px solid rgba(120,137,173,0.2);
-    background: rgba(255,255,255,0.05);
-    color: #93c5fd;
-    font-size: 0.72rem;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
+  /* Participants compact in room mode */
+  body.in-room-mode .room-info-expanded {
+    display: block !important;
   }
 
-  .room-info-chevron {
-    transition: transform 0.2s ease;
-    flex-shrink: 0;
+  body.in-room-mode .transaction-participants-strip {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    padding: 0 !important;
+    background: none !important;
+    border: none !important;
   }
 
-  .room-info-toggle-btn[aria-expanded="true"] .room-info-chevron {
-    transform: rotate(180deg);
+  body.in-room-mode .participant-card {
+    flex: 1 !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    padding: 8px 4px !important;
+    gap: 5px !important;
+    background: rgba(255,255,255,0.04) !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
   }
 
-  .room-info-expanded {
-    animation: slideDown 0.2s ease;
+  body.in-room-mode .participant-avatar-shell {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 0.85rem !important;
+    border-radius: 50% !important;
+    flex-shrink: 0 !important;
   }
 
-  @keyframes slideDown {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: 1; transform: translateY(0); }
+  body.in-room-mode .participant-copy {
+    align-items: center !important;
+    gap: 2px !important;
+  }
+
+  body.in-room-mode .participant-label {
+    font-size: 0.6rem !important;
+    color: rgba(255,255,255,0.45) !important;
+  }
+
+  body.in-room-mode .participant-copy strong {
+    font-size: 0.68rem !important;
+    max-width: 70px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  body.in-room-mode .participant-state {
+    font-size: 0.58rem !important;
+  }
+
+  /* Timeline compact in room mode */
+  body.in-room-mode .transaction-progress-strip {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 4px !important;
+    padding: 0 !important;
+    background: none !important;
+    border: none !important;
+    grid-template-columns: unset !important;
+  }
+
+  body.in-room-mode .progress-step {
+    flex: 1 !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 4px !important;
+    padding: 8px 4px !important;
+    background: rgba(255,255,255,0.03) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
+  }
+
+  body.in-room-mode .progress-step-icon {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 0.7rem !important;
+    border-radius: 8px !important;
+  }
+
+  body.in-room-mode .progress-step-copy strong {
+    font-size: 0.6rem !important;
+    font-weight: 600 !important;
+    display: block !important;
+  }
+
+  body.in-room-mode .progress-step-copy span {
+    display: none !important;
+  }
+
+  /* Room content grid fills remaining space */
+  body.in-room-mode .room-content-grid {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    grid-template-columns: unset !important;
+    gap: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.in-room-mode .room-summary-panel {
+    display: none !important;
+  }
+
+  body.in-room-mode .chat-room-card.room-chat-main {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  body.in-room-mode .telegram-chat-head {
+    display: none !important;
+  }
+
+  body.in-room-mode .chat-room-alert {
+    flex-shrink: 0 !important;
+    margin: 8px 12px !important;
+    border-radius: 12px !important;
+  }
+
+  body.in-room-mode #chat-box {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    min-height: 0 !important;
+    padding: 8px 12px !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  body.in-room-mode .seller-bank-form {
+    flex-shrink: 0 !important;
+    padding: 10px 12px !important;
+  }
+
+  body.in-room-mode .chat-form {
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+    background: #111827 !important;
+    border-top: 1px solid rgba(255,255,255,0.07) !important;
+  }
+
+  body.in-room-mode .chat-file-picker {
+    flex-shrink: 0 !important;
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    background: rgba(255,255,255,0.06) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 1.1rem !important;
+    color: rgba(255,255,255,0.7) !important;
+    cursor: pointer !important;
+  }
+
+  body.in-room-mode #chat-input {
+    flex: 1 !important;
+    min-width: 0 !important;
+    height: 42px !important;
+    border-radius: 12px !important;
+    padding: 0 14px !important;
+    font-size: 0.88rem !important;
+    background: rgba(255,255,255,0.07) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: #fff !important;
+  }
+
+  body.in-room-mode .chat-send-btn {
+    flex-shrink: 0 !important;
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 12px !important;
+    background: #3b82f6 !important;
+    border: none !important;
+    color: #fff !important;
+    font-size: 1rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+  }
+
+  body.in-room-mode .mobile-room-shortcuts {
+    flex-shrink: 0 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 6px !important;
+    padding: 8px 12px 12px !important;
+    background: #0b1120 !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  body.in-room-mode .mobile-room-shortcut-btn {
+    flex-shrink: 0 !important;
+    height: 36px !important;
+    padding: 0 14px !important;
+    border-radius: 99px !important;
+    border: 1px solid rgba(255,255,255,0.14) !important;
+    background: rgba(255,255,255,0.06) !important;
+    color: rgba(255,255,255,0.85) !important;
+    font-size: 0.75rem !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+    cursor: pointer !important;
+  }
+
+  body.in-room-mode .mobile-room-shortcut-btn.danger {
+    color: #f87171 !important;
+    border-color: rgba(248,113,113,0.3) !important;
+    background: rgba(248,113,113,0.07) !important;
+  }
+
+  /* Hide upload progress bar padding issues */
+  body.in-room-mode .upload-progress {
+    margin: 0 !important;
+    padding: 8px 12px !important;
+  }
+
+  body.in-room-mode .pending-attachments:not(.hidden) {
+    padding: 6px 12px !important;
   }
 }

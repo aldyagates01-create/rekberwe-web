@@ -84,10 +84,13 @@ const elements = {
   mobileHeaderProfile: document.getElementById("mobile-header-profile"),
   mobileHeaderProfileAvatar: document.getElementById("mobile-header-profile-avatar"),
   mobileHeaderLogout: document.getElementById("mobile-header-logout"),
-  roomInfoToggle: document.getElementById("room-info-toggle"),
   roomInfoExpanded: document.getElementById("room-info-expanded"),
-  roomInfoStatusMini: document.getElementById("room-info-status-mini"),
-  roomInfoPriceMini: document.getElementById("room-info-price-mini"),
+  mobileChatHeader: document.getElementById("mobile-chat-header"),
+  mobileChatBack: document.getElementById("mobile-chat-back"),
+  mobileChatHeaderTitle: document.getElementById("mobile-chat-header-title"),
+  mobileChatHeaderBadge: document.getElementById("mobile-chat-header-badge"),
+  mobileRoomStatusBadge: document.getElementById("mobile-room-status-badge"),
+  mobileRoomPrice: document.getElementById("mobile-room-price"),
   sampleLink: document.getElementById("sample-link"),
   transactionRoomSection: document.getElementById("ruang-transaksi"),
   transactionRoom: document.getElementById("transaction-room"),
@@ -531,7 +534,11 @@ function bindForms() {
   elements.homeLoginShortcut?.addEventListener("click", openLoginModal);
   elements.logoutButton?.addEventListener("click", handleLogout);
   elements.mobileHeaderLogout?.addEventListener("click", handleLogout);
-  elements.roomInfoToggle?.addEventListener("click", toggleRoomInfoCollapse);
+  elements.mobileChatBack?.addEventListener("click", () => {
+    exitRoomMode();
+    state.transactionScreen = "list";
+    openWorkspaceSection("transactions");
+  });
   elements.transactionsNavButton?.addEventListener("click", () => {
     state.transactionScreen = "list";
     openWorkspaceSection("transactions");
@@ -1277,15 +1284,12 @@ function renderTermsAndConditions() {
   });
 }
 
-function toggleRoomInfoCollapse() {
-  const expanded = elements.roomInfoExpanded;
-  const toggle = elements.roomInfoToggle;
-  if (!expanded || !toggle) return;
-  const isExpanded = !expanded.classList.contains("hidden");
-  expanded.classList.toggle("hidden", isExpanded);
-  toggle.setAttribute("aria-expanded", String(!isExpanded));
-  const label = toggle.querySelector(".room-info-toggle-label");
-  if (label) label.textContent = isExpanded ? "Lihat Detail" : "Sembunyikan";
+function enterRoomMode() {
+  document.body.classList.add("in-room-mode");
+}
+
+function exitRoomMode() {
+  document.body.classList.remove("in-room-mode");
 }
 
 function renderAuthButtons() {
@@ -2112,6 +2116,9 @@ function openMemberView(view) {
 }
 
 function openWorkspaceSection(section) {
+  if (section !== "transactions" || state.transactionScreen !== "room") {
+    exitRoomMode();
+  }
   state.currentMemberView = "transactions";
   state.workspaceSection = section;
   renderHomeVisibility();
@@ -2209,14 +2216,11 @@ function renderRoom(transaction) {
   elements.roomPaymentStatus.textContent = transaction.paymentStatus;
   elements.roomBuyer.textContent = transaction.buyer ? transaction.buyer.displayName : "Menunggu pembeli";
   elements.roomSeller.textContent = transaction.seller ? transaction.seller.displayName : "Menunggu penjual";
-  if (elements.roomInfoStatusMini) elements.roomInfoStatusMini.textContent = transaction.paymentStatus || "-";
-  if (elements.roomInfoPriceMini) elements.roomInfoPriceMini.textContent = formatCurrency(transaction.price);
-  if (elements.roomInfoExpanded && !elements.roomInfoExpanded.classList.contains("hidden")) {
-    elements.roomInfoExpanded.classList.add("hidden");
-    elements.roomInfoToggle?.setAttribute("aria-expanded", "false");
-    const label = elements.roomInfoToggle?.querySelector(".room-info-toggle-label");
-    if (label) label.textContent = "Lihat Detail";
-  }
+  if (elements.mobileChatHeaderTitle) elements.mobileChatHeaderTitle.textContent = `Transaksi #${transaction.code}`;
+  if (elements.mobileChatHeaderBadge) elements.mobileChatHeaderBadge.textContent = transaction.paymentStatus || "-";
+  if (elements.mobileRoomStatusBadge) elements.mobileRoomStatusBadge.textContent = transaction.paymentStatus || "-";
+  if (elements.mobileRoomPrice) elements.mobileRoomPrice.textContent = formatCurrency(transaction.price);
+  enterRoomMode();
   renderRoomParticipantAvatars(transaction);
   renderRoomProgress(transaction);
   elements.roomSummary.innerHTML = buildSummaryItems(transaction).map(renderSummaryItem).join("");
@@ -3219,6 +3223,7 @@ function renderTransactionScreen() {
 }
 
 function openTransactionListView() {
+  exitRoomMode();
   state.transactionScreen = "list";
   state.pendingJoinTransaction = null;
   renderTransactionScreen();

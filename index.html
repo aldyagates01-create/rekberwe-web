@@ -552,7 +552,24 @@
             <div class="join-role-box hidden" id="join-role-box"></div>
 
             <div class="room hidden" id="transaction-room">
+
+              <!-- Mobile-only: Room Header (back + title + status) -->
+              <div class="mobile-chat-header" id="mobile-chat-header">
+                <button type="button" class="mobile-chat-back" id="mobile-chat-back" aria-label="Kembali">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20" aria-hidden="true">
+                    <path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <div class="mobile-chat-header-info">
+                  <span class="mobile-chat-header-title" id="mobile-chat-header-title">Transaksi</span>
+                  <span class="mobile-chat-header-online">● Online</span>
+                </div>
+                <span class="mobile-chat-header-badge" id="mobile-chat-header-badge">Memuat</span>
+                <button type="button" class="mobile-chat-header-menu" aria-label="Menu lainnya">⋮</button>
+              </div>
+
               <section class="transaction-overview-card">
+                <!-- Desktop: code + status pill (hidden on mobile room mode) -->
                 <div class="room-header">
                   <div>
                     <p class="mini-label">Kode transaksi</p>
@@ -561,18 +578,20 @@
                   <span class="status-pill" id="room-payment-status">Belum dibayar</span>
                 </div>
 
-                <div class="room-info-collapse-bar" id="room-info-collapse-bar">
-                  <div class="room-info-collapse-summary">
-                    <span id="room-info-status-mini" class="room-info-status-mini">Memuat...</span>
-                    <span id="room-info-price-mini" class="room-info-price-mini"></span>
+                <!-- Mobile-only: compact status + price row -->
+                <div class="mobile-room-status-row" id="mobile-room-status-row">
+                  <div class="mobile-room-status-col">
+                    <span class="mobile-room-label">Status Transaksi</span>
+                    <span class="mobile-room-status-badge" id="mobile-room-status-badge">Memuat...</span>
                   </div>
-                  <button type="button" class="room-info-toggle-btn" id="room-info-toggle" aria-expanded="false">
-                    <span class="room-info-toggle-label">Lihat Detail</span>
-                    <svg class="room-info-chevron" viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  </button>
+                  <div class="mobile-room-price-col">
+                    <span class="mobile-room-label">Nilai Transaksi</span>
+                    <span class="mobile-room-price" id="mobile-room-price">-</span>
+                  </div>
                 </div>
 
-                <div class="room-info-expanded hidden" id="room-info-expanded">
+                <!-- Participants + Timeline: always visible on mobile -->
+                <div class="room-info-expanded" id="room-info-expanded">
                 <section class="transaction-participants-strip">
                   <article class="participant-card participant-buyer-card">
                     <div class="participant-avatar-shell participant-avatar-buyer" id="room-buyer-avatar">B</div>
