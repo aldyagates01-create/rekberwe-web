@@ -263,18 +263,32 @@ async function bootstrap() {
   updateProviderAvailability();
   await hydrateCurrentSession();
   renderAll();
+  const hasTransactionRoute = new URLSearchParams(window.location.search).has("trx");
+  if (hasTransactionRoute) {
+    try {
+      await handleInitialRoute();
+    } catch (routeError) {
+      handleInitialRouteError(routeError);
+    }
+  }
   const initialJobs = [refreshTransactions()];
   if (state.currentUser) {
     initialJobs.push(refreshDashboard());
   } else {
     initialJobs.push(refreshSupportThread());
   }
-  await Promise.all(initialJobs);
+  const initialResults = await Promise.allSettled(initialJobs);
+  const failedInitialJob = initialResults.find((item) => item.status === "rejected");
+  if (failedInitialJob && !hasTransactionRoute) {
+    throw failedInitialJob.reason;
+  }
   renderAll();
-  try {
-    await handleInitialRoute();
-  } catch (routeError) {
-    handleInitialRouteError(routeError);
+  if (!hasTransactionRoute) {
+    try {
+      await handleInitialRoute();
+    } catch (routeError) {
+      handleInitialRouteError(routeError);
+    }
   }
   startRoomRefresh();
 }
