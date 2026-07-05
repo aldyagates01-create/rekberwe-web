@@ -64,6 +64,15 @@ const adminUserIds = new Set(
 );
 const uploadsDir = path.resolve(process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads"));
 const cloudinaryFolder = String(process.env.CLOUDINARY_FOLDER || "rekberwe").trim() || "rekberwe";
+
+function getRequestBaseUrl(req) {
+  const forwardedProto = String(req.get("x-forwarded-proto") || "").split(",")[0].trim();
+  const forwardedHost = String(req.get("x-forwarded-host") || "").split(",")[0].trim();
+  const protocol = forwardedProto || req.protocol || "https";
+  const host = forwardedHost || req.get("host");
+  if (!host) return appBaseUrl;
+  return `${protocol}://${host}`.replace(/\/$/, "");
+}
 const cloudinaryEnabled = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
   process.env.CLOUDINARY_API_KEY &&
@@ -485,7 +494,7 @@ app.post("/api/transactions", requireAuth, async (req, res) => {
 
   const feeSettings = await getAdminFeeSettings();
   const code = generateTransactionCode();
-  const shareLink = `${appBaseUrl}/?trx=${encodeURIComponent(code)}`;
+  const shareLink = `${getRequestBaseUrl(req)}/?trx=${encodeURIComponent(code)}`;
   const transaction = await createTransaction({
     code,
     title: String(title).trim(),
