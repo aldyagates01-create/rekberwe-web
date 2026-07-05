@@ -981,9 +981,19 @@ function renderActiveTransaction() {
   restoreScrollState(elements.adminChatBox, adminChatScrollState);
   markAdminTransactionSeen(transaction);
 
+  const payoutBlockReason = getAdminSendPayoutBlockReason(transaction);
   elements.adminRequestPayment.disabled = !transaction.adminPayoutAccount || Boolean(transaction.adminFundsReceived);
   elements.adminFundsReceived.disabled = Boolean(transaction.adminFundsReceived);
-  elements.adminSendPayout.disabled = !transaction.buyerConfirmedReceived || Boolean(transaction.sellerPayoutSent) || isWarrantyStillActive(transaction) || transaction.paymentStatus === "Antrian transfer" || !transaction.sellerBankName || !transaction.sellerBankNumber || !transaction.sellerBankHolder;
+  elements.adminSendPayout.disabled = transaction.paymentStatus === "Antrian transfer"
+    || Boolean(transaction.sellerPayoutSent)
+    || transaction.paymentStatus === "Selesai"
+    || transaction.paymentStatus === "Transaksi dibatalkan";
+  elements.adminSendPayout.title = payoutBlockReason || "Masukkan transaksi ke antrian transfer penjual.";
+  elements.adminSendPayout.textContent = transaction.paymentStatus === "Antrian transfer"
+    ? "Sudah di antrian"
+    : payoutBlockReason
+      ? "Cek syarat transfer"
+      : "Segera di transfer";
   elements.adminCompleteTransaction.disabled = transaction.paymentStatus !== "Antrian transfer";
   if (elements.adminCancelTransaction) {
     elements.adminCancelTransaction.disabled = transaction.paymentStatus === "Transaksi dibatalkan" || transaction.paymentStatus === "Selesai";
@@ -1348,6 +1358,13 @@ async function handleAdminAction(action) {
       showStatus("Pilih transaksi dulu sebelum menjalankan aksi admin.", true);
       return;
     }
+    if (action === "send_payout") {
+      const payoutBlockReason = getAdminSendPayoutBlockReason(state.activeTransaction);
+      if (payoutBlockReason) {
+        showStatus(payoutBlockReason, true);
+        return;
+      }
+    }
     const confirmation = getAdminActionConfirmation(action);
     if (confirmation && !window.confirm(confirmation)) return;
     const body = action === "request_buyer_payment"
@@ -1382,7 +1399,7 @@ async function handleAdminAction(action) {
             ? "Transaksi ditandai selesai."
             : action === "cancel_transaction"
               ? "Transaksi dibatalkan oleh admin."
-              : "Dana ke penjual sudah ditandai terkirim.",
+              : "Transaksi masuk ke antrian transfer penjual.",
     );
   } catch (error) {
     showStatus(error.message || "Aksi admin gagal dijalankan.", true);
@@ -2062,6 +2079,23 @@ function renderSupportAttachment(message) {
 function isWarrantyStillActive(transaction) {
   if (!transaction?.warrantyEndsAt) return false;
   return new Date(transaction.warrantyEndsAt).getTime() > Date.now();
+}
+
+function getAdminSendPayoutBlockReason(transaction) {
+  if (!transaction) return "Pilih transaksi dulu sebelum menjalankan transfer.";
+  if (transaction.paymentStatus === "Transaksi dibatalkan") return "Transaksi sudah dibatalkan, dana tidak bisa dimasukkan ke antrian transfer.";
+  if (transaction.paymentStatus === "Sengketa dibuka") return "Transaksi masih dalam sengketa. Selesaikan sengketa dulu sebelum transfer ke penjual.";
+  if (transaction.paymentStatus === "Antrian transfer") return "Transaksi ini sudah masuk antrian transfer.";
+  if (transaction.sellerPayoutSent || transaction.paymentStatus === "Selesai") return "Transfer penjual sudah selesai, tombol edit/transfer tidak bisa dipakai lagi.";
+  if (!transaction.adminFundsReceived) return "Dana pembeli belum dikonfirmasi diterima admin.";
+  if (!transaction.buyerConfirmedReceived) return "Pembeli belum menekan tombol item diterima.";
+  if (!transaction.sellerBankName || !transaction.sellerBankNumber || !transaction.sellerBankHolder) {
+    return "Penjual belum mengirim data rekening lengkap.";
+  }
+  if (isWarrantyStillActive(transaction)) {
+    return `Masa garansi masih aktif sampai ${formatDateTime(new Date(transaction.warrantyEndsAt))}. Dana belum bisa masuk antrian transfer.`;
+  }
+  return "";
 }
 
 function getAdminSupportStorageKey() {

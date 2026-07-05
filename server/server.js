@@ -997,6 +997,10 @@ app.post("/api/admin/transactions/:code/actions", requireAdmin, async (req, res)
       systemMessage: "Dana sudah diterima admin. Penjual, silakan kirim data akun / item ke pembeli sekarang. Setelah data / item benar-benar terkirim, klik tombol data / item sudah diserahkan di ruang transaksi.",
     });
   } else if (action === "send_payout") {
+    if (current.paymentStatus === "Transaksi dibatalkan" || current.paymentStatus === "Sengketa dibuka") {
+      res.status(400).json({ message: "Transaksi dibatalkan / sengketa belum bisa dimasukkan ke antrian transfer." });
+      return;
+    }
     if (!current.adminFundsReceived) {
       res.status(400).json({ message: "Dana pembeli belum dikonfirmasi diterima admin." });
       return;
