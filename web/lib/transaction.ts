@@ -63,6 +63,8 @@ export type TransactionActionButton = {
   action: TransactionActionKey;
   label: string;
   variant: "default" | "success" | "danger";
+  disabled?: boolean;
+  reason?: string;
 };
 
 export function getConfirmAction(transaction: Transaction, role: "buyer" | "seller" | null) {
@@ -84,28 +86,33 @@ export function getTransactionActions(transaction: Transaction, role: "buyer" | 
   }
 
   const actions: TransactionActionButton[] = [];
-  if (role === "buyer" && !transaction.adminFundsReceived) {
-    actions.push({ action: "mark_paid", label: "Konfirmasi Bayar", variant: "success" });
+
+  if (role === "seller") {
+    const enabled = transaction.adminFundsReceived
+      && transaction.paymentStatus !== "Akun sudah diserahkan"
+      && !transaction.buyerConfirmedReceived
+      && !transaction.sellerPayoutSent;
+    actions.push({
+      action: "account_delivered",
+      label: "Data / Item Diserahkan",
+      variant: "success",
+      disabled: !enabled,
+      reason: enabled ? "" : "Belum bisa dipakai sampai dana diamankan admin atau tahap penyerahan belum valid.",
+    });
   }
 
-  if (
-    role === "seller"
-    && transaction.adminFundsReceived
-    && transaction.paymentStatus !== "Akun sudah diserahkan"
-    && !transaction.buyerConfirmedReceived
-    && !transaction.sellerPayoutSent
-  ) {
-    actions.push({ action: "account_delivered", label: "Data / Item Diserahkan", variant: "success" });
-  }
-
-  if (
-    role === "buyer"
-    && transaction.adminFundsReceived
-    && (transaction.paymentStatus === "Akun sudah diserahkan" || transaction.buyerConfirmedReceived || transaction.sellerPayoutSent)
-    && !transaction.buyerConfirmedReceived
-    && !transaction.sellerPayoutSent
-  ) {
-    actions.push({ action: "goods_received", label: "Item Diterima", variant: "success" });
+  if (role === "buyer") {
+    const enabled = transaction.adminFundsReceived
+      && (transaction.paymentStatus === "Akun sudah diserahkan" || transaction.buyerConfirmedReceived || transaction.sellerPayoutSent)
+      && !transaction.buyerConfirmedReceived
+      && !transaction.sellerPayoutSent;
+    actions.push({
+      action: "goods_received",
+      label: "Data / Item Diterima",
+      variant: "success",
+      disabled: !enabled,
+      reason: enabled ? "" : "Belum bisa dipakai karena penjual belum menekan Data / Item Diserahkan.",
+    });
   }
 
   actions.push({ action: "open_dispute", label: "Ajukan Sengketa", variant: "danger" });

@@ -22,8 +22,9 @@ export function QuickActionChips({
           <Chip
             key={item.action}
             onClick={() => onAction(item.action)}
-            disabled={disabled}
+            disabled={disabled || item.disabled}
             variant={item.variant}
+            title={item.reason}
           >
             {item.label}
           </Chip>
@@ -38,11 +39,13 @@ function Chip({
   onClick,
   disabled = false,
   variant = "default",
+  title,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
   variant?: "default" | "success" | "danger";
+  title?: string;
 }) {
   const colors =
     variant === "success"
@@ -56,6 +59,7 @@ function Chip({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={title}
       className={`inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full border bg-card px-3 text-[11px] font-semibold disabled:opacity-40 ${colors}`}
     >
       {children}

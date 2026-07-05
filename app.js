@@ -998,10 +998,15 @@ function openCreatedTransactionModal(link) {
   if (!elements.createdTransactionModal) return;
   elements.createdTransactionLink.textContent = link;
   elements.createdTransactionModal.classList.remove("hidden");
+  elements.createdTransactionModal.style.display = "flex";
+  elements.createdTransactionModal.setAttribute("aria-hidden", "false");
 }
 
 function closeCreatedTransactionModal() {
-  elements.createdTransactionModal?.classList.add("hidden");
+  if (!elements.createdTransactionModal) return;
+  elements.createdTransactionModal.classList.add("hidden");
+  elements.createdTransactionModal.style.removeProperty("display");
+  elements.createdTransactionModal.setAttribute("aria-hidden", "true");
 }
 
 async function copyCreatedTransactionLink() {
