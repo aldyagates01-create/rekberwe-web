@@ -8271,6 +8271,12 @@ body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy span {
     overflow: visible !important;
     display: block !important;
     border-radius: 24px !important;
+    min-height: auto !important;
+  }
+
+  body.in-room-mode #ruang-transaksi.telegram-room-shell {
+    overflow: visible !important;
+    min-height: auto !important;
   }
 
   body.in-room-mode #transaction-room {
