@@ -6605,17 +6605,15 @@ a.primary-btn.submit-btn {
 
   .mobile-bottom-nav {
     position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: 10px;
+    left: clamp(8px, 3vw, 14px);
+    right: clamp(8px, 3vw, 14px);
+    bottom: clamp(8px, 2.5vw, 12px);
     z-index: 120;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     align-items: center;
-    gap: 4px;
-    height: 60px;
-    max-height: 60px;
-    padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
-    border-radius: 22px;
+    gap: clamp(2px, 1vw, 6px);
+    padding: clamp(4px, 1.5vw, 8px) clamp(6px, 2.5vw, 12px) calc(clamp(4px, 1.5vw, 8px) + env(safe-area-inset-bottom));
+    border-radius: clamp(18px, 5vw, 24px);
     background: rgba(8, 13, 24, 0.96);
     border: 1px solid rgba(120, 137, 173, 0.16);
     box-shadow: 0 24px 42px rgba(2, 8, 23, 0.46);
@@ -6624,9 +6622,9 @@ a.primary-btn.submit-btn {
 
   .mobile-bottom-nav-btn {
     position: relative;
-    min-height: 48px;
-    height: 48px;
-    padding: 4px;
+    min-height: clamp(42px, 12vw, 50px);
+    min-width: 0;
+    padding: clamp(2px, 1vw, 5px);
     border: 0;
     background: transparent;
     color: #98aac9;
@@ -6634,20 +6632,21 @@ a.primary-btn.submit-btn {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    border-radius: 14px;
+    gap: clamp(2px, 1vw, 5px);
+    border-radius: clamp(10px, 3.5vw, 15px);
     cursor: pointer;
   }
 
   .mobile-bottom-nav-btn span[aria-hidden="true"] {
-    font-size: 22px;
+    font-size: clamp(18px, 5.5vw, 22px);
     line-height: 1;
   }
 
   .mobile-bottom-nav-btn strong {
-    font-size: 11px;
+    font-size: clamp(9.5px, 2.8vw, 11px);
     font-weight: 700;
     line-height: 1;
+    white-space: nowrap;
   }
 
   .mobile-bottom-nav-btn.active {
@@ -6656,9 +6655,8 @@ a.primary-btn.submit-btn {
   }
 
   .mobile-bottom-nav-btn-primary {
-    margin-top: -6px;
-    height: 54px;
-    min-height: 54px;
+    margin-top: clamp(-8px, -2vw, -4px);
+    min-height: clamp(46px, 13.5vw, 56px);
     border-radius: 999px;
     background: linear-gradient(135deg, #7b4dff 0%, #4b5bff 100%) !important;
     color: #ffffff !important;
@@ -7208,6 +7206,27 @@ body.widget-dragging * {
     display: none;
   }
 
+  /* ─── Fluid design tokens: scale with viewport width, never fixed ─── */
+  body.in-room-mode #ruang-transaksi {
+    --fl-1: clamp(4px, 1.1vw, 6px);
+    --fl-2: clamp(6px, 1.8vw, 10px);
+    --fl-3: clamp(8px, 2.4vw, 12px);
+    --fl-4: clamp(10px, 3.2vw, 16px);
+    --fl-fs-2xs: clamp(8.5px, 2.5vw, 10px);
+    --fl-fs-xs: clamp(9.5px, 2.8vw, 11px);
+    --fl-fs-sm: clamp(10.5px, 3.1vw, 12.5px);
+    --fl-fs-base: clamp(12px, 3.6vw, 14.5px);
+    --fl-fs-md: clamp(13px, 3.9vw, 15.5px);
+    --fl-fs-lg: clamp(16px, 5.2vw, 20px);
+    --fl-avatar: clamp(30px, 9.5vw, 42px);
+    --fl-avatar-chat: clamp(22px, 7vw, 30px);
+    --fl-icon-btn: clamp(28px, 8.5vw, 36px);
+    --fl-touch: clamp(38px, 11vw, 46px);
+    --fl-progress-circle: clamp(26px, 8vw, 36px);
+    --fl-radius: clamp(10px, 3vw, 16px);
+    --fl-radius-lg: clamp(14px, 4vw, 20px);
+  }
+
   body.in-room-mode .mobile-workspace-header {
     display: none !important;
   }
@@ -7248,13 +7267,12 @@ body.widget-dragging * {
     overflow: hidden !important;
   }
 
-  /* ============ HEADER (max 70px) ============ */
+  /* ============ HEADER: fluid height, never overlaps ============ */
   body.in-room-mode .mobile-chat-header {
     display: flex !important;
     align-items: center !important;
-    gap: 10px !important;
-    padding: 12px 16px !important;
-    max-height: 70px !important;
+    gap: var(--fl-2) !important;
+    padding: var(--fl-3) var(--fl-4) !important;
     background: #111827 !important;
     border-bottom: 1px solid rgba(255,255,255,0.07) !important;
     flex-shrink: 0 !important;
@@ -7264,9 +7282,9 @@ body.widget-dragging * {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: var(--fl-icon-btn);
+    height: var(--fl-icon-btn);
+    border-radius: var(--fl-1);
     border: none;
     background: transparent;
     color: #fff;
@@ -7276,8 +7294,8 @@ body.widget-dragging * {
   }
 
   .mobile-chat-back svg {
-    width: 24px;
-    height: 24px;
+    width: 55%;
+    height: 55%;
   }
 
   .mobile-chat-header-info {
@@ -7287,22 +7305,21 @@ body.widget-dragging * {
 
   .mobile-chat-header-title {
     display: block;
-    font-size: 0.86rem;
+    font-size: var(--fl-fs-md);
     font-weight: 700;
     color: #fff;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.2;
+    line-height: 1.25;
   }
 
   .mobile-chat-header-online {
     display: block;
-    font-size: 0.68rem;
+    font-size: var(--fl-fs-xs);
     font-weight: 500;
     color: #22c55e;
-    margin-top: 1px;
-    line-height: 1.2;
+    line-height: 1.25;
   }
 
   .mobile-chat-header-badge {
@@ -7310,13 +7327,13 @@ body.widget-dragging * {
   }
 
   .mobile-chat-header-menu {
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
+    width: var(--fl-icon-btn);
+    height: var(--fl-icon-btn);
+    border-radius: var(--fl-1);
     border: none;
     background: transparent;
     color: rgba(255,255,255,0.65);
-    font-size: 1.15rem;
+    font-size: var(--fl-fs-lg);
     cursor: pointer;
     flex-shrink: 0;
     display: flex;
@@ -7325,15 +7342,13 @@ body.widget-dragging * {
     padding: 0;
   }
 
-  /* ============ STATUS CARD (max 160px) ============ */
+  /* ============ STATUS CARD: fluid, grows/shrinks with content ============ */
   body.in-room-mode .transaction-overview-card {
-    padding: 12px !important;
-    gap: 8px !important;
+    padding: var(--fl-3) !important;
+    gap: var(--fl-2) !important;
     flex-shrink: 0 !important;
-    max-height: 160px !important;
-    overflow-y: auto !important;
-    border-radius: 16px !important;
-    margin: 8px 10px 0 !important;
+    border-radius: var(--fl-radius) !important;
+    margin: var(--fl-2) var(--fl-2) 0 !important;
     border: 1px solid rgba(120, 137, 173, 0.14) !important;
     background: rgba(255,255,255,0.03) !important;
   }
@@ -7346,21 +7361,23 @@ body.widget-dragging * {
     display: flex !important;
     align-items: flex-start !important;
     justify-content: space-between !important;
-    gap: 12px !important;
+    gap: var(--fl-3) !important;
+    flex-wrap: wrap !important;
   }
 
   .mobile-room-label {
     display: block;
-    font-size: 0.62rem;
+    font-size: var(--fl-fs-2xs);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: rgba(255,255,255,0.4);
-    margin-bottom: 4px;
+    margin-bottom: var(--fl-1);
   }
 
   .mobile-room-status-col {
     min-width: 0;
+    flex: 1 1 auto;
   }
 
   .mobile-room-price-col {
@@ -7370,15 +7387,15 @@ body.widget-dragging * {
 
   .mobile-room-status-badge {
     display: inline-block;
-    font-size: 12px;
+    font-size: var(--fl-fs-sm);
     font-weight: 700;
     letter-spacing: 0.02em;
     color: #93c5fd;
     background: rgba(96,165,250,0.12);
     border: 1px solid rgba(96,165,250,0.22);
-    border-radius: 8px;
-    padding: 3px 9px;
-    max-width: 190px;
+    border-radius: var(--fl-1);
+    padding: 3px var(--fl-2);
+    max-width: 48vw;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -7386,42 +7403,44 @@ body.widget-dragging * {
 
   .mobile-room-price {
     display: block;
-    font-size: 20px;
+    font-size: var(--fl-fs-lg);
     font-weight: 700;
     color: #22c55e;
     line-height: 1.15;
   }
 
-  /* ============ PARTICIPANTS: 3-col flex, 40x40 avatar ============ */
+  /* ============ PARTICIPANTS: 3-col flex, fluid avatar ============ */
   body.in-room-mode .room-info-expanded {
     display: block !important;
+    min-width: 0 !important;
   }
 
   body.in-room-mode .transaction-participants-strip {
     display: flex !important;
     flex-direction: row !important;
     justify-content: space-between !important;
-    gap: 8px !important;
+    gap: var(--fl-2) !important;
     padding: 0 !important;
     background: none !important;
     border: none !important;
   }
 
   body.in-room-mode .participant-card {
-    flex: 1 !important;
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
     flex-direction: column !important;
     align-items: center !important;
     text-align: center !important;
-    padding: 6px 2px !important;
-    gap: 4px !important;
+    padding: var(--fl-1) 2px !important;
+    gap: var(--fl-1) !important;
     background: none !important;
     border: none !important;
   }
 
   body.in-room-mode .participant-avatar-shell {
-    width: 40px !important;
-    height: 40px !important;
-    font-size: 0.9rem !important;
+    width: var(--fl-avatar) !important;
+    height: var(--fl-avatar) !important;
+    font-size: var(--fl-fs-base) !important;
     border-radius: 50% !important;
     flex-shrink: 0 !important;
   }
@@ -7429,57 +7448,59 @@ body.widget-dragging * {
   body.in-room-mode .participant-copy {
     align-items: center !important;
     gap: 2px !important;
+    min-width: 0 !important;
+    width: 100% !important;
   }
 
   body.in-room-mode .participant-label {
-    font-size: 10px !important;
+    font-size: var(--fl-fs-2xs) !important;
     color: rgba(255,255,255,0.45) !important;
   }
 
   body.in-room-mode .participant-copy strong {
-    font-size: 13px !important;
-    max-width: 82px !important;
+    font-size: var(--fl-fs-sm) !important;
+    max-width: 100% !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
   }
 
   body.in-room-mode .participant-state {
-    font-size: 11px !important;
+    font-size: var(--fl-fs-2xs) !important;
   }
 
   body.in-room-mode .participant-role-badge.admin {
-    font-size: 9px !important;
-    padding: 2px 6px !important;
+    font-size: var(--fl-fs-2xs) !important;
+    padding: 2px var(--fl-1) !important;
   }
 
-  /* ============ PROGRESS: 4 horizontal steps, max 70px ============ */
+  /* ============ PROGRESS: 4 horizontal steps, fluid circle ============ */
   body.in-room-mode .transaction-progress-strip {
     display: flex !important;
     flex-direction: row !important;
-    gap: 4px !important;
+    gap: var(--fl-1) !important;
     padding: 0 !important;
-    margin-top: 4px !important;
+    margin-top: var(--fl-1) !important;
     background: none !important;
     border: none !important;
     grid-template-columns: unset !important;
-    max-height: 70px !important;
   }
 
   body.in-room-mode .progress-step {
-    flex: 1 !important;
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
     flex-direction: column !important;
     align-items: center !important;
     text-align: center !important;
     gap: 3px !important;
-    padding: 4px 2px !important;
+    padding: var(--fl-1) 1px !important;
     background: none !important;
     border: none !important;
   }
 
   body.in-room-mode .progress-step-icon {
-    width: 36px !important;
-    height: 36px !important;
+    width: var(--fl-progress-circle) !important;
+    height: var(--fl-progress-circle) !important;
     padding: 0 !important;
     border-radius: 50% !important;
     display: flex !important;
@@ -7488,12 +7509,12 @@ body.widget-dragging * {
   }
 
   body.in-room-mode .progress-step-icon svg {
-    width: 16px !important;
-    height: 16px !important;
+    width: 45% !important;
+    height: 45% !important;
   }
 
   body.in-room-mode .progress-step-copy strong {
-    font-size: 11px !important;
+    font-size: var(--fl-fs-xs) !important;
     font-weight: 600 !important;
     display: block !important;
     line-height: 1.2 !important;
@@ -7532,36 +7553,38 @@ body.widget-dragging * {
     display: none !important;
   }
 
-  /* ============ WARNING/INFO CARD: auto height, 13px ============ */
+  /* ============ WARNING/INFO CARD: fluid, auto height ============ */
   body.in-room-mode .chat-room-alert {
     flex-shrink: 0 !important;
-    margin: 8px 10px !important;
-    padding: 12px !important;
-    border-radius: 14px !important;
+    margin: var(--fl-2) var(--fl-2) !important;
+    padding: var(--fl-3) !important;
+    border-radius: var(--fl-radius) !important;
     height: auto !important;
   }
 
   body.in-room-mode .chat-room-alert p {
-    font-size: 13px !important;
+    font-size: var(--fl-fs-base) !important;
     line-height: 1.4 !important;
   }
 
-  /* ============ CHAT AREA: priority zone, WhatsApp-style bubbles ============ */
+  /* ============ CHAT AREA: priority zone, fluid WhatsApp-style bubbles ============ */
   body.in-room-mode #chat-box {
-    flex: 1 !important;
+    flex: 1 1 auto !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     min-height: 0 !important;
-    padding: 10px 10px 4px !important;
+    padding: var(--fl-3) var(--fl-2) var(--fl-1) !important;
     -webkit-overflow-scrolling: touch !important;
     display: flex !important;
     flex-direction: column !important;
-    gap: 8px !important;
+    gap: var(--fl-2) !important;
   }
 
   /* Each row: full width, aligns bubble left/right */
   body.in-room-mode .chat-message {
-    width: auto !important;
+    width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
     display: flex !important;
     gap: 0 !important;
     padding: 0 !important;
@@ -7581,8 +7604,9 @@ body.widget-dragging * {
   }
 
   body.in-room-mode .chat-message-body {
-    max-width: 82% !important;
-    gap: 8px !important;
+    max-width: 84% !important;
+    min-width: 0 !important;
+    gap: var(--fl-2) !important;
     align-items: flex-end !important;
   }
 
@@ -7591,45 +7615,45 @@ body.widget-dragging * {
   }
 
   body.in-room-mode .chat-avatar-btn {
-    width: 30px !important;
-    height: 30px !important;
-    min-width: 30px !important;
-    flex: 0 0 30px !important;
+    width: var(--fl-avatar-chat) !important;
+    height: var(--fl-avatar-chat) !important;
+    min-width: var(--fl-avatar-chat) !important;
+    flex: 0 0 var(--fl-avatar-chat) !important;
     border-radius: 50% !important;
   }
 
   /* Bubble itself */
   body.in-room-mode .chat-message-copy {
-    min-width: 0;
-    border-radius: 16px !important;
-    padding: 10px 12px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    border-radius: var(--fl-radius) !important;
+    padding: var(--fl-2) var(--fl-3) !important;
   }
 
   body.in-room-mode .chat-message.chat-own .chat-message-copy {
     background: linear-gradient(180deg, #1f7a52, #17603f) !important;
     border: none !important;
-    border-radius: 16px 4px 16px 16px !important;
   }
 
   body.in-room-mode .chat-message.chat-other .chat-message-copy {
     background: #1b2536 !important;
     border: none !important;
-    border-radius: 4px 16px 16px 16px !important;
   }
 
   body.in-room-mode .chat-message.chat-admin .chat-message-copy {
     background: #23283f !important;
     border: none !important;
-    border-radius: 4px 16px 16px 16px !important;
   }
 
   body.in-room-mode .chat-header {
-    gap: 8px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: var(--fl-2) !important;
     margin-bottom: 2px !important;
   }
 
   body.in-room-mode .chat-author-btn strong {
-    font-size: 12px !important;
+    font-size: var(--fl-fs-sm) !important;
     color: #fff !important;
   }
 
@@ -7638,40 +7662,41 @@ body.widget-dragging * {
   }
 
   body.in-room-mode .chat-badge.chat-badge-role {
-    font-size: 9px !important;
-    padding: 1px 7px !important;
+    font-size: var(--fl-fs-2xs) !important;
+    padding: 1px var(--fl-2) !important;
   }
 
   body.in-room-mode .chat-header > span {
-    font-size: 11px !important;
+    font-size: var(--fl-fs-xs) !important;
     color: rgba(255,255,255,0.45) !important;
     flex-shrink: 0;
   }
 
   body.in-room-mode .chat-message p {
-    font-size: 14px !important;
+    font-size: var(--fl-fs-base) !important;
     line-height: 1.4 !important;
     color: #fff !important;
     margin: 0 !important;
+    word-break: break-word !important;
   }
 
   body.in-room-mode .seller-bank-form {
     flex-shrink: 0 !important;
-    margin: 0 10px 8px !important;
-    padding: 12px !important;
-    border-radius: 14px !important;
+    margin: 0 var(--fl-2) var(--fl-2) !important;
+    padding: var(--fl-3) !important;
+    border-radius: var(--fl-radius) !important;
   }
 
-  /* ============ ACTION BUTTONS: slim horizontal chip row ============ */
+  /* ============ ACTION BUTTONS: slim fluid horizontal chip row ============ */
   /* (Data/Item Diserahkan, Item Diterima, Ajukan Sengketa, Batalkan) */
   body.in-room-mode .room-chat-actions-inline {
     flex-shrink: 0 !important;
     display: flex !important;
     flex-direction: row !important;
     grid-template-columns: unset !important;
-    gap: 6px !important;
+    gap: var(--fl-1) !important;
     margin: 0 !important;
-    padding: 6px 10px !important;
+    padding: var(--fl-1) var(--fl-2) !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
   }
@@ -7681,51 +7706,51 @@ body.widget-dragging * {
   body.in-room-mode .room-chat-actions-inline .danger-btn {
     flex-shrink: 0 !important;
     width: auto !important;
-    min-height: 32px !important;
-    height: 32px !important;
-    padding: 0 12px !important;
+    min-height: clamp(28px, 8vw, 34px) !important;
+    height: clamp(28px, 8vw, 34px) !important;
+    padding: 0 var(--fl-3) !important;
     border-radius: 99px !important;
-    font-size: 11.5px !important;
+    font-size: var(--fl-fs-xs) !important;
     font-weight: 600 !important;
     white-space: nowrap !important;
   }
 
-  /* ============ INPUT: sticky bottom, 56px ============ */
+  /* ============ INPUT: sticky bottom, fluid height ============ */
   body.in-room-mode .chat-form {
     flex-shrink: 0 !important;
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
-    height: 56px !important;
-    min-height: 56px !important;
-    padding: 6px 10px !important;
-    padding-bottom: calc(6px + env(safe-area-inset-bottom)) !important;
+    gap: var(--fl-2) !important;
+    min-height: clamp(50px, 14vw, 60px) !important;
+    padding: var(--fl-2) var(--fl-2) !important;
+    padding-bottom: calc(var(--fl-2) + env(safe-area-inset-bottom)) !important;
     background: #111827 !important;
     border-top: 1px solid rgba(255,255,255,0.07) !important;
   }
 
   body.in-room-mode .chat-file-picker {
     flex-shrink: 0 !important;
-    width: 44px !important;
-    height: 44px !important;
-    border-radius: 12px !important;
+    width: var(--fl-touch) !important;
+    height: var(--fl-touch) !important;
+    border-radius: var(--fl-1) !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
     background: rgba(255,255,255,0.06) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 1.1rem !important;
+    font-size: var(--fl-fs-lg) !important;
     color: rgba(255,255,255,0.7) !important;
     cursor: pointer !important;
   }
 
   body.in-room-mode #chat-input {
-    flex: 1 !important;
+    flex: 1 1 auto !important;
     min-width: 0 !important;
-    height: 44px !important;
-    border-radius: 22px !important;
-    padding: 0 16px !important;
-    font-size: 14px !important;
+    width: 100% !important;
+    height: var(--fl-touch) !important;
+    border-radius: 999px !important;
+    padding: 0 var(--fl-3) !important;
+    font-size: var(--fl-fs-base) !important;
     background: rgba(255,255,255,0.07) !important;
     border: 1px solid rgba(255,255,255,0.1) !important;
     color: #fff !important;
@@ -7733,28 +7758,27 @@ body.widget-dragging * {
 
   body.in-room-mode .chat-send-btn {
     flex-shrink: 0 !important;
-    width: 44px !important;
-    height: 44px !important;
+    width: var(--fl-touch) !important;
+    height: var(--fl-touch) !important;
     border-radius: 50% !important;
     background: #3b82f6 !important;
     border: none !important;
     color: #fff !important;
-    font-size: 1rem !important;
+    font-size: var(--fl-fs-md) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     cursor: pointer !important;
   }
 
-  /* ============ MENU BAWAH: 4-col grid, max 80px ============ */
+  /* ============ MENU BAWAH: 4-col fluid grid ============ */
   body.in-room-mode .mobile-room-shortcuts {
     flex-shrink: 0 !important;
     display: grid !important;
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 4px !important;
-    padding: 6px 8px !important;
-    padding-bottom: calc(6px + env(safe-area-inset-bottom)) !important;
-    max-height: 80px !important;
+    gap: var(--fl-1) !important;
+    padding: var(--fl-1) var(--fl-2) !important;
+    padding-bottom: calc(var(--fl-1) + env(safe-area-inset-bottom)) !important;
     background: #0b1120 !important;
     border-top: 1px solid rgba(255,255,255,0.06) !important;
   }
@@ -7765,13 +7789,14 @@ body.widget-dragging * {
     align-items: center !important;
     justify-content: center !important;
     gap: 3px !important;
-    height: 60px !important;
+    min-width: 0 !important;
+    height: clamp(46px, 14vw, 58px) !important;
     padding: 4px 2px !important;
-    border-radius: 12px !important;
+    border-radius: var(--fl-1) !important;
     border: none !important;
     background: rgba(255,255,255,0.04) !important;
     color: rgba(255,255,255,0.85) !important;
-    font-size: 11px !important;
+    font-size: var(--fl-fs-xs) !important;
     font-weight: 500 !important;
     line-height: 1.15 !important;
     white-space: normal !important;
@@ -7780,7 +7805,7 @@ body.widget-dragging * {
   }
 
   body.in-room-mode .mobile-room-shortcut-btn .mobile-shortcut-icon {
-    font-size: 20px !important;
+    font-size: var(--fl-fs-lg) !important;
     line-height: 1 !important;
   }
 
@@ -7812,8 +7837,8 @@ body.widget-dragging * {
     z-index: 341 !important;
     max-height: 75vh !important;
     overflow-y: auto !important;
-    border-radius: 20px 20px 0 0 !important;
-    padding: 16px 16px calc(16px + env(safe-area-inset-bottom)) !important;
+    border-radius: clamp(16px, 4.5vw, 22px) clamp(16px, 4.5vw, 22px) 0 0 !important;
+    padding: var(--fl-4, 14px) var(--fl-4, 14px) calc(var(--fl-4, 14px) + env(safe-area-inset-bottom)) !important;
     background: #111827 !important;
     border: 1px solid rgba(120, 137, 173, 0.16) !important;
     box-shadow: 0 -12px 40px rgba(0,0,0,0.4) !important;
@@ -7821,15 +7846,15 @@ body.widget-dragging * {
 
   .mobile-detail-close {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 32px;
-    height: 32px;
+    top: clamp(10px, 3vw, 14px);
+    right: clamp(10px, 3vw, 14px);
+    width: clamp(28px, 8vw, 34px);
+    height: clamp(28px, 8vw, 34px);
     border-radius: 10px;
     border: none;
     background: rgba(255,255,255,0.08);
     color: #fff;
-    font-size: 1.1rem;
+    font-size: clamp(1rem, 4vw, 1.2rem);
     display: none;
     align-items: center;
     justify-content: center;
@@ -7841,17 +7866,27 @@ body.widget-dragging * {
   }
 
   body.mobile-detail-open .summary-card-block h5 {
-    padding-right: 40px;
+    padding-right: clamp(32px, 10vw, 44px);
   }
 
   /* Hide upload progress bar padding issues */
   body.in-room-mode .upload-progress {
-    margin: 0 10px !important;
-    padding: 8px 12px !important;
+    margin: 0 var(--fl-2) !important;
+    padding: var(--fl-2) var(--fl-3) !important;
   }
 
   body.in-room-mode .pending-attachments:not(.hidden) {
-    margin: 0 10px !important;
-    padding: 6px 12px !important;
+    margin: 0 var(--fl-2) !important;
+    padding: var(--fl-1) var(--fl-3) !important;
+  }
+
+  /* ============ Ultra-narrow phones (<=340px): tighten fluid floor ============ */
+  @media (max-width: 340px) {
+    body.in-room-mode #ruang-transaksi {
+      --fl-fs-base: 12px;
+      --fl-fs-md: 12.5px;
+      --fl-avatar: 30px;
+      --fl-avatar-chat: 22px;
+    }
   }
 }
