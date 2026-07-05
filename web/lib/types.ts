@@ -9,6 +9,13 @@ export type User = {
   verificationStatus?: string;
   provider?: string;
   socialId?: string;
+  presence?: PresenceInfo;
+};
+
+export type PresenceInfo = {
+  isOnline: boolean;
+  lastSeenAt?: string;
+  activeTransactionCode?: string;
 };
 
 export type TransactionMessage = {
@@ -57,6 +64,8 @@ export type Transaction = {
   seller: User | null;
   messages: TransactionMessage[];
   uploads: TransactionUpload[];
+  adminPresence?: PresenceInfo;
+  typing?: Record<string, string>;
   settlement?: {
     buyerTransferAmount: number;
     sellerReceiveAmount: number;

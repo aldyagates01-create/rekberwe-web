@@ -161,6 +161,20 @@ export async function sendMessage(code: string, text: string) {
   });
 }
 
+export async function sendPresenceHeartbeat(activeTransactionCode = "") {
+  return fetchJson<{ presence: unknown }>("/api/presence/heartbeat", {
+    method: "POST",
+    body: JSON.stringify({ activeTransactionCode }),
+  });
+}
+
+export async function sendTypingState(code: string, isTyping: boolean) {
+  return fetchJson<{ ok: boolean }>(`/api/transactions/${encodeURIComponent(code)}/typing`, {
+    method: "POST",
+    body: JSON.stringify({ isTyping }),
+  });
+}
+
 export async function runAction(code: string, action: string) {
   return fetchJson<{ transaction: Transaction }>(`/api/transactions/${encodeURIComponent(code)}/actions`, {
     method: "POST",
