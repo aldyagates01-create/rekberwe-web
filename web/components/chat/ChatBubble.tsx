@@ -1,5 +1,7 @@
 import { getInitials, formatTime } from "@/lib/format";
 
+export const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-header.svg";
+
 type AvatarProps = {
   name: string;
   avatarUrl?: string;
@@ -95,6 +97,7 @@ export function UploadBubble({
   time,
   isMine,
   isAdmin,
+  avatarUrl,
 }: {
   sender: string;
   senderTitle: string;
@@ -103,11 +106,13 @@ export function UploadBubble({
   time: string;
   isMine: boolean;
   isAdmin: boolean;
+  avatarUrl?: string;
 }) {
   const isImage = isImageFile(fileName, fileUrl);
 
   return (
-    <div className={`flex ${isMine && !isAdmin ? "justify-end" : "justify-start"} px-3 py-1`}>
+    <div className={`flex ${isMine && !isAdmin ? "justify-end" : "justify-start"} gap-2 px-3 py-1`}>
+      {!isMine || isAdmin ? <Avatar name={sender} avatarUrl={avatarUrl} /> : null}
       <div className="max-w-bubble overflow-hidden rounded-xl border border-border bg-card px-3 py-2">
         <p className="text-xs font-semibold">{sender} · {senderTitle}</p>
         {isImage ? (
@@ -132,6 +137,7 @@ export function UploadBubble({
         )}
         <p className="mt-1 text-right text-[10px] text-white/40">{formatTime(time)}</p>
       </div>
+      {isMine && !isAdmin ? <Avatar name={sender} avatarUrl={avatarUrl} /> : null}
     </div>
   );
 }

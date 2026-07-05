@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChatBubble, SystemMessage, UploadBubble } from "@/components/chat/ChatBubble";
+import { ADMIN_AVATAR_URL, ChatBubble, SystemMessage, UploadBubble } from "@/components/chat/ChatBubble";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { QuickActionChips } from "@/components/chat/QuickActionChips";
@@ -49,6 +49,17 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
 
   const timeline = useMemo(
     () => (transaction ? buildTimeline(transaction) : []),
+    [transaction],
+  );
+
+  const getAvatarUrl = useCallback(
+    (senderUserId: string | null, senderTitle: string) => {
+      if (senderTitle === "Admin") return ADMIN_AVATAR_URL;
+      if (!transaction || !senderUserId) return undefined;
+      if (transaction.buyer?.id === senderUserId) return transaction.buyer.avatar;
+      if (transaction.seller?.id === senderUserId) return transaction.seller.avatar;
+      return undefined;
+    },
     [transaction],
   );
 
@@ -219,6 +230,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
                 time={item.time}
                 isMine={isMine}
                 isAdmin={isAdmin}
+                avatarUrl={getAvatarUrl(item.senderUserId, item.senderTitle)}
               />
             );
           }
@@ -248,6 +260,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
               time={item.time}
               isMine={isMine}
               isAdmin={isAdmin}
+              avatarUrl={getAvatarUrl(item.senderUserId, item.senderTitle)}
             />
           );
         })}
