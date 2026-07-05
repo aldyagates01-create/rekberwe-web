@@ -91,6 +91,8 @@ const elements = {
   mobileChatHeaderBadge: document.getElementById("mobile-chat-header-badge"),
   mobileRoomStatusBadge: document.getElementById("mobile-room-status-badge"),
   mobileRoomPrice: document.getElementById("mobile-room-price"),
+  mobileDetailBackdrop: document.getElementById("mobile-detail-backdrop"),
+  mobileDetailClose: document.getElementById("mobile-detail-close"),
   sampleLink: document.getElementById("sample-link"),
   transactionRoomSection: document.getElementById("ruang-transaksi"),
   transactionRoom: document.getElementById("transaction-room"),
@@ -604,8 +606,14 @@ function bindForms() {
   });
   elements.mobileNavAccount?.addEventListener("click", () => openWorkspaceSection("profile"));
   elements.mobileRoomDetailButton?.addEventListener("click", () => {
-    document.querySelector(".room-summary-panel")?.scrollIntoView({ behavior: window.innerWidth <= 768 ? "auto" : "smooth", block: "start" });
+    if (isMobileViewport()) {
+      toggleMobileDetailSheet();
+      return;
+    }
+    document.querySelector(".room-summary-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
+  elements.mobileDetailBackdrop?.addEventListener("click", () => toggleMobileDetailSheet(false));
+  elements.mobileDetailClose?.addEventListener("click", () => toggleMobileDetailSheet(false));
   elements.mobileRoomUploadButton?.addEventListener("click", () => elements.proofUpload?.click());
   elements.mobileRoomGuideButton?.addEventListener("click", () => window.open("/security-guide", "_blank", "noopener"));
   elements.mobileRoomDisputeButton?.addEventListener("click", () => elements.openDispute?.click());
@@ -1290,6 +1298,12 @@ function enterRoomMode() {
 
 function exitRoomMode() {
   document.body.classList.remove("in-room-mode");
+  toggleMobileDetailSheet(false);
+}
+
+function toggleMobileDetailSheet(open) {
+  const shouldOpen = typeof open === "boolean" ? open : !document.body.classList.contains("mobile-detail-open");
+  document.body.classList.toggle("mobile-detail-open", shouldOpen);
 }
 
 function renderAuthButtons() {

@@ -556,7 +556,7 @@
               <!-- Mobile-only: Room Header (back + title + status) -->
               <div class="mobile-chat-header" id="mobile-chat-header">
                 <button type="button" class="mobile-chat-back" id="mobile-chat-back" aria-label="Kembali">
-                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" width="24" height="24" aria-hidden="true">
                     <path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </button>
@@ -731,14 +731,15 @@
                     </div>
                   </form>
                   <div class="mobile-room-shortcuts">
-                    <button type="button" class="mobile-room-shortcut-btn" id="mobile-room-detail-button">Detail Transaksi</button>
-                    <button type="button" class="mobile-room-shortcut-btn" id="mobile-room-upload-button">Bukti Transfer</button>
-                    <button type="button" class="mobile-room-shortcut-btn" id="mobile-room-guide-button">Panduan</button>
-                    <button type="button" class="mobile-room-shortcut-btn danger" id="mobile-room-dispute-button">Laporkan</button>
+                    <button type="button" class="mobile-room-shortcut-btn" id="mobile-room-detail-button"><span class="mobile-shortcut-icon" aria-hidden="true">📄</span><span>Detail Transaksi</span></button>
+                    <button type="button" class="mobile-room-shortcut-btn" id="mobile-room-upload-button"><span class="mobile-shortcut-icon" aria-hidden="true">🧾</span><span>Bukti Transfer</span></button>
+                    <button type="button" class="mobile-room-shortcut-btn" id="mobile-room-guide-button"><span class="mobile-shortcut-icon" aria-hidden="true">❓</span><span>Panduan</span></button>
+                    <button type="button" class="mobile-room-shortcut-btn danger" id="mobile-room-dispute-button"><span class="mobile-shortcut-icon" aria-hidden="true">⚠️</span><span>Laporkan</span></button>
                   </div>
                 </section>
 
                 <aside class="panel room-summary-panel">
+                  <button type="button" class="mobile-detail-close" id="mobile-detail-close" aria-label="Tutup detail">×</button>
                   <section class="summary-card-block">
                     <h5>Ringkasan transaksi</h5>
                     <div class="summary-list" id="room-summary"></div>
@@ -749,6 +750,7 @@
                   </section>
                 </aside>
               </div>
+              <div class="hidden" id="mobile-detail-backdrop"></div>
             </div>
           </section>
         </section>
