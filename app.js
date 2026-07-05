@@ -901,6 +901,9 @@ async function handleJoinTransaction() {
 
     if (alreadyParticipantLocal || (localTransaction.buyer && localTransaction.seller)) {
       closeJoinRoleModal();
+      if (isMobileViewport() && openMobileTransactionChat(code)) {
+        return;
+      }
       state.activeTransaction = localTransaction;
       state.transactionScreen = "room";
       openWorkspaceSection("transactions");
@@ -937,6 +940,9 @@ async function handleJoinTransaction() {
 
   elements.joinRoleBox.classList.add("hidden");
   closeJoinRoleModal();
+  if (isMobileViewport() && openMobileTransactionChat(code)) {
+    return;
+  }
   state.activeTransaction = transaction;
   state.transactionScreen = "room";
   await refreshTransactions();
@@ -957,6 +963,9 @@ async function handleRoleJoin(role) {
     });
     state.pendingJoinTransaction = null;
     closeJoinRoleModal();
+    if (isMobileViewport() && openMobileTransactionChat(code)) {
+      return;
+    }
     state.activeTransaction = joined.transaction;
     state.transactionScreen = "room";
     await refreshTransactions();
@@ -2106,7 +2115,11 @@ function buildChatHistoryRows(messages) {
 function bindOpenTransactionButtons() {
   document.querySelectorAll(".open-transaction-btn").forEach((button) => {
     button.addEventListener("click", () => {
-      elements.joinCode.value = button.dataset.transactionCode;
+      const code = button.dataset.transactionCode;
+      if (isMobileViewport() && openMobileTransactionChat(code)) {
+        return;
+      }
+      elements.joinCode.value = code;
       handleJoinTransaction();
     });
   });
