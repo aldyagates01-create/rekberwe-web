@@ -25,6 +25,7 @@ const state = {
   },
   supportThread: null,
   workspaceSection: "dashboard",
+  mobileCreateOpen: false,
 };
 
 const notificationState = {
@@ -572,32 +573,33 @@ function bindForms() {
     }
   });
   elements.mobileQuickCreate?.addEventListener("click", () => {
-    openWorkspaceSection("dashboard");
-    document.getElementById("workspace-inline-transaction-panel")?.scrollIntoView({ behavior: window.innerWidth <= 768 ? "auto" : "smooth", block: "start" });
+    openMobileCreateTransaction();
   });
   elements.mobileQuickTransactions?.addEventListener("click", () => {
     state.transactionScreen = "list";
     openWorkspaceSection("transactions");
   });
   elements.mobileQuickGuide?.addEventListener("click", () => {
-    document.getElementById("workspace-terms-list")?.scrollIntoView({ behavior: window.innerWidth <= 768 ? "auto" : "smooth", block: "start" });
+    openMobileDashboardDetail("workspace-terms-list");
   });
   elements.mobileQuickSecurity?.addEventListener("click", () => {
     window.location.href = "/security-guide";
   });
   elements.mobileDashboardLearnMore?.addEventListener("click", () => {
-    document.getElementById("workspace-public-fee-list")?.scrollIntoView({ behavior: window.innerWidth <= 768 ? "auto" : "smooth", block: "start" });
+    openMobileDashboardDetail("workspace-public-fee-list");
   });
   elements.mobileHeaderNotifications?.addEventListener("click", () => openWorkspaceSection("notifications"));
   elements.mobileHeaderProfile?.addEventListener("click", () => openWorkspaceSection("profile"));
-  elements.mobileNavDashboard?.addEventListener("click", () => openWorkspaceSection("dashboard"));
+  elements.mobileNavDashboard?.addEventListener("click", () => {
+    state.mobileCreateOpen = false;
+    openWorkspaceSection("dashboard");
+  });
   elements.mobileNavTransactions?.addEventListener("click", () => {
     state.transactionScreen = "list";
     openWorkspaceSection("transactions");
   });
   elements.mobileNavCreate?.addEventListener("click", () => {
-    openWorkspaceSection("dashboard");
-    document.getElementById("workspace-inline-transaction-panel")?.scrollIntoView({ behavior: window.innerWidth <= 768 ? "auto" : "smooth", block: "start" });
+    openMobileCreateTransaction();
   });
   elements.mobileNavSupport?.addEventListener("click", () => {
     if (!elements.supportWidgetPanel?.classList.contains("open")) {
@@ -1514,18 +1516,23 @@ function renderMobileDashboard() {
   }
 
   elements.mobileDashboardTransactions.innerHTML = activeTransactions.slice(0, 4).map((transaction) => `
-    <button type="button" class="mobile-dashboard-transaction-item" data-transaction-code="${escapeAttribute(transaction.code)}">
-      <div class="mobile-dashboard-transaction-top">
-        <div>
-          <strong>${escapeHtml(transaction.code)}</strong>
+    <button type="button" class="mobile-dashboard-transaction-item mobile-transaction-card" data-transaction-code="${escapeAttribute(transaction.code)}">
+      <div class="mobile-transaction-card-main">
+        <div class="mobile-transaction-game-icon">${getInitials(transaction.title || transaction.code)}</div>
+        <div class="mobile-transaction-copy">
+          <div class="mobile-transaction-code-row">
+            <strong>${escapeHtml(transaction.code)}</strong>
+            <span class="summary-status-chip summary-status-chip-info">${escapeHtml(transaction.paymentStatus)}</span>
+          </div>
           <span>${escapeHtml(transaction.title)}</span>
+          <small>Penjual: ${escapeHtml(transaction.seller?.displayName || "Menunggu seller")}</small>
         </div>
-        <span class="mobile-dashboard-transaction-price">${formatCurrency(transaction.price)}</span>
+        <div class="mobile-transaction-value">
+          <strong>${formatCurrency(transaction.price)}</strong>
+          <small>Dibuat: ${transaction.createdAt ? formatDate(new Date(transaction.createdAt)) : "-"}</small>
+        </div>
       </div>
-      <div class="mobile-dashboard-transaction-bottom">
-        <span class="summary-status-chip summary-status-chip-info">${escapeHtml(transaction.paymentStatus)}</span>
-        <small>${transaction.createdAt ? formatDate(new Date(transaction.createdAt)) : "-"}</small>
-      </div>
+      ${buildMobileTransactionProgress(transaction)}
     </button>
   `).join("");
 
@@ -1540,6 +1547,48 @@ function renderMobileDashboard() {
       renderRoom(transaction);
     });
   });
+}
+
+function buildMobileTransactionProgress(transaction) {
+  const steps = [
+    { label: "Pesanan Dibuat", done: true, icon: "▣" },
+    { label: "Dana Diamankan", done: Boolean(transaction.adminFundsReceived), icon: "●" },
+    {
+      label: "Akun Diperiksa",
+      done: transaction.paymentStatus === "Akun sudah diserahkan"
+        || Boolean(transaction.buyerConfirmedReceived)
+        || Boolean(transaction.sellerPayoutSent)
+        || transaction.paymentStatus === "Selesai",
+      icon: "⌕",
+    },
+    { label: "Selesai", done: transaction.paymentStatus === "Selesai" || Boolean(transaction.sellerPayoutSent), icon: "✓" },
+  ];
+
+  return `
+    <div class="mobile-transaction-progress">
+      ${steps.map((step) => `
+        <span class="mobile-transaction-progress-step ${step.done ? "is-done" : ""}">
+          <i>${step.icon}</i>
+          <small>${step.label}</small>
+        </span>
+      `).join("")}
+    </div>
+  `;
+}
+
+function openMobileCreateTransaction() {
+  state.mobileCreateOpen = true;
+  openWorkspaceSection("dashboard");
+  renderTransactionScreen();
+  const target = document.getElementById("workspace-inline-transaction-panel");
+  target?.scrollIntoView({ behavior: window.innerWidth <= 768 ? "auto" : "smooth", block: "start" });
+}
+
+function openMobileDashboardDetail(targetId) {
+  state.mobileCreateOpen = true;
+  openWorkspaceSection("dashboard");
+  renderTransactionScreen();
+  document.getElementById(targetId)?.scrollIntoView({ behavior: window.innerWidth <= 768 ? "auto" : "smooth", block: "start" });
 }
 
 function renderHero() {
@@ -2146,6 +2195,9 @@ function openWorkspaceSection(section) {
   if (section !== "transactions" || state.transactionScreen !== "room") {
     exitRoomMode();
   }
+  if (section !== "dashboard") {
+    state.mobileCreateOpen = false;
+  }
   state.currentMemberView = "transactions";
   state.workspaceSection = section;
   renderHomeVisibility();
@@ -2157,6 +2209,7 @@ function openHomeView() {
   if (state.currentUser) {
     state.currentMemberView = "transactions";
     state.workspaceSection = "dashboard";
+    state.mobileCreateOpen = false;
     renderHomeVisibility();
     renderMemberVisibility();
     scrollWorkspaceTarget("member-area");
@@ -3226,6 +3279,7 @@ function renderTransactionScreen() {
   elements.historyRekberSection.classList.toggle("hidden", !showTransactionsSection);
   elements.transactionRoomSection.classList.toggle("hidden", !inWorkspace);
   elements.workspaceDashboardView?.classList.toggle("hidden", !showDashboard);
+  elements.workspaceDashboardView?.classList.toggle("mobile-create-open", Boolean(showDashboard && state.mobileCreateOpen));
   elements.workspaceProfileView?.classList.toggle("hidden", !showProfile);
   elements.workspaceNotificationsView?.classList.toggle("hidden", !showNotifications);
   elements.workspaceMobileTransactionsView?.classList.toggle("hidden", !showMobileTransactionsView);

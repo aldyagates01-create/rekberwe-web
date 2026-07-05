@@ -6116,8 +6116,15 @@ a.primary-btn.submit-btn {
     min-width: 0 !important;
   }
 
-  #workspace-dashboard-view:not(.hidden) .workspace-dashboard-shell {
+  #workspace-dashboard-view:not(.hidden):not(.mobile-create-open) .workspace-dashboard-shell {
     display: none !important;
+  }
+
+  #workspace-dashboard-view.mobile-create-open .workspace-dashboard-shell {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+    margin-top: 14px !important;
   }
 
   .mobile-dashboard-shell {
@@ -6222,29 +6229,29 @@ a.primary-btn.submit-btn {
 
   .mobile-quick-actions-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .mobile-quick-action-btn {
     border: 1px solid rgba(120, 137, 173, 0.16);
     background: linear-gradient(180deg, rgba(20, 29, 49, 0.98), rgba(14, 21, 37, 0.98));
     border-radius: 18px;
-    min-height: 120px;
-    padding: 16px 12px;
+    min-height: 104px;
+    padding: 12px 8px;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    align-items: flex-start;
+    align-items: center;
     gap: 6px;
-    text-align: left;
+    text-align: center;
     color: #eef3ff;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
   }
 
   .mobile-quick-action-icon {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     border-radius: 14px;
     display: grid;
     place-items: center;
@@ -6255,13 +6262,13 @@ a.primary-btn.submit-btn {
   }
 
   .mobile-quick-action-btn strong {
-    font-size: 0.95rem;
+    font-size: 0.78rem;
     line-height: 1.2;
     color: #ffffff;
   }
 
   .mobile-quick-action-btn small {
-    font-size: 0.76rem;
+    font-size: 0.62rem;
     line-height: 1.45;
     color: #93a6c9;
   }
@@ -6750,7 +6757,6 @@ a.primary-btn.submit-btn {
     font-size: 1.48rem !important;
   }
 
-  .mobile-quick-actions-grid,
   .transaction-progress-strip,
   .transaction-participants-strip,
   .mobile-dashboard-summary-grid {
@@ -6869,6 +6875,167 @@ body.widget-dragging * {
 
   .mobile-dashboard-shell {
     margin-bottom: 14px !important;
+  }
+
+  .mobile-transaction-card {
+    width: 100%;
+    padding: 14px !important;
+    border-radius: 18px !important;
+    background: linear-gradient(180deg, rgba(20, 29, 49, 0.98), rgba(14, 21, 37, 0.98)) !important;
+    border: 1px solid rgba(120, 137, 173, 0.12) !important;
+    color: #f8fbff !important;
+    text-align: left !important;
+  }
+
+  .mobile-transaction-card-main {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .mobile-transaction-game-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    color: #ffffff;
+    font-weight: 800;
+    background: radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.2), transparent 35%), linear-gradient(135deg, #6d4cff, #16213f);
+    border: 1px solid rgba(139, 92, 246, 0.45);
+  }
+
+  .mobile-transaction-copy,
+  .mobile-transaction-value {
+    min-width: 0;
+  }
+
+  .mobile-transaction-code-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .mobile-transaction-code-row strong {
+    font-size: 0.9rem;
+    color: #ffffff;
+    line-height: 1.2;
+  }
+
+  .mobile-transaction-code-row .summary-status-chip {
+    max-width: 116px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.55rem !important;
+    padding: 3px 6px !important;
+  }
+
+  .mobile-transaction-copy > span,
+  .mobile-transaction-copy > small,
+  .mobile-transaction-value small {
+    display: block;
+    margin-top: 3px;
+    color: #8fa2c5;
+    font-size: 0.68rem;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-transaction-value {
+    text-align: right;
+  }
+
+  .mobile-transaction-value strong {
+    display: block;
+    color: #22c55e;
+    font-size: 0.82rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .mobile-transaction-progress {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .mobile-transaction-progress-step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    color: #6d7f9f;
+  }
+
+  .mobile-transaction-progress-step::before {
+    content: "";
+    position: absolute;
+    top: 13px;
+    left: -50%;
+    width: 100%;
+    height: 1px;
+    background: rgba(120, 137, 173, 0.18);
+  }
+
+  .mobile-transaction-progress-step:first-child::before {
+    display: none;
+  }
+
+  .mobile-transaction-progress-step.is-done::before {
+    background: rgba(109, 76, 255, 0.55);
+  }
+
+  .mobile-transaction-progress-step i {
+    position: relative;
+    z-index: 1;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-style: normal;
+    font-size: 0.7rem;
+    background: #1a2436;
+    border: 1px solid rgba(120, 137, 173, 0.16);
+  }
+
+  .mobile-transaction-progress-step.is-done i {
+    background: linear-gradient(135deg, #7b4dff, #4b5bff);
+    color: #ffffff;
+    border-color: rgba(139, 92, 246, 0.55);
+  }
+
+  .mobile-transaction-progress-step small {
+    max-width: 72px;
+    font-size: 0.56rem;
+    line-height: 1.2;
+    text-align: center;
+    color: inherit;
+  }
+
+  #workspace-dashboard-view.mobile-create-open #workspace-inline-transaction-panel {
+    scroll-margin-top: 12px;
+  }
+
+  #workspace-dashboard-view.mobile-create-open #workspace-transaction-form {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  #workspace-dashboard-view.mobile-create-open #workspace-transaction-form input,
+  #workspace-dashboard-view.mobile-create-open #workspace-transaction-form select {
+    min-height: 46px !important;
+    border-radius: 14px !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #f8fbff !important;
   }
 
   .mobile-dashboard-transaction-item .transaction-list-card {
