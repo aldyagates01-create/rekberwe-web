@@ -8267,27 +8267,22 @@ body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy span {
     position: relative !important;
     inset: auto !important;
     height: auto !important;
-    max-height: calc(100vh - 24px);
-    overflow: hidden;
-    display: flex !important;
-    flex-direction: column !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
     border-radius: 24px !important;
   }
 
   body.in-room-mode #transaction-room {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
+    display: block;
+    overflow: visible;
   }
 
   body.in-room-mode .mobile-chat-header {
     display: flex !important;
-    position: sticky;
-    top: 0;
-    z-index: 40;
+    position: relative;
+    top: auto;
+    z-index: 1;
     flex-shrink: 0;
     align-items: center;
     gap: 12px;
@@ -8310,7 +8305,18 @@ body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy span {
   }
 
   body.in-room-mode .transaction-overview-card {
-    flex-shrink: 0;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  body.in-room-mode .room-sticky-head {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding: 12px 0 14px;
+    margin-bottom: 14px;
+    background: linear-gradient(180deg, rgba(11, 17, 32, 0.99) 0%, rgba(11, 17, 32, 0.99) 92%, rgba(11, 17, 32, 0));
+    box-shadow: 0 10px 24px rgba(2, 8, 23, 0.22);
   }
 
   body.in-room-mode .room-content-grid {
@@ -8318,25 +8324,51 @@ body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy span {
     grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.72fr) !important;
     gap: 18px !important;
     align-items: start !important;
-    flex-direction: unset !important;
     overflow: visible !important;
-    padding: 0 0 18px !important;
+    padding: 0 0 24px !important;
   }
 
   body.in-room-mode .room-chat-main {
-    min-height: 640px !important;
+    display: block !important;
+    min-height: auto !important;
     max-height: none !important;
     height: auto !important;
   }
 
+  body.in-room-mode .room-chat-main .chat-box,
+  body.in-room-mode .room-chat-main #chat-box {
+    display: grid !important;
+    flex: none !important;
+    overflow: visible !important;
+    max-height: none !important;
+    min-height: 240px !important;
+    height: auto !important;
+  }
+
+  body.in-room-mode .room-chat-main #chat-form,
+  body.in-room-mode .room-chat-main #admin-chat-form,
+  body.in-room-mode .room-chat-main .chat-typing-indicator {
+    position: static !important;
+    bottom: auto !important;
+    margin-top: 0 !important;
+    z-index: auto !important;
+  }
+
+  body.in-room-mode .room-chat-main .chat-typing-indicator {
+    order: unset !important;
+  }
+
   body.in-room-mode .room-summary-panel {
     display: block !important;
-    position: sticky;
-    top: 72px;
+    position: static !important;
+    top: auto !important;
     align-self: start;
   }
 
-  body.in-room-mode .chat-typing-indicator {
-    bottom: 62px;
+  body.in-room-mode .room-chat-actions-inline,
+  body.in-room-mode .seller-bank-form,
+  body.in-room-mode .chat-room-alert,
+  body.in-room-mode .telegram-chat-head {
+    position: static !important;
   }
 }
