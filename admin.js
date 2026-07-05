@@ -1975,31 +1975,36 @@ function applyAdminPresenceToTransaction(transaction, userId, presence) {
   return next;
 }
 
+function buildTypingIndicatorText(transaction, excludeUserId) {
+  if (!transaction?.typing) return "";
+  const labels = Object.keys(transaction.typing)
+    .filter((userId) => userId !== excludeUserId)
+    .map((userId) => {
+      if (transaction.buyer?.id === userId) return transaction.buyer.displayName || "Pembeli";
+      if (transaction.seller?.id === userId) return transaction.seller.displayName || "Penjual";
+      return "Admin";
+    });
+  if (!labels.length) return "";
+  if (labels.length === 1) return `${labels[0]} sedang mengetik...`;
+  if (labels.length === 2) return `${labels[0]} & ${labels[1]} sedang mengetik...`;
+  return `${labels.slice(0, -1).join(", ")} & ${labels[labels.length - 1]} sedang mengetik...`;
+}
+
 function renderAdminRoomPresence(transaction) {
   if (!transaction) return;
-  const typing = transaction.typing || {};
-  const buyerTyping = Boolean(transaction.buyer?.id && typing[transaction.buyer.id]);
-  const sellerTyping = Boolean(transaction.seller?.id && typing[transaction.seller.id]);
-  const anyoneTyping = Object.keys(typing).some((userId) => userId !== state.currentUser?.id);
+  const typingText = buildTypingIndicatorText(transaction, state.currentUser?.id);
 
   if (elements.adminRoomBuyerState) {
-    elements.adminRoomBuyerState.textContent = buyerTyping ? "Sedang mengetik..." : formatPresenceLabel(transaction.buyer?.presence);
-    elements.adminRoomBuyerState.className = `participant-state ${getAdminPresenceStateClass(transaction.buyer?.presence, buyerTyping)}`;
+    elements.adminRoomBuyerState.textContent = formatPresenceLabel(transaction.buyer?.presence);
+    elements.adminRoomBuyerState.className = `participant-state ${getAdminPresenceStateClass(transaction.buyer?.presence)}`;
   }
   if (elements.adminRoomSellerState) {
-    elements.adminRoomSellerState.textContent = sellerTyping ? "Sedang mengetik..." : formatPresenceLabel(transaction.seller?.presence);
-    elements.adminRoomSellerState.className = `participant-state ${getAdminPresenceStateClass(transaction.seller?.presence, sellerTyping)}`;
+    elements.adminRoomSellerState.textContent = formatPresenceLabel(transaction.seller?.presence);
+    elements.adminRoomSellerState.className = `participant-state ${getAdminPresenceStateClass(transaction.seller?.presence)}`;
   }
   if (elements.adminChatTypingIndicator) {
-    const typingLabels = [];
-    if (buyerTyping) typingLabels.push("Pembeli");
-    if (sellerTyping) typingLabels.push("Penjual");
-    elements.adminChatTypingIndicator.classList.toggle("hidden", !anyoneTyping);
-    elements.adminChatTypingIndicator.textContent = typingLabels.length
-      ? `${typingLabels.join(" & ")} sedang mengetik...`
-      : anyoneTyping
-        ? "Sedang mengetik..."
-        : "";
+    elements.adminChatTypingIndicator.classList.toggle("hidden", !typingText);
+    elements.adminChatTypingIndicator.textContent = typingText;
   }
 }
 

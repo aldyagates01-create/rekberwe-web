@@ -599,44 +599,49 @@ function applyPresenceToTransaction(transaction, userId, presence, adminPresence
   return next;
 }
 
+function buildTypingIndicatorText(transaction, excludeUserId) {
+  if (!transaction?.typing) return "";
+  const labels = Object.keys(transaction.typing)
+    .filter((userId) => userId !== excludeUserId)
+    .map((userId) => {
+      if (transaction.buyer?.id === userId) return transaction.buyer.displayName || "Pembeli";
+      if (transaction.seller?.id === userId) return transaction.seller.displayName || "Penjual";
+      return "Admin";
+    });
+  if (!labels.length) return "";
+  if (labels.length === 1) return `${labels[0]} sedang mengetik...`;
+  if (labels.length === 2) return `${labels[0]} & ${labels[1]} sedang mengetik...`;
+  return `${labels.slice(0, -1).join(", ")} & ${labels[labels.length - 1]} sedang mengetik...`;
+}
+
 function renderRoomPresence(transaction) {
   if (!transaction) return;
   const role = getCurrentUserTransactionRole(transaction);
   const counterparty = role === "buyer" ? transaction.seller : role === "seller" ? transaction.buyer : null;
-  const typing = transaction.typing || {};
-  const counterpartyTyping = Boolean(counterparty?.id && typing[counterparty.id]);
-  const anyoneTyping = Object.keys(typing).some((userId) => userId !== state.currentUser?.id);
+  const typingText = buildTypingIndicatorText(transaction, state.currentUser?.id);
 
   if (elements.roomBuyerState) {
-    const buyerTyping = Boolean(transaction.buyer?.id && typing[transaction.buyer.id]);
-    elements.roomBuyerState.textContent = buyerTyping ? "Sedang mengetik..." : formatPresenceLabel(transaction.buyer?.presence);
-    elements.roomBuyerState.className = `participant-state ${getPresenceStateClass(transaction.buyer?.presence, buyerTyping)}`;
+    elements.roomBuyerState.textContent = formatPresenceLabel(transaction.buyer?.presence);
+    elements.roomBuyerState.className = `participant-state ${getPresenceStateClass(transaction.buyer?.presence)}`;
   }
   if (elements.roomSellerState) {
-    const sellerTyping = Boolean(transaction.seller?.id && typing[transaction.seller.id]);
-    elements.roomSellerState.textContent = sellerTyping ? "Sedang mengetik..." : formatPresenceLabel(transaction.seller?.presence);
-    elements.roomSellerState.className = `participant-state ${getPresenceStateClass(transaction.seller?.presence, sellerTyping)}`;
+    elements.roomSellerState.textContent = formatPresenceLabel(transaction.seller?.presence);
+    elements.roomSellerState.className = `participant-state ${getPresenceStateClass(transaction.seller?.presence)}`;
   }
   if (elements.roomAdminState) {
     elements.roomAdminState.textContent = formatPresenceLabel(transaction.adminPresence);
     elements.roomAdminState.className = `participant-state ${getPresenceStateClass(transaction.adminPresence)}`;
   }
 
-  const headerLabel = counterpartyTyping
-    ? "Sedang mengetik..."
-    : formatPresenceLabel(counterparty?.presence || transaction.adminPresence);
-  const headerOnline = counterpartyTyping || isPresenceOnline(counterparty?.presence) || isPresenceOnline(transaction.adminPresence);
+  const headerLabel = formatPresenceLabel(counterparty?.presence || transaction.adminPresence);
+  const headerOnline = isPresenceOnline(counterparty?.presence) || isPresenceOnline(transaction.adminPresence);
   if (elements.mobileChatHeaderOnline) {
-    elements.mobileChatHeaderOnline.textContent = counterpartyTyping ? "Sedang mengetik..." : `● ${headerLabel}`;
+    elements.mobileChatHeaderOnline.textContent = `● ${headerLabel}`;
     elements.mobileChatHeaderOnline.style.color = headerOnline ? "#22c55e" : "#93a4c3";
   }
   if (elements.chatTypingIndicator) {
-    elements.chatTypingIndicator.classList.toggle("hidden", !anyoneTyping);
-    elements.chatTypingIndicator.textContent = counterpartyTyping
-      ? "Lawannya sedang mengetik..."
-      : anyoneTyping
-        ? "Sedang mengetik..."
-        : "";
+    elements.chatTypingIndicator.classList.toggle("hidden", !typingText);
+    elements.chatTypingIndicator.textContent = typingText;
   }
 }
 
@@ -2521,7 +2526,7 @@ function renderRoom(transaction) {
   elements.roomPaymentStatus.textContent = transaction.paymentStatus;
   elements.roomBuyer.textContent = transaction.buyer ? transaction.buyer.displayName : "Menunggu pembeli";
   elements.roomSeller.textContent = transaction.seller ? transaction.seller.displayName : "Menunggu penjual";
-  if (elements.mobileChatHeaderTitle) elements.mobileChatHeaderTitle.textContent = `Transaksi #${transaction.code}`;
+  if (elements.mobileChatHeaderTitle) elements.mobileChatHeaderTitle.textContent = transaction.title || transaction.code;
   if (elements.mobileChatHeaderBadge) elements.mobileChatHeaderBadge.textContent = transaction.paymentStatus || "-";
   if (elements.mobileRoomStatusBadge) elements.mobileRoomStatusBadge.textContent = transaction.paymentStatus || "-";
   if (elements.mobileRoomPrice) elements.mobileRoomPrice.textContent = formatCurrency(transaction.price);

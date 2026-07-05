@@ -79,8 +79,10 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
   );
   const showSellerBankEditor = showSellerBankForm && (!hasSellerBankDetails || editingBank);
   const showSellerBankSummary = showSellerBankForm && hasSellerBankDetails && !editingBank;
-  const typingUserIds = Object.keys(transaction?.typing || {}).filter((userId) => userId !== user?.id);
-  const isCounterpartyTyping = typingUserIds.length > 0;
+  const typingIndicatorText = useMemo(
+    () => (transaction && user?.id ? buildTypingIndicatorText(transaction, user.id) : ""),
+    [transaction, user?.id],
+  );
   const presenceText = useMemo(
     () => getTransactionPresenceText(transaction, role),
     [transaction, role, presenceTick],
@@ -362,10 +364,10 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-bg">
       <ChatHeader
+        title={transaction.title}
         code={transaction.code}
         status={transaction.paymentStatus}
         presenceText={presenceText}
-        isTyping={isCounterpartyTyping}
         onBack={() => router.push("/")}
       />
 
@@ -510,6 +512,12 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
         disabled={sending}
       />
 
+      {typingIndicatorText ? (
+        <p className="shrink-0 border-t border-white/5 bg-[#0d1524] px-4 py-2 text-[11px] font-medium text-accent-blue">
+          {typingIndicatorText}
+        </p>
+      ) : null}
+
       <ChatInput
         value={message}
         onChange={setMessage}
@@ -528,6 +536,20 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
       />
     </div>
   );
+}
+
+function buildTypingIndicatorText(transaction: Transaction, excludeUserId: string) {
+  const labels = Object.keys(transaction.typing || {})
+    .filter((userId) => userId !== excludeUserId)
+    .map((userId) => {
+      if (transaction.buyer?.id === userId) return transaction.buyer.displayName || "Pembeli";
+      if (transaction.seller?.id === userId) return transaction.seller.displayName || "Penjual";
+      return "Admin";
+    });
+  if (!labels.length) return "";
+  if (labels.length === 1) return `${labels[0]} sedang mengetik...`;
+  if (labels.length === 2) return `${labels[0]} & ${labels[1]} sedang mengetik...`;
+  return `${labels.slice(0, -1).join(", ")} & ${labels[labels.length - 1]} sedang mengetik...`;
 }
 
 function getActionConfirmation(action: TransactionActionKey) {
