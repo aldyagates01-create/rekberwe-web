@@ -792,13 +792,18 @@ async function handleCreateTransaction(event) {
   const shareLink = buildTransactionLink(payload.transaction.code);
   state.activeTransaction = payload.transaction;
   state.transactionScreen = "room";
+  state.currentMemberView = "transactions";
+  state.workspaceSection = "transactions";
   state.mobileCreateOpen = false;
-  renderAll();
   showResult(form, `Transaksi ${payload.transaction.code} berhasil dibuat. Bagikan link ini ke lawan transaksi: ${shareLink}`, false);
   history.replaceState({}, "", `?trx=${payload.transaction.code}`);
   form.reset();
   toggleVerificationFieldsForForm(form);
   updateTransactionFeePreview(form);
+  if (isMobileViewport() && openMobileTransactionChat(payload.transaction.code)) {
+    return;
+  }
+  renderAll();
 }
 
 function parseCurrencyInput(value) {
