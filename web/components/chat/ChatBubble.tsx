@@ -104,20 +104,39 @@ export function UploadBubble({
   isMine: boolean;
   isAdmin: boolean;
 }) {
+  const isImage = isImageFile(fileName, fileUrl);
+
   return (
     <div className={`flex ${isMine && !isAdmin ? "justify-end" : "justify-start"} px-3 py-1`}>
-      <div className="max-w-bubble rounded-xl border border-border bg-card px-3 py-2">
+      <div className="max-w-bubble overflow-hidden rounded-xl border border-border bg-card px-3 py-2">
         <p className="text-xs font-semibold">{sender} · {senderTitle}</p>
-        <a
-          href={fileUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-1 block break-all text-sm text-accent-blue underline"
-        >
-          📎 {fileName}
-        </a>
+        {isImage ? (
+          <a href={fileUrl} target="_blank" rel="noreferrer" className="mt-2 block">
+            <img
+              src={fileUrl}
+              alt={fileName}
+              className="max-h-64 w-full rounded-lg object-cover ring-1 ring-border"
+              loading="lazy"
+            />
+            <span className="mt-1 block break-all text-xs text-white/50">{fileName}</span>
+          </a>
+        ) : (
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 block break-all text-sm text-accent-blue underline"
+          >
+            📎 {fileName}
+          </a>
+        )}
         <p className="mt-1 text-right text-[10px] text-white/40">{formatTime(time)}</p>
       </div>
     </div>
   );
+}
+
+function isImageFile(fileName: string, fileUrl: string) {
+  const value = `${fileName} ${fileUrl}`.split("?")[0].toLowerCase();
+  return /\.(apng|avif|gif|jpe?g|png|webp)$/i.test(value);
 }
