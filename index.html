@@ -839,6 +839,49 @@
     </div>
   </main>
 
+  <div class="modal hidden" id="whatsapp-otp-modal" aria-hidden="true">
+    <div class="modal-card whatsapp-otp-modal-card">
+      <p class="eyebrow">Keamanan akun</p>
+      <h3>Verifikasi WhatsApp</h3>
+      <p class="mini-note">Masukkan kode OTP yang telah dikirim ke WhatsApp Anda.</p>
+      <div class="whatsapp-otp-edit-panel hidden" id="whatsapp-otp-edit-panel">
+        <label>
+          Edit nomor WhatsApp
+          <input type="tel" id="whatsapp-otp-edit-input" placeholder="08xxxxxxxxxx" />
+        </label>
+        <button type="button" class="ghost-btn" id="whatsapp-otp-save-number-btn">Simpan Nomor</button>
+      </div>
+      <input
+        type="text"
+        id="whatsapp-otp-input"
+        class="whatsapp-otp-code-input"
+        inputmode="numeric"
+        maxlength="6"
+        placeholder="______"
+        autocomplete="one-time-code"
+      />
+      <p class="mini-note whatsapp-otp-timer" id="whatsapp-otp-resend-timer">Timer kirim ulang: 00:00</p>
+      <p class="danger-note hidden" id="whatsapp-otp-error"></p>
+      <p class="success-note hidden" id="whatsapp-otp-success"></p>
+      <div class="whatsapp-otp-actions">
+        <button type="button" class="primary-btn" id="whatsapp-otp-verify-btn">Verifikasi</button>
+        <button type="button" class="ghost-btn" id="whatsapp-otp-resend-btn">Kirim Ulang OTP</button>
+        <button type="button" class="ghost-btn" id="whatsapp-otp-edit-number-btn">Edit No WhatsApp</button>
+      </div>
+      <div class="warning-note hidden" id="whatsapp-otp-lockout-help">
+        <p id="whatsapp-otp-lockout-text"></p>
+        <p class="mini-note hidden" id="whatsapp-otp-lock-timer"></p>
+        <div class="topbar-actions">
+          <button type="button" class="ghost-btn" id="whatsapp-otp-lock-change-btn">Ganti Nomor</button>
+          <button type="button" class="ghost-btn" id="whatsapp-otp-contact-admin-btn">Hubungi Admin</button>
+        </div>
+      </div>
+      <div class="topbar-actions modal-actions-end">
+        <button type="button" class="ghost-btn" id="whatsapp-otp-close-btn">Tutup</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal hidden" id="verification-modal">
     <div class="modal-card">
       <p class="eyebrow">Verifikasi diperlukan</p>

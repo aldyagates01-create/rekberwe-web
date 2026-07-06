@@ -45,6 +45,16 @@ const sellerBankUiState = {
   lastLoadedSnapshot: "",
 };
 
+const OTP_LOCK_MESSAGE = "Kode OTP belum masuk? Pastikan nomor WhatsApp aktif, tidak salah input, dan memiliki koneksi internet. Anda dapat mencoba lagi dalam 10 menit atau menghubungi admin untuk verifikasi manual.";
+const OTP_SUPPORT_MESSAGE = "Saya mengalami kendala OTP WhatsApp tidak masuk setelah 3 kali percobaan. Mohon bantu verifikasi nomor saya.";
+
+const whatsappOtpRuntime = {
+  state: null,
+  tickTimer: null,
+  cooldownEndsAt: 0,
+  lockEndsAt: 0,
+};
+
 const elements = {
   homeNavButton: document.getElementById("home-nav-button"),
   openLogin: document.getElementById("open-login"),
@@ -220,6 +230,23 @@ const elements = {
   userProfileModalName: document.getElementById("user-profile-modal-name"),
   userProfileModalBadge: document.getElementById("user-profile-modal-badge"),
   userProfileModalGrid: document.getElementById("user-profile-modal-grid"),
+  whatsappOtpModal: document.getElementById("whatsapp-otp-modal"),
+  whatsappOtpInput: document.getElementById("whatsapp-otp-input"),
+  whatsappOtpResendTimer: document.getElementById("whatsapp-otp-resend-timer"),
+  whatsappOtpError: document.getElementById("whatsapp-otp-error"),
+  whatsappOtpSuccess: document.getElementById("whatsapp-otp-success"),
+  whatsappOtpVerifyBtn: document.getElementById("whatsapp-otp-verify-btn"),
+  whatsappOtpResendBtn: document.getElementById("whatsapp-otp-resend-btn"),
+  whatsappOtpEditNumberBtn: document.getElementById("whatsapp-otp-edit-number-btn"),
+  whatsappOtpEditPanel: document.getElementById("whatsapp-otp-edit-panel"),
+  whatsappOtpEditInput: document.getElementById("whatsapp-otp-edit-input"),
+  whatsappOtpSaveNumberBtn: document.getElementById("whatsapp-otp-save-number-btn"),
+  whatsappOtpLockoutHelp: document.getElementById("whatsapp-otp-lockout-help"),
+  whatsappOtpLockoutText: document.getElementById("whatsapp-otp-lockout-text"),
+  whatsappOtpLockTimer: document.getElementById("whatsapp-otp-lock-timer"),
+  whatsappOtpLockChangeBtn: document.getElementById("whatsapp-otp-lock-change-btn"),
+  whatsappOtpContactAdminBtn: document.getElementById("whatsapp-otp-contact-admin-btn"),
+  whatsappOtpCloseBtn: document.getElementById("whatsapp-otp-close-btn"),
   sidebarHomeButton: document.getElementById("sidebar-home-button"),
   sidebarTransactionsButton: document.getElementById("sidebar-transactions-button"),
   sidebarProfileButton: document.getElementById("sidebar-profile-button"),
@@ -283,12 +310,22 @@ async function bootstrap() {
   renderAll();
   const routeParams = new URLSearchParams(window.location.search);
   const returnTo = routeParams.get("returnTo");
-  if (state.currentUser && returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")) {
-    routeParams.delete("returnTo");
-    const cleanQuery = routeParams.toString();
-    history.replaceState({}, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
-    window.location.href = returnTo;
-    return;
+  if (state.currentUser && returnTo) {
+    const profileReturn = returnTo === "profile" || returnTo === "/profil" || returnTo.startsWith("/profil");
+    if (profileReturn) {
+      routeParams.delete("returnTo");
+      const cleanQuery = routeParams.toString();
+      history.replaceState({}, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
+      openWorkspaceSection("profile");
+      return;
+    }
+    if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+      routeParams.delete("returnTo");
+      const cleanQuery = routeParams.toString();
+      history.replaceState({}, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
+      window.location.href = returnTo;
+      return;
+    }
   }
   const hasTransactionRoute = routeParams.has("trx");
   const hasSupportRoute = routeParams.get("support") === "1";
@@ -348,6 +385,315 @@ async function fetchJson(url, options = {}) {
     throw new Error(payload.message || "Permintaan gagal.");
   }
   return payload;
+}
+
+async function fetchWhatsappJson(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    headers,
+    ...options,
+  });
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : {};
+  if (!response.ok) {
+    const error = new Error(payload.message || "Permintaan gagal.");
+    error.state = payload.state || null;
+    throw error;
+  }
+  return payload;
+}
+
+function formatOtpTimer(totalSeconds) {
+  const safe = Math.max(0, Number(totalSeconds || 0));
+  const minutes = String(Math.floor(safe / 60)).padStart(2, "0");
+  const seconds = String(safe % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function getProfileWhatsappInputValue() {
+  const input = document.getElementById("profile-whatsapp-input");
+  return String(input?.value || state.currentUser?.whatsapp || "").trim();
+}
+
+function syncProfileWhatsappInput() {
+  const input = document.getElementById("profile-whatsapp-input");
+  if (!input || input === document.activeElement) return;
+  const nextValue = state.currentUser?.whatsapp || state.currentUser?.phoneNumber || "";
+  if (nextValue) input.value = nextValue;
+}
+
+function applyWhatsappOtpPayload(payload) {
+  if (payload?.user) state.currentUser = payload.user;
+  if (payload?.state) {
+    whatsappOtpRuntime.state = payload.state;
+    whatsappOtpRuntime.cooldownEndsAt = payload.state.resendCooldownSeconds > 0
+      ? Date.now() + (payload.state.resendCooldownSeconds * 1000)
+      : 0;
+    whatsappOtpRuntime.lockEndsAt = payload.state.lockedUntil
+      ? new Date(payload.state.lockedUntil).getTime()
+      : 0;
+  }
+  syncProfileWhatsappInput();
+  renderWhatsappOtpModal();
+}
+
+function getWhatsappOtpResendCooldown() {
+  if (whatsappOtpRuntime.cooldownEndsAt > Date.now()) {
+    return Math.max(0, Math.ceil((whatsappOtpRuntime.cooldownEndsAt - Date.now()) / 1000));
+  }
+  return 0;
+}
+
+function getWhatsappOtpLockRemaining() {
+  if (whatsappOtpRuntime.lockEndsAt > Date.now()) {
+    return Math.max(0, Math.ceil((whatsappOtpRuntime.lockEndsAt - Date.now()) / 1000));
+  }
+  return 0;
+}
+
+function renderWhatsappOtpModal() {
+  const otpState = whatsappOtpRuntime.state;
+  if (!elements.whatsappOtpModal) return;
+
+  const resendCooldown = getWhatsappOtpResendCooldown();
+  const lockRemaining = getWhatsappOtpLockRemaining();
+  const showLockout = Boolean(otpState?.maxResendReached) || lockRemaining > 0;
+
+  if (elements.whatsappOtpResendTimer) {
+    elements.whatsappOtpResendTimer.textContent = `Timer kirim ulang: ${formatOtpTimer(resendCooldown)}`;
+  }
+  if (elements.whatsappOtpResendBtn) {
+    elements.whatsappOtpResendBtn.disabled = Boolean(
+      !otpState
+      || otpState.resendDisabled
+      || resendCooldown > 0
+      || lockRemaining > 0,
+    );
+  }
+  if (elements.whatsappOtpVerifyBtn) {
+    elements.whatsappOtpVerifyBtn.disabled = Boolean(
+      !otpState?.canVerify
+      || String(elements.whatsappOtpInput?.value || "").trim().length !== 6,
+    );
+  }
+  if (elements.whatsappOtpLockoutHelp) {
+    elements.whatsappOtpLockoutHelp.classList.toggle("hidden", !showLockout);
+  }
+  if (elements.whatsappOtpLockoutText) {
+    elements.whatsappOtpLockoutText.textContent = OTP_LOCK_MESSAGE;
+  }
+  if (elements.whatsappOtpLockTimer) {
+    elements.whatsappOtpLockTimer.classList.toggle("hidden", lockRemaining <= 0);
+    if (lockRemaining > 0) {
+      elements.whatsappOtpLockTimer.textContent = `Coba lagi dalam ${formatOtpTimer(lockRemaining)}`;
+    }
+  }
+}
+
+function startWhatsappOtpTick() {
+  stopWhatsappOtpTick();
+  whatsappOtpRuntime.tickTimer = window.setInterval(() => {
+    renderWhatsappOtpModal();
+  }, 1000);
+}
+
+function stopWhatsappOtpTick() {
+  if (whatsappOtpRuntime.tickTimer) {
+    window.clearInterval(whatsappOtpRuntime.tickTimer);
+    whatsappOtpRuntime.tickTimer = null;
+  }
+}
+
+function setWhatsappOtpMessage(errorMessage = "", successMessage = "") {
+  if (elements.whatsappOtpError) {
+    elements.whatsappOtpError.textContent = errorMessage;
+    elements.whatsappOtpError.classList.toggle("hidden", !errorMessage);
+  }
+  if (elements.whatsappOtpSuccess) {
+    elements.whatsappOtpSuccess.textContent = successMessage;
+    elements.whatsappOtpSuccess.classList.toggle("hidden", !successMessage);
+  }
+}
+
+function openWhatsappOtpModalShell() {
+  if (!elements.whatsappOtpModal) return;
+  elements.whatsappOtpModal.classList.remove("hidden");
+  elements.whatsappOtpModal.setAttribute("aria-hidden", "false");
+  if (elements.whatsappOtpEditPanel) elements.whatsappOtpEditPanel.classList.add("hidden");
+  if (elements.whatsappOtpInput) elements.whatsappOtpInput.value = "";
+  setWhatsappOtpMessage();
+  renderWhatsappOtpModal();
+  startWhatsappOtpTick();
+  elements.whatsappOtpInput?.focus();
+}
+
+function closeWhatsappOtpModal() {
+  if (!elements.whatsappOtpModal) return;
+  elements.whatsappOtpModal.classList.add("hidden");
+  elements.whatsappOtpModal.setAttribute("aria-hidden", "true");
+  stopWhatsappOtpTick();
+  if (elements.whatsappOtpEditPanel) elements.whatsappOtpEditPanel.classList.add("hidden");
+}
+
+async function refreshWhatsappOtpState() {
+  if (!state.currentUser) return null;
+  const payload = await fetchWhatsappJson("/api/me/whatsapp/status");
+  applyWhatsappOtpPayload(payload);
+  return payload;
+}
+
+async function openWhatsappOtpModal() {
+  if (!state.currentUser || state.currentUser.phoneVerified) return;
+  const phone = getProfileWhatsappInputValue();
+  if (!phone) {
+    window.alert("Isi nomor WhatsApp aktif terlebih dahulu.");
+    document.getElementById("profile-whatsapp-input")?.focus();
+    return;
+  }
+  openWhatsappOtpModalShell();
+  setWhatsappOtpMessage("", "Mengirim kode OTP...");
+  try {
+    const payload = await fetchWhatsappJson("/api/me/whatsapp/send-otp", {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber: phone }),
+    });
+    applyWhatsappOtpPayload(payload);
+    setWhatsappOtpMessage("", payload.message || "Kode OTP telah dikirim ke WhatsApp Anda.");
+  } catch (error) {
+    if (error.state) whatsappOtpRuntime.state = error.state;
+    renderWhatsappOtpModal();
+    setWhatsappOtpMessage(error.message || "Gagal mengirim OTP.");
+    if (error.state?.maxResendReached) {
+      setWhatsappOtpMessage();
+    }
+  }
+}
+
+async function handleWhatsappOtpResend() {
+  const phone = getProfileWhatsappInputValue();
+  if (!phone) {
+    setWhatsappOtpMessage("Isi nomor WhatsApp aktif terlebih dahulu.");
+    return;
+  }
+  setWhatsappOtpMessage();
+  try {
+    const payload = await fetchWhatsappJson("/api/me/whatsapp/send-otp", {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber: phone }),
+    });
+    applyWhatsappOtpPayload(payload);
+    if (elements.whatsappOtpInput) elements.whatsappOtpInput.value = "";
+    setWhatsappOtpMessage("", payload.message || "Kode OTP telah dikirim ulang.");
+  } catch (error) {
+    if (error.state) whatsappOtpRuntime.state = error.state;
+    renderWhatsappOtpModal();
+    setWhatsappOtpMessage(error.message || "Gagal mengirim ulang OTP.");
+  }
+}
+
+async function handleWhatsappOtpVerify() {
+  const otp = String(elements.whatsappOtpInput?.value || "").trim();
+  if (!/^\d{6}$/.test(otp)) {
+    setWhatsappOtpMessage("OTP harus 6 digit angka.");
+    return;
+  }
+  setWhatsappOtpMessage();
+  try {
+    const payload = await fetchWhatsappJson("/api/me/whatsapp/verify-otp", {
+      method: "POST",
+      body: JSON.stringify({ otp }),
+    });
+    applyWhatsappOtpPayload(payload);
+    setWhatsappOtpMessage("", payload.message || "Nomor WhatsApp berhasil diverifikasi.");
+    await refreshDashboard();
+    renderAll();
+    window.setTimeout(() => closeWhatsappOtpModal(), 1200);
+  } catch (error) {
+    setWhatsappOtpMessage(error.message || "Verifikasi OTP gagal.");
+    try {
+      await refreshWhatsappOtpState();
+    } catch {
+      // ignore refresh errors
+    }
+  }
+}
+
+function toggleWhatsappOtpEditPanel(show) {
+  if (!elements.whatsappOtpEditPanel) return;
+  elements.whatsappOtpEditPanel.classList.toggle("hidden", !show);
+  if (show && elements.whatsappOtpEditInput) {
+    elements.whatsappOtpEditInput.value = getProfileWhatsappInputValue();
+    elements.whatsappOtpEditInput.focus();
+  }
+}
+
+async function handleWhatsappOtpChangeNumber(rawPhone) {
+  const phone = String(rawPhone || "").trim();
+  if (!phone) {
+    setWhatsappOtpMessage("Nomor WhatsApp wajib diisi.");
+    return;
+  }
+  setWhatsappOtpMessage();
+  try {
+    const payload = await fetchWhatsappJson("/api/me/whatsapp/change-number", {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber: phone }),
+    });
+    applyWhatsappOtpPayload(payload);
+    toggleWhatsappOtpEditPanel(false);
+    if (elements.whatsappOtpInput) elements.whatsappOtpInput.value = "";
+    setWhatsappOtpMessage("", payload.message || "Nomor WhatsApp diperbarui. Silakan kirim OTP lagi.");
+    renderProfile();
+  } catch (error) {
+    setWhatsappOtpMessage(error.message || "Gagal mengganti nomor WhatsApp.");
+  }
+}
+
+function handleWhatsappOtpContactAdmin() {
+  closeWhatsappOtpModal();
+  const params = new URLSearchParams({
+    support: "1",
+    prefill: OTP_SUPPORT_MESSAGE,
+  });
+  window.location.href = `/?${params.toString()}`;
+}
+
+function bindWhatsappOtpModalControls() {
+  if (elements.whatsappOtpModal?.dataset.bound === "true") return;
+  if (elements.whatsappOtpModal) elements.whatsappOtpModal.dataset.bound = "true";
+
+  elements.whatsappOtpCloseBtn?.addEventListener("click", closeWhatsappOtpModal);
+  elements.whatsappOtpVerifyBtn?.addEventListener("click", handleWhatsappOtpVerify);
+  elements.whatsappOtpResendBtn?.addEventListener("click", handleWhatsappOtpResend);
+  elements.whatsappOtpEditNumberBtn?.addEventListener("click", () => toggleWhatsappOtpEditPanel(true));
+  elements.whatsappOtpSaveNumberBtn?.addEventListener("click", () => {
+    handleWhatsappOtpChangeNumber(elements.whatsappOtpEditInput?.value || "");
+  });
+  elements.whatsappOtpLockChangeBtn?.addEventListener("click", () => toggleWhatsappOtpEditPanel(true));
+  elements.whatsappOtpContactAdminBtn?.addEventListener("click", handleWhatsappOtpContactAdmin);
+  elements.whatsappOtpInput?.addEventListener("input", (event) => {
+    event.currentTarget.value = String(event.currentTarget.value || "").replace(/\D/g, "").slice(0, 6);
+    renderWhatsappOtpModal();
+  });
+  elements.whatsappOtpModal?.addEventListener("click", (event) => {
+    if (event.target === elements.whatsappOtpModal) closeWhatsappOtpModal();
+  });
+}
+
+function bindWhatsappOtpDelegation() {
+  if (elements.profileVerificationAsideWorkspace?.dataset.otpBound === "true") return;
+  if (!elements.profileVerificationAsideWorkspace) return;
+  elements.profileVerificationAsideWorkspace.dataset.otpBound = "true";
+  elements.profileVerificationAsideWorkspace.addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-open-whatsapp-otp]");
+    if (!trigger || trigger.disabled) return;
+    event.preventDefault();
+    openWhatsappOtpModal();
+  });
 }
 
 function uploadWithProgress(url, formData, onProgress) {
@@ -950,6 +1296,8 @@ function bindForms() {
     openWorkspaceSection("profile");
     closeVerificationModal();
   });
+  bindWhatsappOtpModalControls();
+  bindWhatsappOtpDelegation();
   elements.closeVerificationModal.addEventListener("click", closeVerificationModal);
   elements.closeLocationConsentModal?.addEventListener("click", () => closeLocationConsentModal(false));
   elements.approveLocationConsentModal?.addEventListener("click", () => closeLocationConsentModal(true));
@@ -2043,28 +2391,8 @@ function renderProfile() {
           <input type="file" name="avatar" accept="image/*" />
           ${state.currentUser.avatar ? `<a class="mini-link" href="${escapeHtml(state.currentUser.avatar)}" target="_blank" rel="noreferrer">Lihat foto profil sekarang</a>` : ""}
         </label>
-        <label>
-          Nama pengguna
-          <input type="text" name="displayName" value="${escapeHtml(state.currentUser.displayName || "")}" placeholder="Wajib sesuai KTP" ${isVerificationLocked ? "disabled" : ""} />
-        </label>
-        <label>
-          Nama lengkap sesuai KTP
-          <input type="text" name="legalName" value="${escapeHtml(state.currentUser.legalName || "")}" placeholder="Nama lengkap sesuai KTP" ${isVerificationLocked ? "disabled" : ""} />
-        </label>
-        <label>
-          No. WhatsApp
-          <input type="text" name="whatsapp" value="${escapeHtml(state.currentUser.whatsapp || "")}" placeholder="08xxxxxxxxxx" ${isVerificationLocked || state.currentUser.phoneVerified ? "disabled" : ""} />
-        </label>
-        <div class="profile-subsection profile-side-card">
-          <h5>Verifikasi WhatsApp (OTP)</h5>
-          <p class="mini-note">${state.currentUser.phoneVerified
-    ? "Nomor WhatsApp sudah terverifikasi dan terkunci."
-    : "Verifikasi nomor WhatsApp sekali untuk keamanan transaksi."}</p>
-          <a class="primary-btn profile-verify-whatsapp-btn" href="/profil">Buka Verifikasi WhatsApp</a>
-        </div>
-        <button type="submit" class="primary-btn" ${isVerificationLocked ? "disabled" : ""}>Simpan Profil</button>
+        <button type="submit" class="primary-btn">Simpan Foto Profil</button>
       </form>
-      ${isVerificationLocked ? "<p class=\"mini-note\">Data identitas sedang dikunci selama proses review / setelah diverifikasi. Hubungi admin melalui live chat bila perlu revisi.</p>" : ""}
     </div>
       </div>
       <aside class="profile-side-stack">
@@ -2109,6 +2437,22 @@ function renderProfile() {
 
 function buildProfileVerificationMarkup(isVerificationLocked) {
   if (!state.currentUser) return "";
+  const phoneVerified = Boolean(state.currentUser.phoneVerified);
+  const whatsappDisabled = isVerificationLocked || phoneVerified;
+  const whatsappValue = escapeHtml(state.currentUser.whatsapp || state.currentUser.phoneNumber || "");
+  const whatsappField = phoneVerified
+    ? `
+        <div class="whatsapp-field-row whatsapp-field-row-verified">
+          <input type="text" name="whatsapp" id="profile-whatsapp-input" value="${whatsappValue}" placeholder="08xxxxxxxxxx" disabled />
+          <span class="verified-inline-badge whatsapp-verified-badge">Terverifikasi</span>
+        </div>
+      `
+    : `
+        <div class="whatsapp-field-row">
+          <input type="text" name="whatsapp" id="profile-whatsapp-input" value="${whatsappValue}" placeholder="08xxxxxxxxxx" ${isVerificationLocked ? "disabled" : ""} />
+          <button type="button" class="ghost-btn whatsapp-otp-trigger-btn" data-open-whatsapp-otp ${isVerificationLocked ? "disabled" : ""}>OTP</button>
+        </div>
+      `;
   return `
     <div class="profile-subsection profile-verification-panel">
       <h5>Verifikasi identitas penjual</h5>
@@ -2123,7 +2467,8 @@ function buildProfileVerificationMarkup(isVerificationLocked) {
         </label>
         <label>
           No. WhatsApp aktif
-          <input type="text" name="whatsapp" value="${escapeHtml(state.currentUser.whatsapp || "")}" placeholder="08xxxxxxxxxx" ${isVerificationLocked ? "disabled" : ""} />
+          ${whatsappField}
+          ${phoneVerified ? '<p class="mini-note">Nomor WhatsApp sudah terverifikasi dan tidak dapat diubah.</p>' : '<p class="mini-note">Klik tombol OTP untuk verifikasi nomor WhatsApp Anda.</p>'}
         </label>
         <label>
           Foto KTP
@@ -2387,29 +2732,20 @@ function bindProfileForms() {
 async function handleProfileSettingsSave(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
-  const hasEditableIdentity = formData.has("displayName") || formData.has("legalName") || formData.has("whatsapp");
-  const displayName = String(formData.get("displayName") || state.currentUser?.displayName || "").trim();
-  const legalName = String(formData.get("legalName") || state.currentUser?.legalName || "").trim();
-  const whatsapp = String(formData.get("whatsapp") || state.currentUser?.whatsapp || "").trim();
   const avatarFile = formData.get("avatar");
 
-  if (avatarFile instanceof File && avatarFile.size > 0) {
-    const avatarForm = new FormData();
-    avatarForm.append("avatar", avatarFile);
-    const avatarPayload = await uploadWithProgress("/api/me/profile/avatar", avatarForm);
-    state.currentUser = avatarPayload.user;
+  if (!(avatarFile instanceof File) || avatarFile.size <= 0) {
+    setAuthStatus("Pilih foto profil terlebih dahulu.", true);
+    return;
   }
 
-  if (hasEditableIdentity && displayName && legalName) {
-    const payload = await fetchJson("/api/me/profile", {
-      method: "POST",
-      body: JSON.stringify({ displayName, legalName, whatsapp }),
-    });
-    state.currentUser = payload.user;
-  }
+  const avatarForm = new FormData();
+  avatarForm.append("avatar", avatarFile);
+  const avatarPayload = await uploadWithProgress("/api/me/profile/avatar", avatarForm);
+  state.currentUser = avatarPayload.user;
   await refreshDashboard();
   renderAll();
-  setAuthStatus("Profil pengguna berhasil diperbarui.");
+  setAuthStatus("Foto profil berhasil diperbarui.");
 }
 
 async function handleProfileVerificationSave(event) {
