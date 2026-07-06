@@ -397,11 +397,16 @@ img.brand-logo-mark {
 .step-item strong {
   width: 34px;
   height: 34px;
+  min-width: 34px;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: var(--accent);
-  color: white;
+  font-size: 0.92rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--brand-blue, #446dff), #7a61ff);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(68, 109, 255, 0.25);
+  border: 1px solid rgba(167, 190, 229, 0.12);
 }
 
 .step-item h4,
@@ -1014,13 +1019,76 @@ select {
 }
 
 .office-box {
-  display: grid;
-  gap: 6px;
   margin-top: 16px;
   padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(31, 77, 154, 0.12);
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(82, 110, 255, 0.14);
+  background: linear-gradient(180deg, rgba(16, 27, 45, 0.98), rgba(12, 21, 35, 0.98));
+  box-shadow: 0 14px 30px rgba(2, 7, 19, 0.22);
+}
+
+.office-box-layout {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.office-pin-visual {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 22px rgba(68, 109, 255, 0.18);
+}
+
+.office-pin-visual img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.office-box-content {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.office-box-content strong {
+  color: var(--text, #eff5ff);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.office-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin-top: 2px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #9eb4ff;
+  text-decoration: none;
+}
+
+.office-map-link:hover {
+  color: #c5d4ff;
+  text-decoration: underline;
+}
+
+#cara-kerja .steps {
+  display: grid;
+  gap: 12px;
+}
+
+#cara-kerja .step-item {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(16, 27, 45, 0.98), rgba(12, 21, 35, 0.98));
+  border: 1px solid rgba(143, 164, 205, 0.1);
 }
 
 .room-header {

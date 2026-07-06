@@ -1579,13 +1579,26 @@ function renderAccountSection() {
   }
   if (elements.officeBox) {
     const officeAddress = String(state.providerConfig?.officeAddress || "").trim();
+    const officeMapUrl = officeAddress
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(officeAddress)}`
+      : "#";
     elements.officeBox.classList.toggle("hidden", !officeAddress);
     if (elements.officeAddress) {
       elements.officeAddress.textContent = officeAddress || "Alamat kantor belum diatur admin.";
     }
+    const officeMapLink = document.getElementById("office-map-link");
+    if (officeMapLink) {
+      officeMapLink.href = officeMapUrl;
+      officeMapLink.classList.toggle("hidden", !officeAddress);
+    }
     elements.workspaceOfficeBox?.classList.toggle("hidden", !officeAddress);
     if (elements.workspaceOfficeAddress) {
       elements.workspaceOfficeAddress.textContent = officeAddress || "Alamat kantor belum diatur admin.";
+    }
+    const workspaceOfficeMapLink = document.getElementById("workspace-office-map-link");
+    if (workspaceOfficeMapLink) {
+      workspaceOfficeMapLink.href = officeMapUrl;
+      workspaceOfficeMapLink.classList.toggle("hidden", !officeAddress);
     }
   }
 }
