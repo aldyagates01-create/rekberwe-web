@@ -688,6 +688,11 @@ app.post("/api/me/verification", requireAuth, verificationUpload.fields([
     return;
   }
 
+  if (req.session.user.verificationStatus === "pending") {
+    res.status(400).json({ message: "Verifikasi sedang ditinjau admin. Tunggu hasil review terlebih dahulu." });
+    return;
+  }
+
   const files = req.files || {};
   const ktpPhoto = files.ktpPhoto?.[0];
   const ktpVideo = files.ktpVideo?.[0];

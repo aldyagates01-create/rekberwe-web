@@ -149,6 +149,40 @@ const elements = {
 };
 
 let adminNoteResolver = null;
+let adminUserMenuDelegationBound = false;
+
+function toAdminMenuKey(userId) {
+  return String(userId || "user").replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+function bindAdminUserMenuDelegation() {
+  if (adminUserMenuDelegationBound) return;
+  adminUserMenuDelegationBound = true;
+  document.addEventListener("click", (event) => {
+    const menuItem = event.target.closest(".admin-user-menu-item");
+    if (menuItem) {
+      event.preventDefault();
+      event.stopPropagation();
+      menuItem.closest(".admin-user-menu")?.classList.add("hidden");
+      handleUserMenuAction(menuItem.dataset.userId, menuItem.dataset.userAction);
+      return;
+    }
+    const menuBtn = event.target.closest(".admin-user-menu-btn");
+    if (menuBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      const menu = document.getElementById(`admin-user-menu-${menuBtn.dataset.menuKey}`);
+      document.querySelectorAll(".admin-user-menu").forEach((item) => {
+        if (item !== menu) item.classList.add("hidden");
+      });
+      menu?.classList.toggle("hidden");
+      return;
+    }
+    if (!event.target.closest(".admin-user-menu-wrap")) {
+      document.querySelectorAll(".admin-user-menu").forEach((menu) => menu.classList.add("hidden"));
+    }
+  });
+}
 
 bootstrap().catch((error) => {
   console.error(error);
@@ -206,6 +240,7 @@ elements.adminTransferProofForm?.addEventListener("submit", handleAdminTransferP
 elements.adminTransferCompleteInline?.addEventListener("click", () => handleAdminAction("complete_transaction"));
 elements.adminNoteCancel?.addEventListener("click", () => closeAdminNoteModal(null));
 elements.adminNoteConfirm?.addEventListener("click", () => closeAdminNoteModal(String(elements.adminNoteInput?.value || "").trim()));
+bindAdminUserMenuDelegation();
 elements.closeAdminUserProfileModal?.addEventListener("click", closeAdminUserProfileModal);
 document.addEventListener("click", handleAdminProfileTriggerClick);
 elements.adminUserSearch?.addEventListener("input", () => {
@@ -937,6 +972,7 @@ function renderVerificationQueue(users) {
 
 function renderUserCard(user) {
   const presence = formatPresenceLabel(user.presence);
+  const menuKey = toAdminMenuKey(user.id);
   const locationRow = user.locationVerified
     ? `
       <p>Lokasi terverifikasi: Ya</p>
@@ -954,11 +990,11 @@ function renderUserCard(user) {
           <span class="admin-tag ${isPresenceOnline(user.presence) ? "" : "admin-tag-muted"}">${escapeHtml(presence)}</span>
           <span class="admin-tag ${user.interestedInRekber ? "" : "admin-tag-muted"}">${user.interestedInRekber ? "Calon pengguna rekber" : "Belum transaksi"}</span>
           <div class="admin-user-menu-wrap">
-            <button type="button" class="ghost-btn admin-user-menu-btn" data-user-id="${escapeHtml(user.id)}" title="Kelola user">â‹¯</button>
-            <div class="admin-user-menu hidden" id="admin-user-menu-${escapeHtml(user.id)}">
-              <button type="button" class="admin-user-menu-item" data-user-id="${escapeHtml(user.id)}" data-user-action="ban">Ban akun</button>
-              <button type="button" class="admin-user-menu-item" data-user-id="${escapeHtml(user.id)}" data-user-action="unban">Unban akun</button>
-              <button type="button" class="admin-user-menu-item" data-user-id="${escapeHtml(user.id)}" data-user-action="unverify">Unverify akun</button>
+            <button type="button" class="ghost-btn admin-user-menu-btn" data-user-id="${escapeAttribute(user.id)}" data-menu-key="${escapeAttribute(menuKey)}" title="Kelola user" aria-label="Kelola user" aria-haspopup="menu">&#8942;</button>
+            <div class="admin-user-menu hidden" id="admin-user-menu-${menuKey}" role="menu">
+              <button type="button" class="admin-user-menu-item" role="menuitem" data-user-id="${escapeAttribute(user.id)}" data-user-action="ban">Ban akun</button>
+              <button type="button" class="admin-user-menu-item" role="menuitem" data-user-id="${escapeAttribute(user.id)}" data-user-action="unban">Unban akun</button>
+              <button type="button" class="admin-user-menu-item" role="menuitem" data-user-id="${escapeAttribute(user.id)}" data-user-action="unverify">Unverify akun</button>
             </div>
           </div>
         </div>
@@ -991,21 +1027,7 @@ function bindVerificationReviewButtons() {
 }
 
 function bindUserMenuButtons() {
-  document.querySelectorAll(".admin-user-menu-btn").forEach((button) => {
-    button.onclick = () => {
-      const target = document.getElementById(`admin-user-menu-${button.dataset.userId}`);
-      document.querySelectorAll(".admin-user-menu").forEach((menu) => {
-        if (menu !== target) menu.classList.add("hidden");
-      });
-      target?.classList.toggle("hidden");
-    };
-  });
-  document.querySelectorAll(".admin-user-menu-item").forEach((button) => {
-    button.onclick = () => {
-      document.getElementById(`admin-user-menu-${button.dataset.userId}`)?.classList.add("hidden");
-      handleUserMenuAction(button.dataset.userId, button.dataset.userAction);
-    };
-  });
+  // Menu actions use document-level delegation via bindAdminUserMenuDelegation().
 }
 
 function matchesUserSearch(user, keyword) {
@@ -1776,10 +1798,17 @@ async function handleUserVerificationReview(userId, action) {
 }
 
 async function handleUserMenuAction(userId, forcedAction = "") {
-  const user = state.users.find((item) => item.id === userId);
-  if (!user) return;
   const action = String(forcedAction || "").trim().toLowerCase();
-  if (!["ban", "unban", "unverify"].includes(action)) return;
+  if (!userId || !["ban", "unban", "unverify"].includes(action)) return;
+  let user = state.users.find((item) => item.id === userId);
+  if (!user) {
+    await refreshDashboardData();
+    user = state.users.find((item) => item.id === userId);
+  }
+  if (!user) {
+    showStatus("Data pengguna tidak ditemukan.", true);
+    return;
+  }
   let reason = "";
   if (action === "ban" || action === "unverify") {
     reason = await openAdminNoteModal("Status akun", `Tulis alasan untuk aksi ${action}:`, action === "ban" ? "Melanggar aturan platform." : "Verifikasi perlu diulang.");

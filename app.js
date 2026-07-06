@@ -420,9 +420,13 @@ function getProfileWhatsappInputValue() {
 }
 
 function isWhatsappOtpLocked() {
+  return Boolean(state.currentUser?.phoneVerified);
+}
+
+function isIdentityVerificationLocked() {
   if (!state.currentUser) return true;
-  if (state.currentUser.verificationStatus === "unverified") return false;
-  return Boolean(state.currentUser.phoneVerified);
+  const status = state.currentUser.verificationStatus;
+  return status === "pending" || status === "verified";
 }
 
 function syncProfileWhatsappInput() {
@@ -638,6 +642,10 @@ function toggleWhatsappOtpEditPanel(show) {
 }
 
 async function handleWhatsappOtpChangeNumber(rawPhone) {
+  if (isWhatsappOtpLocked()) {
+    setWhatsappOtpMessage("Nomor WhatsApp sudah terverifikasi dan tidak dapat diubah.");
+    return;
+  }
   const phone = String(rawPhone || "").trim();
   if (!phone) {
     setWhatsappOtpMessage("Nomor WhatsApp wajib diisi.");
@@ -2443,19 +2451,20 @@ function renderProfile() {
 
 function buildProfileVerificationMarkup(isVerificationLocked) {
   if (!state.currentUser) return "";
-  const phoneVerified = isWhatsappOtpLocked();
+  const identityLocked = isVerificationLocked || isIdentityVerificationLocked();
+  const phoneLocked = isWhatsappOtpLocked() || identityLocked;
   const whatsappValue = escapeHtml(state.currentUser.whatsapp || state.currentUser.phoneNumber || "");
-  const whatsappField = phoneVerified
+  const whatsappField = phoneLocked
     ? `
         <div class="whatsapp-field-row whatsapp-field-row-verified">
           <input type="text" name="whatsapp" id="profile-whatsapp-input" value="${whatsappValue}" placeholder="08xxxxxxxxxx" disabled />
-          <span class="verified-inline-badge whatsapp-verified-badge">Terverifikasi</span>
+          ${isWhatsappOtpLocked() ? '<span class="verified-inline-badge whatsapp-verified-badge">Terverifikasi</span>' : ""}
         </div>
       `
     : `
         <div class="whatsapp-field-row">
-          <input type="text" name="whatsapp" id="profile-whatsapp-input" value="${whatsappValue}" placeholder="08xxxxxxxxxx" ${isVerificationLocked ? "disabled" : ""} />
-          <button type="button" class="ghost-btn whatsapp-otp-trigger-btn" data-open-whatsapp-otp ${isVerificationLocked ? "disabled" : ""}>OTP</button>
+          <input type="text" name="whatsapp" id="profile-whatsapp-input" value="${whatsappValue}" placeholder="08xxxxxxxxxx" />
+          <button type="button" class="ghost-btn whatsapp-otp-trigger-btn" data-open-whatsapp-otp>OTP</button>
         </div>
       `;
   return `
@@ -2464,28 +2473,30 @@ function buildProfileVerificationMarkup(isVerificationLocked) {
       <form id="profile-verification-form" class="profile-form">
         <label>
           Nama sesuai KTP
-          <input type="text" name="legalName" value="${escapeHtml(state.currentUser.legalName || "")}" placeholder="Nama lengkap sesuai KTP" ${isVerificationLocked ? "disabled" : ""} />
+          <input type="text" name="legalName" value="${escapeHtml(state.currentUser.legalName || "")}" placeholder="Nama lengkap sesuai KTP" ${identityLocked ? "disabled" : ""} />
         </label>
         <label>
           Nomor KTP
-          <input type="text" name="ktp" value="${escapeHtml(state.currentUser.ktp || "")}" placeholder="Nomor KTP aktif" ${isVerificationLocked ? "disabled" : ""} />
+          <input type="text" name="ktp" value="${escapeHtml(state.currentUser.ktp || "")}" placeholder="Nomor KTP aktif" ${identityLocked ? "disabled" : ""} />
         </label>
         <label>
           No. WhatsApp aktif
           ${whatsappField}
-          ${phoneVerified ? '<p class="mini-note">Nomor WhatsApp sudah terverifikasi dan tidak dapat diubah.</p>' : `<p class="mini-note">${state.currentUser.verificationStatus === "unverified" ? "Verifikasi akun di-reset admin. Klik OTP untuk verifikasi ulang nomor WhatsApp." : "Klik tombol OTP untuk verifikasi nomor WhatsApp Anda."}</p>`}
+          ${phoneLocked
+    ? `<p class="mini-note">${isWhatsappOtpLocked() ? "Nomor WhatsApp sudah terverifikasi dan tidak dapat diubah." : "Data identitas sedang dikunci selama proses review admin."}</p>`
+    : `<p class="mini-note">${state.currentUser.verificationStatus === "unverified" ? "Verifikasi akun di-reset admin. Klik OTP untuk verifikasi ulang nomor WhatsApp." : "Klik tombol OTP untuk verifikasi nomor WhatsApp Anda."}</p>`}
         </label>
         <label>
           Foto KTP
-          <input type="file" name="ktpPhoto" accept="image/*" ${isVerificationLocked ? "disabled" : ""} />
+          <input type="file" name="ktpPhoto" accept="image/*" ${identityLocked ? "disabled" : ""} />
           ${state.currentUser.ktpPhotoUrl ? `<a class="mini-link" href="${escapeHtml(state.currentUser.ktpPhotoUrl)}" target="_blank" rel="noreferrer">${escapeHtml(state.currentUser.ktpPhotoName || "Lihat foto KTP")}</a>` : ""}
         </label>
         <label>
           Video selfie memegang KTP
-          <input type="file" name="ktpVideo" accept="video/*" ${isVerificationLocked ? "disabled" : ""} />
+          <input type="file" name="ktpVideo" accept="video/*" ${identityLocked ? "disabled" : ""} />
           ${state.currentUser.ktpVideoUrl ? `<a class="mini-link" href="${escapeHtml(state.currentUser.ktpVideoUrl)}" target="_blank" rel="noreferrer">${escapeHtml(state.currentUser.ktpVideoName || "Lihat video selfie")}</a>` : ""}
         </label>
-        <button type="submit" class="primary-btn" ${isVerificationLocked ? "disabled" : ""}>${verificationActionLabel(state.currentUser.verificationStatus, state.currentUser.verified)}</button>
+        <button type="submit" class="primary-btn" ${identityLocked ? "disabled" : ""}>${verificationActionLabel(state.currentUser.verificationStatus, state.currentUser.verified)}</button>
         <div class="upload-progress hidden" id="verification-upload-progress" aria-live="polite">
           <div class="upload-progress-top">
             <strong id="verification-upload-progress-label"><span class="upload-spinner"></span>Sedang upload verifikasi...</strong>
