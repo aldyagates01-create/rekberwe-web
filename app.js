@@ -619,7 +619,11 @@ async function handleWhatsappOtpVerify() {
     });
     applyWhatsappOtpPayload(payload);
     setWhatsappOtpMessage("", payload.message || "Nomor WhatsApp berhasil diverifikasi.");
+    renderAll();
     await refreshDashboard();
+    if (payload.user?.phoneVerified) {
+      state.currentUser = { ...state.currentUser, ...payload.user, phoneVerified: true };
+    }
     renderAll();
     window.setTimeout(() => closeWhatsappOtpModal(), 1200);
   } catch (error) {

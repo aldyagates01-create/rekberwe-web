@@ -1749,10 +1749,6 @@ export async function resetUserPhoneVerification(userId, detail = "Phone verific
 
 export async function reconcileStalePhoneVerification(user) {
   if (!postgresEnabled) return sqliteDb.reconcileStalePhoneVerification(user);
-  if (!user) return null;
-  if (user.verificationStatus === "unverified" && user.phoneVerified) {
-    return resetUserPhoneVerification(user.id, "Stale phone verification cleared for unverified account");
-  }
   return user;
 }
 

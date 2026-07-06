@@ -1499,10 +1499,8 @@ export function resetUserPhoneVerification(userId, detail = "Phone verification 
 }
 
 export function reconcileStalePhoneVerification(user) {
-  if (!user) return null;
-  if (user.verificationStatus === "unverified" && user.phoneVerified) {
-    return resetUserPhoneVerification(user.id, "Stale phone verification cleared for unverified account");
-  }
+  // OTP-verified users stay unverified until KTP admin review — that is expected.
+  // Phone reset on admin unverify is handled in updateUserAdminStatus("unverify").
   return user;
 }
 
