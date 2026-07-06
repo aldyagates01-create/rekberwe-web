@@ -8470,3 +8470,19 @@ body.is-member-view .topbar {
     position: static !important;
   }
 }
+
+/* Transaction form selects: dark theme (role, type, fee payer) */
+#transaction-form select,
+#workspace-transaction-form select {
+  background: rgba(10, 16, 29, 0.96) !important;
+  border: 1px solid rgba(120, 137, 173, 0.2) !important;
+  color: #edf3ff !important;
+  box-shadow: none !important;
+  color-scheme: dark;
+}
+
+#transaction-form select option,
+#workspace-transaction-form select option {
+  background: #0f1a2c;
+  color: #edf3ff;
+}
