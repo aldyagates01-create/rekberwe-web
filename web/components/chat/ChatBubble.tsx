@@ -2,7 +2,7 @@
 
 import { getInitials, formatTime } from "@/lib/format";
 
-export const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-mark.jpg?v=5";
+export const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-shield.png?v=6";
 
 type AvatarProps = {
   name: string;
@@ -13,7 +13,7 @@ type AvatarProps = {
 export function Avatar({ name, avatarUrl, size = 28 }: AvatarProps) {
   const style = { width: size, height: size };
   if (avatarUrl) {
-    const isBrandMark = avatarUrl.includes("rekberwe-logo-mark");
+    const isBrandMark = avatarUrl.includes("rekberwe-logo-shield") || avatarUrl.includes("rekberwe-logo-mark");
     return (
       <img
         src={avatarUrl}

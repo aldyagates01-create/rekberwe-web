@@ -23,8 +23,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title || "RekberWE.id", {
       body: payload.body || "Ada notifikasi baru.",
-      icon: "/assets/rekberwe-logo-mark.jpg?v=5",
-      badge: "/assets/rekberwe-logo-mark.jpg?v=5",
+      icon: "/assets/rekberwe-favicon.png?v=6",
+      badge: "/assets/rekberwe-favicon.png?v=6",
       tag: payload.tag || "rekberwe",
       renotify: true,
       data: { url: payload.url || "/" },

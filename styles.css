@@ -87,12 +87,15 @@ a {
   justify-content: space-between;
   gap: 20px;
   align-items: center;
-  padding: 12px 0 8px;
+  padding: 12px 16px 10px;
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(247, 251, 255, 0.94);
+  background: linear-gradient(180deg, rgba(8, 17, 31, 0.98) 0%, rgba(10, 18, 32, 0.96) 100%);
+  border: 1px solid rgba(143, 164, 205, 0.12);
+  border-radius: 18px;
   backdrop-filter: blur(14px);
+  box-shadow: 0 14px 34px rgba(2, 8, 23, 0.28);
 }
 
 .brand-block {
@@ -103,6 +106,69 @@ a {
 
 .brand-block-logo-only {
   gap: 0;
+}
+
+.brand-block-full {
+  width: 100%;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-mark-wrap {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.brand-text-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.brand-title {
+  color: #ffffff;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.12rem, 2vw, 1.5rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.brand-byline {
+  color: #ffffff;
+  font-size: clamp(0.68rem, 1.3vw, 0.8rem);
+  font-weight: 600;
+  line-height: 1.2;
+  opacity: 0.94;
+}
+
+.brand-tagline {
+  color: #ffffff;
+  font-size: clamp(0.6rem, 1.1vw, 0.72rem);
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  opacity: 0.9;
+}
+
+.brand-logo-icon,
+img.brand-logo-icon {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  filter: drop-shadow(0 8px 22px rgba(46, 125, 255, 0.24));
 }
 
 .site-logo {
@@ -3730,39 +3796,55 @@ textarea::placeholder {
   width: 58px;
   height: 58px;
   border-radius: 16px;
+  background: transparent;
+  border: none;
 }
 
-.workspace-sidebar-brand-featured .workspace-sidebar-brand-copy strong {
-  font-size: 1.42rem;
-  line-height: 1.1;
+.workspace-sidebar-brand-featured .workspace-sidebar-brand-copy .brand-title,
+.workspace-sidebar-brand-featured .workspace-sidebar-brand-copy strong.brand-title {
+  font-size: 1.28rem;
+  line-height: 1.08;
   letter-spacing: -0.02em;
+  color: #ffffff;
 }
 
-.workspace-sidebar-brand-featured .workspace-sidebar-brand-copy span {
-  font-size: 0.92rem;
-  color: #9eb4d8;
+.workspace-sidebar-brand-featured .workspace-sidebar-brand-copy .brand-byline {
+  font-size: 0.78rem;
+  color: #ffffff;
+  opacity: 0.92;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.workspace-sidebar-brand-featured .workspace-sidebar-brand-copy .brand-tagline {
+  font-size: 0.68rem;
+  color: #ffffff;
+  opacity: 0.88;
 }
 
 .workspace-sidebar-logo {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  border: none;
 }
 
-.workspace-sidebar-logo img {
+.workspace-sidebar-logo img,
+.workspace-sidebar-logo img.brand-logo-icon {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  object-position: center;
 }
 
 .workspace-sidebar-logo img.brand-logo-mark {
-  object-fit: cover !important;
-  object-position: center 24% !important;
+  object-fit: contain !important;
+  object-position: center !important;
 }
 
 .workspace-sidebar-brand-copy {
@@ -4711,17 +4793,25 @@ a.primary-btn.submit-btn {
   z-index: 12;
   justify-content: flex-start;
   min-height: 84px;
-  padding: 14px 2px 8px;
-  background: transparent;
-  backdrop-filter: none;
+  padding: 14px 16px 10px;
+  background: linear-gradient(180deg, rgba(8, 17, 31, 0.98) 0%, rgba(10, 18, 32, 0.96) 100%);
+  border: 1px solid rgba(143, 164, 205, 0.12);
+  border-radius: 18px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 34px rgba(2, 8, 23, 0.28);
 }
 
 .topbar > .topbar-actions {
   display: none !important;
 }
 
-.brand-block-logo-only {
+.brand-block-full {
   width: 100%;
+}
+
+.brand-block-full .brand-mark-wrap {
+  width: 58px;
+  height: 58px;
 }
 
 .site-logo.site-logo-brand {
@@ -6136,9 +6226,12 @@ a.primary-btn.submit-btn {
 
   .topbar {
     width: calc(100vw - 24px) !important;
-    padding: 14px 0 10px !important;
-    background: transparent !important;
-    backdrop-filter: none !important;
+    padding: 12px 14px 10px !important;
+    background: linear-gradient(180deg, rgba(8, 17, 31, 0.98) 0%, rgba(10, 18, 32, 0.96) 100%) !important;
+    border: 1px solid rgba(143, 164, 205, 0.12) !important;
+    border-radius: 16px !important;
+    backdrop-filter: blur(14px) !important;
+    box-shadow: 0 10px 28px rgba(2, 8, 23, 0.24) !important;
     position: relative !important;
     top: auto !important;
     z-index: 12 !important;
@@ -6243,38 +6336,49 @@ a.primary-btn.submit-btn {
   .mobile-workspace-brand-logo {
     width: 44px;
     height: 44px;
+    min-width: 44px;
     border-radius: 14px;
     display: grid;
     place-items: center;
-    background: linear-gradient(180deg, rgba(13, 21, 38, 0.96), rgba(14, 25, 44, 0.98));
-    border: 1px solid rgba(122, 139, 176, 0.2);
+    background: transparent;
+    border: none;
     overflow: hidden;
   }
 
-  .mobile-workspace-brand-logo img {
+  .mobile-workspace-brand-logo img,
+  .mobile-workspace-brand-logo img.brand-logo-icon {
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    object-position: center 24%;
+    object-fit: contain;
+    object-position: center;
   }
 
-  .mobile-workspace-brand-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .mobile-workspace-brand-copy strong {
-    font-size: 1.55rem;
-    line-height: 1;
+  .mobile-workspace-brand-copy .brand-title,
+  .mobile-workspace-brand-copy strong.brand-title {
+    font-size: 1.05rem;
+    line-height: 1.05;
     color: #ffffff;
     font-family: "Space Grotesk", sans-serif;
   }
 
-  .mobile-workspace-brand-copy span {
+  .mobile-workspace-brand-copy .brand-byline {
+    font-size: 0.72rem;
+    color: #ffffff;
+    opacity: 0.92;
+    text-transform: none;
+    letter-spacing: 0.02em;
+  }
+
+  .mobile-workspace-brand-copy .brand-tagline {
+    font-size: 0.62rem;
+    color: #ffffff;
+    opacity: 0.88;
+    letter-spacing: 0.12em;
+  }
+
+  .mobile-workspace-brand-copy span:not(.brand-byline):not(.brand-tagline) {
     font-size: 0.78rem;
-    color: #8da2c8;
+    color: #ffffff;
   }
 
   .mobile-workspace-actions {
@@ -8357,18 +8461,26 @@ body.is-member-view .topbar {
   place-items: center;
   overflow: hidden;
   flex-shrink: 0;
-  background: linear-gradient(180deg, rgba(13, 21, 38, 0.96), rgba(14, 25, 44, 0.98));
-  border: 1px solid rgba(122, 139, 176, 0.2);
+  background: transparent;
+  border: none;
 }
 
 .mobile-workspace-brand-logo img,
+.mobile-workspace-brand-logo img.brand-logo-icon,
 .mobile-workspace-brand-logo img.brand-logo-mark {
   width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
   max-height: 100% !important;
-  object-fit: cover !important;
-  object-position: center 24% !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+.mobile-workspace-brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
 @media (max-width: 768px) {
@@ -8387,16 +8499,21 @@ body.is-member-view .topbar {
   }
 
   body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-logo {
-    width: 52px;
-    height: 52px;
+    width: 48px;
+    height: 48px;
   }
 
-  body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy strong {
-    font-size: 1.65rem;
+  body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy .brand-title,
+  body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy strong.brand-title {
+    font-size: 1.12rem;
   }
 
-  body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy span {
-    font-size: 0.88rem;
+  body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy .brand-byline {
+    font-size: 0.76rem;
+  }
+
+  body.is-member-view:not(.in-room-mode) .mobile-workspace-brand-copy .brand-tagline {
+    font-size: 0.66rem;
   }
 }
 
@@ -9127,5 +9244,38 @@ select:disabled,
   .support-chat-main.support-admin-room {
     min-height: 520px;
     max-height: none;
+  }
+}
+
+.participant-avatar-admin img,
+.participant-avatar-admin .brand-logo-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+}
+
+@media (max-width: 768px) {
+  .topbar {
+    padding: 12px 14px 10px !important;
+    border-radius: 16px;
+  }
+
+  .brand-block-full .brand-mark-wrap {
+    width: 48px;
+    height: 48px;
+  }
+
+  .brand-title {
+    font-size: 1rem;
+  }
+
+  .brand-byline {
+    font-size: 0.68rem;
+  }
+
+  .brand-tagline {
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
   }
 }

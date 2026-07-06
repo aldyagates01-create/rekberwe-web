@@ -2203,7 +2203,7 @@ function buildTransactionProfileDetails(role, transaction) {
     return normalizeProfileDetails({
       id: "admin",
       displayName: "RekberWE.id",
-      avatar: state.providerConfig?.brandLogoUrl || "assets/rekberwe-logo-mark.jpg?v=5",
+      avatar: state.providerConfig?.brandLogoUrl || "assets/rekberwe-logo-shield.png?v=6",
       verificationStatus: "verified",
       verified: true,
       provider: "Admin",

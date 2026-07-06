@@ -1652,7 +1652,7 @@ function buildAdminTransactionProfileDetails(role, transaction) {
     return normalizeAdminProfileDetails({
       id: state.currentUser?.id || "admin",
       displayName: "RekberWE.id",
-      avatar: "/assets/rekberwe-logo-mark.jpg?v=5",
+      avatar: "/assets/rekberwe-logo-shield.png?v=6",
       verificationStatus: "verified",
       verified: true,
       provider: "Admin",
@@ -2247,7 +2247,7 @@ function renderSupportAdminMessage(message, threadUser = null) {
   const profile = isAdmin
     ? normalizeAdminProfileDetails({
       displayName: message.sender || "RekberWE.id",
-      avatar: "/assets/rekberwe-logo-mark.jpg?v=5",
+      avatar: "/assets/rekberwe-logo-shield.png?v=6",
       verificationStatus: "verified",
       verified: true,
     }, "Admin")
