@@ -36,6 +36,7 @@ const notificationState = {
 };
 
 const PRESENCE_ONLINE_MS = 45000;
+const TYPING_ACTIVE_MS = 5000;
 
 const sellerBankUiState = {
   dirty: false,
@@ -198,6 +199,8 @@ const elements = {
   supportWidgetUpload: document.getElementById("support-widget-upload"),
   supportWidgetClose: document.getElementById("support-widget-close"),
   supportWidgetDrag: document.getElementById("support-widget-drag"),
+  supportWidgetAdminState: document.getElementById("support-widget-admin-state"),
+  supportWidgetTypingIndicator: document.getElementById("support-widget-typing-indicator"),
   createdTransactionModal: document.getElementById("created-transaction-modal"),
   createdTransactionLink: document.getElementById("created-transaction-link"),
   copyCreatedTransactionLink: document.getElementById("copy-created-transaction-link"),
@@ -246,6 +249,9 @@ let presenceTickTimer = null;
 let typingStopTimer = null;
 let confirmModalResolver = null;
 let supportThreadTimer = null;
+let supportTypingStopTimer = null;
+let supportPresenceTickTimer = null;
+let guestPresenceTimer = null;
 let locationConsentResolver = null;
 let supportHintTimer = null;
 let supportHintShown = false;
@@ -582,6 +588,92 @@ async function sendTypingState(code, isTyping) {
   }).catch(() => {});
 }
 
+function getActiveSupportTyping(thread) {
+  if (!thread?.typing) return {};
+  const now = Date.now();
+  return Object.fromEntries(
+    Object.entries(thread.typing).filter(([, value]) => now - new Date(value).getTime() <= TYPING_ACTIVE_MS),
+  );
+}
+
+function getSupportSelfUserId() {
+  return state.currentUser?.id || state.supportThread?.userId || "";
+}
+
+async function sendSupportTypingState(isTyping) {
+  if (!state.supportThread?.id) return;
+  const basePath = state.currentUser ? "/api/support-thread" : "/api/public-support-thread";
+  await fetchJson(`${basePath}/typing`, {
+    method: "POST",
+    body: JSON.stringify({ isTyping }),
+  }).catch(() => {});
+}
+
+function buildSupportTypingIndicatorText(thread, excludeUserId) {
+  const typing = getActiveSupportTyping(thread);
+  const labels = Object.keys(typing)
+    .filter((userId) => userId !== excludeUserId)
+    .map((userId) => {
+      if (thread?.user?.id === userId) return thread.user.displayName || "Pengguna";
+      if (String(userId).startsWith("guest:")) return "Guest";
+      return "Admin";
+    });
+  if (!labels.length) return "";
+  if (labels.length === 1) return `${labels[0]} sedang mengetik...`;
+  if (labels.length === 2) return `${labels[0]} & ${labels[1]} sedang mengetik...`;
+  return `${labels.slice(0, -1).join(", ")} & ${labels[labels.length - 1]} sedang mengetik...`;
+}
+
+function renderSupportWidgetPresence() {
+  if (elements.supportWidgetAdminState) {
+    elements.supportWidgetAdminState.textContent = "Online";
+    elements.supportWidgetAdminState.className = "participant-state online";
+  }
+  const typingText = buildSupportTypingIndicatorText(state.supportThread, getSupportSelfUserId());
+  if (elements.supportWidgetTypingIndicator) {
+    elements.supportWidgetTypingIndicator.classList.toggle("hidden", !typingText);
+    elements.supportWidgetTypingIndicator.textContent = typingText;
+  }
+}
+
+function getUserHeartbeatBody() {
+  const widgetOpen = elements.supportWidgetPanel && !elements.supportWidgetPanel.classList.contains("hidden");
+  return {
+    activeTransactionCode: state.activeTransaction?.code || "",
+    activeSupportThreadId: widgetOpen && state.supportThread?.id ? state.supportThread.id : null,
+  };
+}
+
+function sendGuestSupportPresenceHeartbeat() {
+  if (state.currentUser) return;
+  const widgetOpen = elements.supportWidgetPanel && !elements.supportWidgetPanel.classList.contains("hidden");
+  if (!widgetOpen) return;
+  fetchJson("/api/public-support-thread/presence", { method: "POST", body: "{}" }).catch(() => {});
+}
+
+function startSupportPresenceServices() {
+  if (supportPresenceTickTimer) window.clearInterval(supportPresenceTickTimer);
+  supportPresenceTickTimer = window.setInterval(() => {
+    renderSupportWidgetPresence();
+  }, 15000);
+  if (guestPresenceTimer) window.clearInterval(guestPresenceTimer);
+  if (!state.currentUser) {
+    sendGuestSupportPresenceHeartbeat();
+    guestPresenceTimer = window.setInterval(sendGuestSupportPresenceHeartbeat, 20000);
+  }
+}
+
+function stopSupportPresenceServices() {
+  if (supportPresenceTickTimer) {
+    window.clearInterval(supportPresenceTickTimer);
+    supportPresenceTickTimer = null;
+  }
+  if (guestPresenceTimer) {
+    window.clearInterval(guestPresenceTimer);
+    guestPresenceTimer = null;
+  }
+}
+
 function applyPresenceToTransaction(transaction, userId, presence, adminPresence) {
   if (!transaction) return transaction;
   const next = { ...transaction };
@@ -816,6 +908,19 @@ function bindForms() {
   elements.supportWidgetToggle?.addEventListener("click", toggleSupportWidget);
   elements.supportWidgetClose?.addEventListener("click", toggleSupportWidget);
   elements.supportWidgetForm?.addEventListener("submit", handleSupportMessageSubmit);
+  elements.supportWidgetInput?.addEventListener("input", () => {
+    if (!state.supportThread?.id) return;
+    if (supportTypingStopTimer) window.clearTimeout(supportTypingStopTimer);
+    const value = String(elements.supportWidgetInput?.value || "").trim();
+    if (!value) {
+      sendSupportTypingState(false);
+      return;
+    }
+    sendSupportTypingState(true);
+    supportTypingStopTimer = window.setTimeout(() => {
+      sendSupportTypingState(false);
+    }, 1600);
+  });
   elements.copyCreatedTransactionLink?.addEventListener("click", copyCreatedTransactionLink);
   elements.shareCreatedTransactionLink?.addEventListener("click", shareCreatedTransactionLink);
   elements.openCreatedTransactionRoom?.addEventListener("click", openCreatedTransactionRoom);
@@ -3006,6 +3111,9 @@ async function refreshSupportThread() {
     state.supportThread = payload.thread || null;
     renderSupportWidget();
     startSupportThreadPolling();
+    if (elements.supportWidgetPanel && !elements.supportWidgetPanel.classList.contains("hidden")) {
+      startSupportPresenceServices();
+    }
   } catch (error) {
     console.error("Gagal memuat live chat:", error);
   }
@@ -3035,6 +3143,7 @@ function renderSupportWidget() {
     }
   }
   updateSupportWidgetBadge();
+  renderSupportWidgetPresence();
   elements.supportWidgetMessages.innerHTML = messages.length
     ? messages.map(renderSupportMessage).join("")
     : "<div class=\"upload-empty-state\">Belum ada pesan live chat.</div>";
@@ -3073,6 +3182,7 @@ async function handleSupportMessageSubmit(event) {
   const text = elements.supportWidgetInput?.value.trim();
   const files = Array.from(elements.supportWidgetUpload?.files || []);
   if (!text && !files.length) return;
+  await sendSupportTypingState(false);
   const basePath = state.currentUser ? "/api/support-thread" : "/api/public-support-thread";
   try {
     let payload = null;
@@ -3118,24 +3228,37 @@ function renderSupportAttachment(message) {
 
 function toggleSupportWidget() {
   if (elements.supportWidgetToggle?.dataset.skipClick === "true") return;
+  const wasHidden = elements.supportWidgetPanel?.classList.contains("hidden");
   elements.supportWidgetPanel?.classList.toggle("hidden");
   elements.supportWidgetHint?.classList.add("hidden");
   updateSupportWidgetBadge();
   if (!elements.supportWidgetPanel?.classList.contains("hidden")) {
     markSupportThreadSeen();
     elements.supportWidgetMessages.scrollTop = elements.supportWidgetMessages.scrollHeight;
+    startSupportPresenceServices();
+    if (state.currentUser) {
+      fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getUserHeartbeatBody()) }).catch(() => {});
+    } else {
+      sendGuestSupportPresenceHeartbeat();
+    }
+  } else if (wasHidden === false) {
+    stopSupportPresenceServices();
+    if (state.currentUser) {
+      fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getUserHeartbeatBody()) }).catch(() => {});
+    }
   }
 }
 
 function startSupportThreadPolling() {
   if (supportThreadTimer) return;
-  supportThreadTimer = window.setInterval(async () => {
+  const poll = async () => {
     try {
       const payload = await fetchJson(state.currentUser ? "/api/support-thread" : "/api/public-support-thread");
       state.supportThread = payload.thread || null;
       renderSupportWidget();
     } catch {}
-  }, 5000);
+  };
+  supportThreadTimer = window.setInterval(poll, state.currentUser ? 5000 : 2500);
 }
 
 function stopSupportThreadPolling() {
@@ -3666,9 +3789,9 @@ function setupLiveEvents() {
   if (!state.currentUser) return;
 
   liveEventSource = new EventSource("/api/events");
-  fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify({ activeTransactionCode: state.activeTransaction?.code || "" }) }).catch(() => {});
+  fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getUserHeartbeatBody()) }).catch(() => {});
   userPresenceTimer = window.setInterval(() => {
-    fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify({ activeTransactionCode: state.activeTransaction?.code || "" }) }).catch(() => {});
+    fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getUserHeartbeatBody()) }).catch(() => {});
   }, 20000);
   startPresenceTick();
   liveEventSource.onmessage = async (event) => {
@@ -3718,6 +3841,13 @@ function setupLiveEvents() {
         renderSupportWidget();
         if (nextCount > previousCount && lastMessage?.senderRole === "admin") {
           playUserNotificationSound("chat");
+        }
+      }
+
+      if (payload.type === "support_typing_updated" && payload.threadId) {
+        if (state.supportThread?.id === payload.threadId) {
+          state.supportThread = { ...state.supportThread, typing: payload.typing || {} };
+          renderSupportWidgetPresence();
         }
       }
 

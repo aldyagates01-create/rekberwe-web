@@ -2233,6 +2233,19 @@ select {
   touch-action: none;
 }
 
+.support-widget-head-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.support-widget-head-copy .participant-state {
+  font-size: 0.78rem;
+}
+
+.support-widget-panel .chat-typing-indicator {
+  margin: 0 14px 6px;
+}
+
 .storage-meter-list {
   display: grid;
   gap: 14px;
@@ -8896,6 +8909,16 @@ body.is-member-view .topbar {
   padding: 18px 20px 0;
   background: transparent;
   border-bottom: none;
+}
+
+.support-chat-main .support-admin-room-head #admin-support-user-state {
+  display: inline-flex;
+  margin-top: 6px;
+  font-size: 0.82rem;
+}
+
+.support-chat-main #admin-support-typing-indicator {
+  margin: 0 20px 8px;
 }
 
 .support-chat-main .support-admin-room-head h5 {

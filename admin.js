@@ -23,6 +23,8 @@ let adminEventSource = null;
 let adminPresenceTimer = null;
 let adminPresenceTickTimer = null;
 let adminTypingStopTimer = null;
+let adminSupportTypingStopTimer = null;
+let adminSupportPresenceTickTimer = null;
 let adminRoomPresenceTickTimer = null;
 let settingsFormDirty = false;
 
@@ -121,6 +123,8 @@ const elements = {
   adminSupportRoomTitle: document.getElementById("admin-support-room-title"),
   adminSupportRoomSubtitle: document.getElementById("admin-support-room-subtitle"),
   adminSupportRoomStatus: document.getElementById("admin-support-room-status"),
+  adminSupportUserState: document.getElementById("admin-support-user-state"),
+  adminSupportTypingIndicator: document.getElementById("admin-support-typing-indicator"),
   adminNoteModal: document.getElementById("admin-note-modal"),
   adminNoteEyebrow: document.getElementById("admin-note-eyebrow"),
   adminNoteTitle: document.getElementById("admin-note-title"),
@@ -177,6 +181,19 @@ elements.adminSendPayout.addEventListener("click", () => handleAdminAction("send
 elements.adminCompleteTransaction?.addEventListener("click", () => handleAdminAction("complete_transaction"));
 elements.adminCancelTransaction?.addEventListener("click", () => handleAdminAction("cancel_transaction"));
 elements.adminSupportForm?.addEventListener("submit", handleAdminSupportMessageSubmit);
+elements.adminSupportInput?.addEventListener("input", () => {
+  if (!state.activeSupportThreadId) return;
+  if (adminSupportTypingStopTimer) window.clearTimeout(adminSupportTypingStopTimer);
+  const value = String(elements.adminSupportInput?.value || "").trim();
+  if (!value) {
+    sendAdminSupportTypingState(false);
+    return;
+  }
+  sendAdminSupportTypingState(true);
+  adminSupportTypingStopTimer = window.setTimeout(() => {
+    sendAdminSupportTypingState(false);
+  }, 1600);
+});
 elements.adminTransferProofForm?.addEventListener("submit", handleAdminTransferProofSubmit);
 elements.adminTransferCompleteInline?.addEventListener("click", () => handleAdminAction("complete_transaction"));
 elements.adminNoteCancel?.addEventListener("click", () => closeAdminNoteModal(null));
@@ -557,6 +574,11 @@ function openAdminPage(page) {
 
   if (page === "settings" && !settingsFormDirty) {
     renderFeeSettings(state.settings);
+  }
+
+  if (page === "support") {
+    renderSupportThreads();
+    fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getAdminHeartbeatBody()) }).catch(() => {});
   }
 }
 
@@ -1995,6 +2017,82 @@ async function sendAdminTypingState(code, isTyping) {
   }).catch(() => {});
 }
 
+const TYPING_ACTIVE_MS = 5000;
+
+function getActiveSupportTyping(thread) {
+  if (!thread?.typing) return {};
+  const now = Date.now();
+  return Object.fromEntries(
+    Object.entries(thread.typing).filter(([, value]) => now - new Date(value).getTime() <= TYPING_ACTIVE_MS),
+  );
+}
+
+async function sendAdminSupportTypingState(isTyping) {
+  const threadId = Number(state.activeSupportThreadId || 0);
+  if (!threadId) return;
+  await fetchJson(`/api/admin/support-threads/${threadId}/typing`, {
+    method: "POST",
+    body: JSON.stringify({ isTyping }),
+  }).catch(() => {});
+}
+
+function buildSupportTypingIndicatorText(thread, excludeUserId) {
+  const typing = getActiveSupportTyping(thread);
+  const labels = Object.keys(typing)
+    .filter((userId) => userId !== excludeUserId)
+    .map((userId) => {
+      if (thread?.user?.id === userId) return thread.user.displayName || "Pengguna";
+      if (String(userId).startsWith("guest:")) return "Guest";
+      return "Admin";
+    });
+  if (!labels.length) return "";
+  if (labels.length === 1) return `${labels[0]} sedang mengetik...`;
+  if (labels.length === 2) return `${labels[0]} & ${labels[1]} sedang mengetik...`;
+  return `${labels.slice(0, -1).join(", ")} & ${labels[labels.length - 1]} sedang mengetik...`;
+}
+
+function getActiveSupportThread() {
+  return (state.supportThreads || []).find((item) => item.id === state.activeSupportThreadId) || null;
+}
+
+function renderAdminSupportPresence(thread = getActiveSupportThread()) {
+  if (!thread) {
+    if (elements.adminSupportUserState) {
+      elements.adminSupportUserState.textContent = "Offline";
+      elements.adminSupportUserState.className = "participant-state offline";
+    }
+    if (elements.adminSupportTypingIndicator) {
+      elements.adminSupportTypingIndicator.classList.add("hidden");
+      elements.adminSupportTypingIndicator.textContent = "";
+    }
+    return;
+  }
+  const userPresence = thread.user?.presence;
+  if (elements.adminSupportUserState) {
+    elements.adminSupportUserState.textContent = formatPresenceLabel(userPresence);
+    elements.adminSupportUserState.className = `participant-state ${getAdminPresenceStateClass(userPresence)}`;
+  }
+  const typingText = buildSupportTypingIndicatorText(thread, state.currentUser?.id);
+  if (elements.adminSupportTypingIndicator) {
+    elements.adminSupportTypingIndicator.classList.toggle("hidden", !typingText);
+    elements.adminSupportTypingIndicator.textContent = typingText;
+  }
+}
+
+function getAdminHeartbeatBody() {
+  return {
+    activeTransactionCode: state.activeTransaction?.code || "",
+    activeSupportThreadId: state.currentPage === "support" && state.activeSupportThreadId ? state.activeSupportThreadId : null,
+  };
+}
+
+function startAdminSupportPresenceTick() {
+  if (adminSupportPresenceTickTimer) window.clearInterval(adminSupportPresenceTickTimer);
+  adminSupportPresenceTickTimer = window.setInterval(() => {
+    if (state.currentPage === "support") renderAdminSupportPresence();
+  }, 15000);
+}
+
 function applyAdminPresenceToTransaction(transaction, userId, presence) {
   if (!transaction) return transaction;
   const next = { ...transaction };
@@ -2106,6 +2204,7 @@ function renderSupportThreads() {
     button.onclick = () => {
       state.activeSupportThreadId = Number(button.dataset.threadId);
       renderSupportThreads();
+      fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getAdminHeartbeatBody()) }).catch(() => {});
     };
   });
   if (state.currentPage !== "support") {
@@ -2135,6 +2234,7 @@ function renderSupportThreads() {
     ? active.messages.map((message) => renderSupportAdminMessage(message, active.user)).join("")
     : "<div class=\"upload-empty-state\">Belum ada pesan live chat.</div>";
   elements.adminSupportMessages.scrollTop = elements.adminSupportMessages.scrollHeight;
+  renderAdminSupportPresence(active);
   updateAdminNotificationBadges();
 }
 
@@ -2188,6 +2288,7 @@ async function handleAdminSupportMessageSubmit(event) {
   const text = elements.adminSupportInput?.value.trim();
   const files = Array.from(elements.adminSupportUpload?.files || []);
   if (!threadId || (!text && !files.length)) return;
+  await sendAdminSupportTypingState(false);
   try {
     let payload = null;
     if (text) {
@@ -2375,11 +2476,12 @@ function setupAdminLiveEvents() {
     adminPresenceTimer = null;
   }
   adminEventSource = new EventSource("/api/events");
-  fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify({ activeTransactionCode: state.activeTransaction?.code || "" }) }).catch(() => {});
+  fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getAdminHeartbeatBody()) }).catch(() => {});
   adminPresenceTimer = window.setInterval(() => {
-    fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify({ activeTransactionCode: state.activeTransaction?.code || "" }) }).catch(() => {});
+    fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getAdminHeartbeatBody()) }).catch(() => {});
   }, 20000);
   startAdminRoomPresenceTick();
+  startAdminSupportPresenceTick();
   adminEventSource.onmessage = async (event) => {
     try {
       const payload = JSON.parse(event.data || "{}");
@@ -2402,12 +2504,20 @@ function setupAdminLiveEvents() {
       if (payload.type === "presence_updated" && payload.userId) {
         state.users = (state.users || []).map((user) => user.id === payload.userId ? { ...user, presence: payload.presence } : user);
         state.transactions = state.transactions.map((item) => applyAdminPresenceToTransaction(item, payload.userId, payload.presence));
+        state.supportThreads = (state.supportThreads || []).map((thread) => {
+          if (thread.user?.id !== payload.userId && thread.userId !== payload.userId) return thread;
+          const nextUser = thread.user
+            ? { ...thread.user, presence: payload.presence }
+            : { id: payload.userId, displayName: "Guest", presence: payload.presence };
+          return { ...thread, user: nextUser };
+        });
         if (state.activeTransaction) {
           state.activeTransaction = applyAdminPresenceToTransaction(state.activeTransaction, payload.userId, payload.presence);
           renderAdminRoomPresence(state.activeTransaction);
         }
         renderUsers(state.users);
         renderVerificationQueue(state.users);
+        if (state.currentPage === "support") renderAdminSupportPresence();
       }
 
       if (payload.type === "transaction_updated" && payload.transaction) {
@@ -2442,6 +2552,15 @@ function setupAdminLiveEvents() {
         }
         if (nextCount > previousCount && lastMessage?.senderRole !== "admin") {
           shouldPlayChatSound = true;
+        }
+      }
+
+      if (payload.type === "support_typing_updated" && payload.threadId) {
+        state.supportThreads = (state.supportThreads || []).map((thread) => (
+          thread.id === payload.threadId ? { ...thread, typing: payload.typing || {} } : thread
+        ));
+        if (state.currentPage === "support" && state.activeSupportThreadId === payload.threadId) {
+          renderAdminSupportPresence();
         }
       }
 

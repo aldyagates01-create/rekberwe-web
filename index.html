@@ -879,10 +879,14 @@
     </button>
     <div class="support-widget-panel hidden" id="support-widget-panel">
       <div class="support-widget-head" id="support-widget-drag">
-        <strong>Live Chat Admin</strong>
+        <div class="support-widget-head-copy">
+          <strong>Live Chat Admin</strong>
+          <span class="participant-state online" id="support-widget-admin-state">Online</span>
+        </div>
         <button type="button" class="ghost-btn" id="support-widget-close">Tutup</button>
       </div>
       <div class="support-widget-messages" id="support-widget-messages"></div>
+      <div class="chat-typing-indicator hidden" id="support-widget-typing-indicator">Sedang mengetik...</div>
       <form class="support-widget-form" id="support-widget-form">
         <label class="chat-file-picker">
           <input type="file" id="support-widget-upload" multiple />

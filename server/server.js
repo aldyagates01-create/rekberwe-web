@@ -273,7 +273,8 @@ app.get("/api/events", requireAuth, (req, res) => {
 
 app.post("/api/presence/heartbeat", requireAuth, async (req, res) => {
   const activeTransactionCode = String(req.body.activeTransactionCode || "").trim().toUpperCase();
-  setUserPresence(req.session.user.id, req.session.user.isAdmin ? "admin" : "user", activeTransactionCode);
+  const activeSupportThreadId = Number(req.body.activeSupportThreadId || 0) || null;
+  setUserPresence(req.session.user.id, req.session.user.isAdmin ? "admin" : "user", activeTransactionCode, activeSupportThreadId);
   await broadcastPresenceUpdate(req.session.user.id);
   res.json({ presence: getUserPresence(req.session.user.id) });
 });
@@ -326,12 +327,39 @@ app.get("/api/me/dashboard", requireAuth, async (req, res) => {
 
 app.get("/api/support-thread", requireAuth, async (req, res) => {
   const thread = await getSupportThreadForUser(req.session.user.id);
-  res.json({ thread });
+  res.json({ thread: enrichSupportThread(thread, { forUser: true }) });
 });
 
 app.get("/api/public-support-thread", async (req, res) => {
   const thread = await getSupportThreadForGuest(getGuestSupportKey(req));
-  res.json({ thread });
+  res.json({ thread: enrichSupportThread(thread, { forUser: true }) });
+});
+
+app.post("/api/support-thread/typing", requireAuth, async (req, res) => {
+  const thread = await getSupportThreadForUser(req.session.user.id);
+  const isTyping = Boolean(req.body.isTyping);
+  setUserPresence(req.session.user.id, "user", "", thread.id);
+  setSupportTypingState(thread.id, req.session.user.id, isTyping);
+  await broadcastSupportTypingUpdated(thread);
+  res.json({ ok: true });
+});
+
+app.post("/api/public-support-thread/typing", async (req, res) => {
+  const guestKey = getGuestSupportKey(req);
+  const thread = await getSupportThreadForGuest(guestKey);
+  const isTyping = Boolean(req.body.isTyping);
+  setSupportTypingState(thread.id, `guest:${guestKey}`, isTyping);
+  await broadcastSupportTypingUpdated(thread);
+  res.json({ ok: true });
+});
+
+app.post("/api/public-support-thread/presence", async (req, res) => {
+  const guestKey = getGuestSupportKey(req);
+  const thread = await getSupportThreadForGuest(guestKey);
+  const userId = `guest:${guestKey}`;
+  setUserPresence(userId, "guest", "", thread?.id || null);
+  await broadcastPresenceUpdate(userId);
+  res.json({ presence: getUserPresence(userId) });
 });
 
 app.post("/api/support-thread/messages", requireAuth, async (req, res) => {
@@ -342,8 +370,8 @@ app.post("/api/support-thread/messages", requireAuth, async (req, res) => {
   }
   const thread = await getSupportThreadForUser(req.session.user.id);
   const updated = await addSupportThreadMessage(thread.id, req.session.user.id, req.session.user.displayName, "user", text);
-  await broadcastEvent("support_updated", null, { thread: updated, userId: req.session.user.id });
-  res.json({ thread: updated });
+  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(updated, { forUser: true }), userId: req.session.user.id });
+  res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
 app.post("/api/public-support-thread/messages", async (req, res) => {
@@ -355,8 +383,8 @@ app.post("/api/public-support-thread/messages", async (req, res) => {
   const guestKey = getGuestSupportKey(req);
   const thread = await getSupportThreadForGuest(guestKey);
   const updated = await addSupportThreadMessage(thread.id, `guest:${guestKey}`, "Guest", "guest", text);
-  await broadcastEvent("support_updated", null, { thread: updated, userId: `guest:${guestKey}` });
-  res.json({ thread: updated });
+  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(updated, { forUser: true }), userId: `guest:${guestKey}` });
+  res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
 app.post("/api/support-thread/uploads", requireAuth, upload.array("supportFiles", 5), async (req, res) => {
@@ -375,8 +403,8 @@ app.post("/api/support-thread/uploads", requireAuth, upload.array("supportFiles"
       attachmentType: file.mimetype || "",
     });
   }
-  await broadcastEvent("support_updated", null, { thread: updated, userId: req.session.user.id });
-  res.json({ thread: updated });
+  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(updated, { forUser: true }), userId: req.session.user.id });
+  res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
 app.post("/api/public-support-thread/uploads", upload.array("supportFiles", 5), async (req, res) => {
@@ -396,8 +424,8 @@ app.post("/api/public-support-thread/uploads", upload.array("supportFiles", 5), 
       attachmentType: file.mimetype || "",
     });
   }
-  await broadcastEvent("support_updated", null, { thread: updated, userId: `guest:${guestKey}` });
-  res.json({ thread: updated });
+  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(updated, { forUser: true }), userId: `guest:${guestKey}` });
+  res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
 app.post("/api/me/profile", requireAuth, async (req, res) => {
@@ -853,7 +881,25 @@ app.get("/api/admin/users", requireAdmin, async (_req, res) => {
 
 app.get("/api/admin/support-threads", requireAdmin, async (_req, res) => {
   const threads = await getAllSupportThreads();
-  res.json({ threads });
+  res.json({ threads: threads.map((thread) => enrichSupportThread(thread, { forUser: false })) });
+});
+
+app.post("/api/admin/support-threads/:id/typing", requireAdmin, async (req, res) => {
+  const threadId = Number(req.params.id || 0);
+  if (!threadId) {
+    res.status(400).json({ message: "Live chat tidak ditemukan." });
+    return;
+  }
+  const thread = (await getAllSupportThreads()).find((item) => item.id === threadId) || null;
+  if (!thread) {
+    res.status(404).json({ message: "Live chat tidak ditemukan." });
+    return;
+  }
+  const isTyping = Boolean(req.body.isTyping);
+  setUserPresence(req.session.user.id, "admin", "", threadId);
+  setSupportTypingState(threadId, req.session.user.id, isTyping);
+  await broadcastSupportTypingUpdated(thread);
+  res.json({ ok: true });
 });
 
 app.post("/api/admin/support-threads/:id/messages", requireAdmin, async (req, res) => {
@@ -868,8 +914,8 @@ app.post("/api/admin/support-threads/:id/messages", requireAdmin, async (req, re
     res.status(404).json({ message: "Live chat tidak ditemukan." });
     return;
   }
-  await broadcastEvent("support_updated", null, { thread: updated, userId: updated.user?.id || null });
-  res.json({ thread: updated });
+  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(updated, { forUser: false }), userId: updated.user?.id || null });
+  res.json({ thread: enrichSupportThread(updated, { forUser: false }) });
 });
 
 app.post("/api/admin/support-threads/:id/uploads", requireAdmin, upload.array("supportFiles", 5), async (req, res) => {
@@ -892,8 +938,8 @@ app.post("/api/admin/support-threads/:id/uploads", requireAdmin, upload.array("s
       attachmentType: file.mimetype || "",
     });
   }
-  await broadcastEvent("support_updated", null, { thread, userId: thread.user?.id || null });
-  res.json({ thread });
+  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(thread, { forUser: false }), userId: thread.user?.id || null });
+  res.json({ thread: enrichSupportThread(thread, { forUser: false }) });
 });
 
 app.post("/api/admin/users/:id/verification", requireAdmin, async (req, res) => {
@@ -1535,7 +1581,7 @@ function setupEventStream(req, res, audience, userId) {
   });
 }
 
-function setUserPresence(userId, role = "user", activeTransactionCode = "") {
+function setUserPresence(userId, role = "user", activeTransactionCode = "", activeSupportThreadId = null) {
   if (!userId) return;
   const previous = presenceState.get(userId) || {};
   presenceState.set(userId, {
@@ -1543,6 +1589,7 @@ function setUserPresence(userId, role = "user", activeTransactionCode = "") {
     userId,
     role,
     activeTransactionCode,
+    activeSupportThreadId: activeSupportThreadId || null,
     lastSeenAt: new Date().toISOString(),
   });
 }
@@ -1587,6 +1634,55 @@ function buildTypingPayload(code) {
   );
 }
 
+function getSupportTypingKey(threadId) {
+  return `SUPPORT-${Number(threadId || 0)}`;
+}
+
+function setSupportTypingState(threadId, userId, isTyping) {
+  setTypingState(getSupportTypingKey(threadId), userId, isTyping);
+}
+
+function buildSupportTypingPayload(threadId) {
+  return buildTypingPayload(getSupportTypingKey(threadId));
+}
+
+function getAlwaysOnlineAdminPresence() {
+  return {
+    isOnline: true,
+    lastSeenAt: new Date().toISOString(),
+    role: "admin",
+  };
+}
+
+function enrichSupportThread(thread, { forUser = false } = {}) {
+  if (!thread) return thread;
+  let user = null;
+  if (thread.user) {
+    user = enrichUserPresence(thread.user);
+  } else if (String(thread.userId || "").startsWith("guest:")) {
+    user = {
+      id: thread.userId,
+      displayName: "Guest",
+      presence: getUserPresence(thread.userId),
+    };
+  }
+  return {
+    ...thread,
+    user,
+    adminPresence: forUser ? getAlwaysOnlineAdminPresence() : getAdminPresence(),
+    typing: buildSupportTypingPayload(thread.id),
+  };
+}
+
+async function broadcastSupportTypingUpdated(thread) {
+  if (!thread?.id) return;
+  await broadcastEvent("support_typing_updated", null, {
+    threadId: thread.id,
+    userId: thread.userId || thread.user?.id || null,
+    typing: buildSupportTypingPayload(thread.id),
+  });
+}
+
 function enrichUserPresence(user) {
   if (!user) return user;
   return {
@@ -1629,6 +1725,9 @@ async function broadcastEvent(type, code, payload = {}) {
   };
   for (const client of eventClients) {
     if (type === "support_updated") {
+      const supportVisible = client.audience === "admin" || client.userId === payload.userId;
+      if (!supportVisible) continue;
+    } else if (type === "support_typing_updated") {
       const supportVisible = client.audience === "admin" || client.userId === payload.userId;
       if (!supportVisible) continue;
     } else if (type === "verification_updated") {
