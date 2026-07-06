@@ -17,6 +17,7 @@ import {
   isSystemMessage,
   runAction,
   sendMessage,
+  sendPresenceAway,
   sendPresenceHeartbeat,
   sendTypingState,
   updateSellerBankDetails,
@@ -24,6 +25,11 @@ import {
 } from "@/lib/transaction";
 import type { TransactionActionKey } from "@/lib/transaction";
 import type { SessionUser, Transaction, TransactionMessage } from "@/lib/types";
+import {
+  getCounterpartyPresenceText,
+  PRESENCE_HEARTBEAT_MS,
+  PRESENCE_UI_TICK_MS,
+} from "@/lib/presence";
 import { ensureWebPushEnabled } from "@/lib/push";
 
 type TransactionChatClientProps = {
@@ -85,7 +91,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     [transaction, user?.id],
   );
   const presenceText = useMemo(
-    () => getTransactionPresenceText(transaction, role),
+    () => getCounterpartyPresenceText(transaction, role, Date.now()),
     [transaction, role, presenceTick],
   );
 
@@ -163,14 +169,27 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     sendPresenceHeartbeat(code).catch(() => {});
     const timer = window.setInterval(() => {
       sendPresenceHeartbeat(code).catch(() => {});
-      setPresenceTick((value) => value + 1);
-    }, 20000);
+    }, PRESENCE_HEARTBEAT_MS);
     const presenceTimer = window.setInterval(() => {
       setPresenceTick((value) => value + 1);
-    }, 15000);
+    }, PRESENCE_UI_TICK_MS);
+    const handleAway = () => {
+      sendPresenceAway(code).catch(() => {});
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        sendPresenceHeartbeat(code).catch(() => {});
+        setPresenceTick((value) => value + 1);
+      }
+    };
+    window.addEventListener("pagehide", handleAway);
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       window.clearInterval(timer);
       window.clearInterval(presenceTimer);
+      window.removeEventListener("pagehide", handleAway);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      sendPresenceAway(code).catch(() => {});
     };
   }, [code, user]);
 
@@ -191,7 +210,15 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
           setTransaction((current) => current ? { ...current, typing: payload.typing || {} } : current);
         }
         if (payload.type === "presence_updated") {
-          setTransaction((current) => updateTransactionPresence(current, payload.userId, payload.presence, payload.adminPresence));
+          setTransaction((current) => {
+            if (!current) return current;
+            const buyerId = current.buyer?.id;
+            const sellerId = current.seller?.id;
+            if (payload.userId !== buyerId && payload.userId !== sellerId) {
+              return current;
+            }
+            return updateTransactionPresence(current, payload.userId, payload.presence, payload.adminPresence);
+          });
         }
       } catch {
         // ignore malformed events
@@ -562,32 +589,6 @@ function getActionConfirmation(action: TransactionActionKey) {
   if (action === "goods_received") return "Konfirmasi bahwa item sudah diterima dan aman?";
   if (action === "mark_paid") return "Konfirmasi bahwa pembayaran sudah dikirim ke admin?";
   return "";
-}
-
-function getTransactionPresenceText(transaction: Transaction | null, role: "buyer" | "seller" | null) {
-  if (!transaction) return "Offline";
-  const counterparty = role === "buyer" ? transaction.seller : role === "seller" ? transaction.buyer : null;
-  if (isPresenceOnline(counterparty?.presence)) return "Online";
-  if (isPresenceOnline(transaction.adminPresence)) return "Admin online";
-  const lastSeenAt = counterparty?.presence?.lastSeenAt || transaction.adminPresence?.lastSeenAt || "";
-  if (!lastSeenAt) return "Offline";
-  return `Aktif ${formatRelativeLastSeen(lastSeenAt)}`;
-}
-
-function isPresenceOnline(presence?: Transaction["adminPresence"]) {
-  if (!presence?.lastSeenAt) return false;
-  return Date.now() - new Date(presence.lastSeenAt).getTime() <= 45000;
-}
-
-function formatRelativeLastSeen(value: string) {
-  const diffSeconds = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
-  if (diffSeconds < 60) return `${diffSeconds} detik lalu`;
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) return `${diffMinutes} menit lalu`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} jam lalu`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} hari lalu`;
 }
 
 function updateTransactionPresence(

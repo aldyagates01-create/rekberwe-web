@@ -2003,7 +2003,7 @@ function formatPresenceLabel(presence) {
 
 function isPresenceOnline(presence) {
   if (!presence?.lastSeenAt) return false;
-  return Date.now() - new Date(presence.lastSeenAt).getTime() <= 45000;
+  return Date.now() - new Date(presence.lastSeenAt).getTime() <= 30000;
 }
 
 function getAdminPresenceStateClass(presence, isTyping = false) {
@@ -2092,7 +2092,7 @@ function startAdminSupportPresenceTick() {
   if (adminSupportPresenceTickTimer) window.clearInterval(adminSupportPresenceTickTimer);
   adminSupportPresenceTickTimer = window.setInterval(() => {
     if (state.currentPage === "support") renderAdminSupportPresence();
-  }, 15000);
+  }, 5000);
 }
 
 function applyAdminPresenceToTransaction(transaction, userId, presence) {
@@ -2144,7 +2144,7 @@ function startAdminRoomPresenceTick() {
   if (adminRoomPresenceTickTimer) window.clearInterval(adminRoomPresenceTickTimer);
   adminRoomPresenceTickTimer = window.setInterval(() => {
     if (state.activeTransaction) renderAdminRoomPresence(state.activeTransaction);
-  }, 15000);
+  }, 5000);
 }
 
 function formatRelativeTime(value) {
@@ -2481,7 +2481,7 @@ function setupAdminLiveEvents() {
   fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getAdminHeartbeatBody()) }).catch(() => {});
   adminPresenceTimer = window.setInterval(() => {
     fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getAdminHeartbeatBody()) }).catch(() => {});
-  }, 20000);
+  }, 15000);
   startAdminRoomPresenceTick();
   startAdminSupportPresenceTick();
   adminEventSource.onmessage = async (event) => {

@@ -168,6 +168,14 @@ export async function sendPresenceHeartbeat(activeTransactionCode = "") {
   });
 }
 
+export async function sendPresenceAway(activeTransactionCode = "") {
+  return fetchJson<{ presence: unknown }>("/api/presence/heartbeat", {
+    method: "POST",
+    body: JSON.stringify({ activeTransactionCode, offline: true }),
+    keepalive: true,
+  });
+}
+
 export async function sendTypingState(code: string, isTyping: boolean) {
   return fetchJson<{ ok: boolean }>(`/api/transactions/${encodeURIComponent(code)}/typing`, {
     method: "POST",

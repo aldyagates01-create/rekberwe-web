@@ -99,8 +99,10 @@ const uploadStorage = multer.memoryStorage();
 const upload = multer({ storage: uploadStorage, limits: { fileSize: 10 * 1024 * 1024, files: 5 } });
 const eventClients = new Set();
 const presenceState = new Map();
+const presenceOnlineSnapshot = new Map();
 const typingState = new Map();
-const PRESENCE_ONLINE_MS = 45000;
+const PRESENCE_ONLINE_MS = 30000;
+const PRESENCE_SWEEP_MS = 5000;
 const TYPING_ACTIVE_MS = 5000;
 
 const providers = {
@@ -277,7 +279,17 @@ app.get("/api/events", requireAuth, (req, res) => {
 app.post("/api/presence/heartbeat", requireAuth, async (req, res) => {
   const activeTransactionCode = String(req.body.activeTransactionCode || "").trim().toUpperCase();
   const activeSupportThreadId = Number(req.body.activeSupportThreadId || 0) || null;
-  setUserPresence(req.session.user.id, req.session.user.isAdmin ? "admin" : "user", activeTransactionCode, activeSupportThreadId);
+  const offline = Boolean(req.body.offline);
+  if (offline) {
+    markUserAway(req.session.user.id);
+  } else {
+    setUserPresence(
+      req.session.user.id,
+      req.session.user.isAdmin ? "admin" : "user",
+      activeTransactionCode,
+      activeSupportThreadId,
+    );
+  }
   await broadcastPresenceUpdate(req.session.user.id);
   res.json({ presence: getUserPresence(req.session.user.id) });
 });
@@ -1403,6 +1415,7 @@ app.get("*", (_req, res) => res.sendFile(path.join(webRoot, "index.html")));
 
 async function startServer() {
   initPushService();
+  startPresenceSweeper();
   if (useNextFrontend) {
     try {
       const nextModule = await import("next");
@@ -1671,8 +1684,6 @@ function setupEventStream(req, res, audience, userId) {
 
   const client = { res, audience, userId };
   eventClients.add(client);
-  setUserPresence(userId, audience, "");
-  broadcastPresenceUpdate(userId).catch(() => {});
   res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
 
   const heartbeat = setInterval(() => {
@@ -1682,9 +1693,31 @@ function setupEventStream(req, res, audience, userId) {
   req.on("close", () => {
     clearInterval(heartbeat);
     eventClients.delete(client);
-    setUserPresence(userId, audience, "");
-    broadcastPresenceUpdate(userId).catch(() => {});
   });
+}
+
+function markUserAway(userId) {
+  if (!userId) return;
+  const previous = presenceState.get(userId) || {};
+  presenceState.set(userId, {
+    ...previous,
+    userId,
+    lastSeenAt: new Date(Date.now() - PRESENCE_ONLINE_MS - 1000).toISOString(),
+  });
+  presenceOnlineSnapshot.set(userId, false);
+}
+
+function startPresenceSweeper() {
+  setInterval(() => {
+    for (const userId of presenceState.keys()) {
+      const presence = getUserPresence(userId);
+      const wasOnline = presenceOnlineSnapshot.get(userId);
+      if (wasOnline === true && !presence.isOnline) {
+        broadcastPresenceUpdate(userId).catch(() => {});
+      }
+      presenceOnlineSnapshot.set(userId, presence.isOnline);
+    }
+  }, PRESENCE_SWEEP_MS);
 }
 
 function setUserPresence(userId, role = "user", activeTransactionCode = "", activeSupportThreadId = null) {
@@ -1698,6 +1731,7 @@ function setUserPresence(userId, role = "user", activeTransactionCode = "", acti
     activeSupportThreadId: activeSupportThreadId || null,
     lastSeenAt: new Date().toISOString(),
   });
+  presenceOnlineSnapshot.set(userId, true);
 }
 
 function getUserPresence(userId) {

@@ -35,7 +35,9 @@ const notificationState = {
   lastSoundAt: 0,
 };
 
-const PRESENCE_ONLINE_MS = 45000;
+const PRESENCE_ONLINE_MS = 30000;
+const PRESENCE_UI_TICK_MS = 5000;
+const PRESENCE_HEARTBEAT_MS = 15000;
 const TYPING_ACTIVE_MS = 5000;
 
 const sellerBankUiState = {
@@ -727,8 +729,8 @@ function renderRoomPresence(transaction) {
     elements.roomAdminState.className = `participant-state ${getPresenceStateClass(transaction.adminPresence)}`;
   }
 
-  const headerLabel = formatPresenceLabel(counterparty?.presence || transaction.adminPresence);
-  const headerOnline = isPresenceOnline(counterparty?.presence) || isPresenceOnline(transaction.adminPresence);
+  const headerLabel = formatPresenceLabel(counterparty?.presence);
+  const headerOnline = isPresenceOnline(counterparty?.presence);
   if (elements.mobileChatHeaderOnline) {
     elements.mobileChatHeaderOnline.textContent = `● ${headerLabel}`;
     elements.mobileChatHeaderOnline.style.color = headerOnline ? "#22c55e" : "#93a4c3";
@@ -743,8 +745,31 @@ function startPresenceTick() {
   if (presenceTickTimer) window.clearInterval(presenceTickTimer);
   presenceTickTimer = window.setInterval(() => {
     if (state.activeTransaction) renderRoomPresence(state.activeTransaction);
-  }, 15000);
+  }, PRESENCE_UI_TICK_MS);
 }
+
+function sendUserPresenceAway() {
+  if (!state.currentUser) return;
+  const body = JSON.stringify({ ...getUserHeartbeatBody(), offline: true });
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon("/api/presence/heartbeat", new Blob([body], { type: "application/json" }));
+    return;
+  }
+  fetch("/api/presence/heartbeat", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body,
+    keepalive: true,
+  }).catch(() => {});
+}
+
+window.addEventListener("pagehide", sendUserPresenceAway);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || !state.currentUser) return;
+  fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getUserHeartbeatBody()) }).catch(() => {});
+  if (state.activeTransaction) renderRoomPresence(state.activeTransaction);
+});
 
 function bindProviderButtons() {
   document.querySelectorAll(".provider-btn[data-provider]").forEach((button) => {
@@ -3796,7 +3821,7 @@ function setupLiveEvents() {
   fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getUserHeartbeatBody()) }).catch(() => {});
   userPresenceTimer = window.setInterval(() => {
     fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getUserHeartbeatBody()) }).catch(() => {});
-  }, 20000);
+  }, PRESENCE_HEARTBEAT_MS);
   startPresenceTick();
   liveEventSource.onmessage = async (event) => {
     try {
