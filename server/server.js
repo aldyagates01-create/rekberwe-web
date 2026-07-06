@@ -819,7 +819,7 @@ app.post("/api/transactions", requireAuth, async (req, res) => {
   const feeSettings = await getAdminFeeSettings();
   const normalizedWarranty = normalizeWarrantyInput(warranty);
   if (!normalizedWarranty) {
-    res.status(400).json({ message: "Masa garansi tidak valid. Pilih 3, 7, 14, 30 hari, atau tulis 'Tanpa garansi'." });
+    res.status(400).json({ message: "Masa garansi tidak valid. Hanya boleh angka 3, 7, 14, 30, atau kosongkan untuk tanpa garansi." });
     return;
   }
   const code = generateTransactionCode();

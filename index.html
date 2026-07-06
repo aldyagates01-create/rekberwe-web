@@ -118,7 +118,9 @@
                   </label>
                   <label>
                     Masa garansi
-                    <input type="text" name="warranty" placeholder="Contoh: 3 hari (optional)" />
+                    <input type="text" name="warranty" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="2" placeholder="3, 7, 14, atau 30" />
+                    <span class="mini-note warranty-field-hint">Kosongkan jika tanpa garansi. Hanya angka 3, 7, 14, atau 30.</span>
+                    <span class="warranty-field-error field-error hidden" role="alert" aria-live="polite"></span>
                   </label>
                   <label>
                     Siapa bayar fee
@@ -470,7 +472,9 @@
                       </label>
                       <label>
                         Masa garansi
-                        <input type="text" name="warranty" placeholder="Contoh: 3 hari (optional)" />
+                        <input type="text" name="warranty" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="2" placeholder="3, 7, 14, atau 30" />
+                        <span class="mini-note warranty-field-hint">Kosongkan jika tanpa garansi. Hanya angka 3, 7, 14, atau 30.</span>
+                        <span class="warranty-field-error field-error hidden" role="alert" aria-live="polite"></span>
                       </label>
                       <label>
                         Siapa bayar fee

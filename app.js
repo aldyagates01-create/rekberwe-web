@@ -292,7 +292,10 @@ let locationConsentResolver = null;
 let supportHintTimer = null;
 let supportHintShown = false;
 
+const ALLOWED_WARRANTY_DAYS = new Set([0, 3, 7, 14, 30]);
+const WARRANTY_VALIDATION_MESSAGE = "Masa garansi tidak valid. Hanya boleh angka 3, 7, 14, 30, atau kosongkan untuk tanpa garansi.";
 const LOCATION_CONSENT_TEXT = "RekberWe meminta akses lokasi saat pendaftaran untuk keamanan transaksi, pencegahan penipuan, dan verifikasi risiko akun. Data lokasi tidak akan ditampilkan ke pengguna lain dan hanya dapat dilihat admin untuk keperluan investigasi sengketa.";
+
 
 bindProviderButtons();
 bindScrollButtons();
@@ -1367,9 +1370,21 @@ function bindForms() {
   [elements.transactionForm, elements.workspaceTransactionForm].forEach((form) => {
     form?.addEventListener("input", (event) => {
       handlePriceInputFormat(event);
+      handleWarrantyInputFormat(event);
       updateTransactionFeePreview(form);
       toggleVerificationFieldsForForm(form);
     });
+    form?.addEventListener("paste", (event) => {
+      if (event.target?.name !== "warranty") return;
+      event.preventDefault();
+      const pasted = (event.clipboardData || window.clipboardData)?.getData("text") || "";
+      event.target.value = sanitizeWarrantyDigits(pasted);
+      validateWarrantyField(form);
+    });
+    form?.addEventListener("blur", (event) => {
+      if (event.target?.name !== "warranty") return;
+      validateWarrantyField(form);
+    }, true);
   });
   elements.joinTransaction.addEventListener("click", handleJoinTransaction);
   elements.joinAsBuyer.addEventListener("click", () => handleRoleJoin("buyer"));
@@ -1546,39 +1561,58 @@ async function handleCreateTransaction(event) {
 
   window.RekberAnalytics?.track?.("create_transaction_click");
 
-  const payload = await fetchJson("/api/transactions", {
-    method: "POST",
-    body: JSON.stringify({
-      title: String(formData.get("title") || "").trim(),
-      price: parseCurrencyInput(formData.get("price")),
-      role,
-      type: String(formData.get("type") || "").trim(),
-      warranty: String(formData.get("warranty") || "").trim(),
-      sellerPayoutAccount: String(formData.get("sellerPayoutAccount") || "").trim(),
-      feePayer: String(formData.get("feePayer") || "").trim(),
-    }),
-  });
-
-  await refreshTransactions();
-  await refreshDashboard();
-
-  window.RekberAnalytics?.track?.("create_transaction_success", { transactionCode: payload.transaction.code });
-
-  const shareLink = buildTransactionLink(payload.transaction.code);
-  state.activeTransaction = payload.transaction;
-  state.transactionScreen = "room";
-  state.currentMemberView = "transactions";
-  state.workspaceSection = "transactions";
-  state.mobileCreateOpen = false;
-  showResult(form, `Transaksi ${payload.transaction.code} berhasil dibuat. Bagikan link ini ke lawan transaksi: ${shareLink}`, false);
-  history.replaceState({}, "", `?trx=${payload.transaction.code}`);
-  form.reset();
-  toggleVerificationFieldsForForm(form);
-  updateTransactionFeePreview(form);
-  if (isMobileViewport() && openMobileTransactionChat(payload.transaction.code)) {
+  const warrantyRaw = String(formData.get("warranty") || "").trim();
+  const warrantyCheck = validateWarrantyValue(warrantyRaw);
+  if (!warrantyCheck.valid) {
+    setWarrantyFieldError(form, warrantyCheck.message);
+    showResult(form, warrantyCheck.message, true);
+    form.querySelector('input[name="warranty"]')?.focus();
     return;
   }
-  renderAll();
+  setWarrantyFieldError(form, "");
+
+  try {
+    const payload = await fetchJson("/api/transactions", {
+      method: "POST",
+      body: JSON.stringify({
+        title: String(formData.get("title") || "").trim(),
+        price: parseCurrencyInput(formData.get("price")),
+        role,
+        type: String(formData.get("type") || "").trim(),
+        warranty: warrantyCheck.value,
+        sellerPayoutAccount: String(formData.get("sellerPayoutAccount") || "").trim(),
+        feePayer: String(formData.get("feePayer") || "").trim(),
+      }),
+    });
+
+    await refreshTransactions();
+    await refreshDashboard();
+
+    window.RekberAnalytics?.track?.("create_transaction_success", { transactionCode: payload.transaction.code });
+
+    const shareLink = buildTransactionLink(payload.transaction.code);
+    state.activeTransaction = payload.transaction;
+    state.transactionScreen = "room";
+    state.currentMemberView = "transactions";
+    state.workspaceSection = "transactions";
+    state.mobileCreateOpen = false;
+    showResult(form, `Transaksi ${payload.transaction.code} berhasil dibuat. Bagikan link ini ke lawan transaksi: ${shareLink}`, false);
+    history.replaceState({}, "", `?trx=${payload.transaction.code}`);
+    form.reset();
+    setWarrantyFieldError(form, "");
+    toggleVerificationFieldsForForm(form);
+    updateTransactionFeePreview(form);
+    if (isMobileViewport() && openMobileTransactionChat(payload.transaction.code)) {
+      return;
+    }
+    renderAll();
+  } catch (error) {
+    const message = error?.message || "Gagal membuat transaksi.";
+    if (/garansi/i.test(message)) {
+      setWarrantyFieldError(form, message);
+    }
+    showResult(form, message, true);
+  }
 }
 
 function parseCurrencyInput(value) {
@@ -1598,6 +1632,59 @@ function handlePriceInputFormat(event) {
   const input = event?.target;
   if (!input || input.name !== "price") return;
   input.value = formatCurrencyInputValue(input.value);
+}
+
+function sanitizeWarrantyDigits(value) {
+  return String(value || "").replace(/[^\d]/g, "");
+}
+
+function validateWarrantyValue(rawValue) {
+  const raw = sanitizeWarrantyDigits(rawValue);
+  if (!raw || raw === "0") {
+    return { valid: true, days: 0, value: "" };
+  }
+  const days = Number(raw);
+  if (!Number.isFinite(days) || !ALLOWED_WARRANTY_DAYS.has(days)) {
+    return { valid: false, message: WARRANTY_VALIDATION_MESSAGE };
+  }
+  return { valid: true, days, value: String(days) };
+}
+
+function setWarrantyFieldError(form, message) {
+  const input = form?.querySelector('input[name="warranty"]');
+  const errorEl = form?.querySelector(".warranty-field-error");
+  if (!errorEl) return;
+  if (!message) {
+    errorEl.textContent = "";
+    errorEl.classList.add("hidden");
+    input?.classList.remove("field-invalid");
+    return;
+  }
+  errorEl.textContent = message;
+  errorEl.classList.remove("hidden");
+  input?.classList.add("field-invalid");
+}
+
+function validateWarrantyField(form) {
+  const input = form?.querySelector('input[name="warranty"]');
+  if (!input) return { valid: true };
+  const result = validateWarrantyValue(input.value);
+  if (!result.valid) {
+    setWarrantyFieldError(form, result.message);
+    return result;
+  }
+  setWarrantyFieldError(form, "");
+  return result;
+}
+
+function handleWarrantyInputFormat(event) {
+  const input = event?.target;
+  if (!input || input.name !== "warranty") return;
+  const sanitized = sanitizeWarrantyDigits(input.value);
+  if (sanitized !== input.value) {
+    input.value = sanitized;
+  }
+  validateWarrantyField(input.closest("form"));
 }
 
 function toggleVerificationFieldsForForm(form) {

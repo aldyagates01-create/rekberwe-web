@@ -4112,6 +4112,29 @@ a.primary-btn.submit-btn {
   margin-top: 0;
 }
 
+.field-error {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--danger, #ff6b6b);
+}
+
+.field-error.hidden {
+  display: none;
+}
+
+input.field-invalid,
+select.field-invalid,
+textarea.field-invalid {
+  border-color: rgba(255, 107, 107, 0.55) !important;
+  box-shadow: 0 0 0 1px rgba(255, 107, 107, 0.18);
+}
+
+.warranty-field-hint {
+  margin-top: 6px;
+}
+
 .brand-home-trigger {
   cursor: pointer;
 }
