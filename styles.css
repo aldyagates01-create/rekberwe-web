@@ -2637,6 +2637,67 @@ select {
   color: var(--muted);
 }
 
+.admin-analytics-card {
+  margin-top: 18px;
+}
+
+.admin-analytics-toolbar {
+  margin-bottom: 14px;
+}
+
+.admin-analytics-funnel,
+.admin-analytics-panel {
+  margin-top: 18px;
+}
+
+.admin-analytics-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.admin-analytics-funnel-list,
+.admin-analytics-daily-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-analytics-funnel-item,
+.admin-analytics-daily-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(46, 36, 26, 0.04);
+  border: 1px solid rgba(46, 36, 26, 0.08);
+}
+
+.admin-analytics-funnel-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.admin-analytics-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(46, 36, 26, 0.08);
+  overflow: hidden;
+}
+
+.admin-analytics-bar-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-deep));
+}
+
+@media (max-width: 900px) {
+  .admin-analytics-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
 .active-filter {
   background: linear-gradient(135deg, var(--accent) 0%, #d68a52 100%);
   color: white;

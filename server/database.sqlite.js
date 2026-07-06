@@ -148,6 +148,23 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id, audience);
+
+  CREATE TABLE IF NOT EXISTS analytics_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    visitor_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    path TEXT DEFAULT '',
+    referrer_source TEXT DEFAULT '',
+    referrer_url TEXT DEFAULT '',
+    transaction_code TEXT DEFAULT '',
+    user_id TEXT DEFAULT NULL,
+    device_type TEXT DEFAULT '',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at);
+  CREATE INDEX IF NOT EXISTS idx_analytics_type ON analytics_events(event_type);
+  CREATE INDEX IF NOT EXISTS idx_analytics_visitor ON analytics_events(visitor_id);
 `);
 
 ensureColumn("users", "legal_name", "TEXT DEFAULT ''");
@@ -1219,4 +1236,134 @@ export function getAdminPushSubscriptions(adminUserIds = []) {
   }
   const placeholders = ids.map(() => "?").join(", ");
   return db.prepare(`SELECT * FROM push_subscriptions WHERE audience = 'admin' AND user_id IN (${placeholders})`).all(...ids).map(normalizePushSubscriptionRow);
+}
+
+export function recordAnalyticsEvent(input) {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO analytics_events (
+      visitor_id, event_type, path, referrer_source, referrer_url, transaction_code, user_id, device_type, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    String(input.visitorId || "").trim(),
+    String(input.eventType || "").trim(),
+    String(input.path || "").slice(0, 500),
+    String(input.referrerSource || "direct").slice(0, 40),
+    String(input.referrerUrl || "").slice(0, 500),
+    String(input.transactionCode || "").slice(0, 40).toUpperCase(),
+    input.userId ? String(input.userId) : null,
+    String(input.deviceType || "").slice(0, 20),
+    now,
+  );
+}
+
+export function getAnalyticsSummary(fromInput, toInput) {
+  const from = fromInput ? new Date(`${fromInput}T00:00:00.000`) : new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
+  const to = toInput ? new Date(`${toInput}T23:59:59.999`) : new Date();
+  const fromIso = from.toISOString();
+  const toIso = to.toISOString();
+
+  const uniqueVisitors = Number(db.prepare(`
+    SELECT COUNT(DISTINCT visitor_id) AS count
+    FROM analytics_events
+    WHERE created_at >= ? AND created_at <= ? AND event_type = 'pageview'
+  `).get(fromIso, toIso)?.count || 0);
+
+  const totalPageviews = Number(db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM analytics_events
+    WHERE created_at >= ? AND created_at <= ? AND event_type = 'pageview'
+  `).get(fromIso, toIso)?.count || 0);
+
+  const daily = db.prepare(`
+    SELECT substr(created_at, 1, 10) AS day,
+      COUNT(DISTINCT visitor_id) AS visitors,
+      SUM(CASE WHEN event_type = 'pageview' THEN 1 ELSE 0 END) AS pageviews
+    FROM analytics_events
+    WHERE created_at >= ? AND created_at <= ?
+    GROUP BY day
+    ORDER BY day ASC
+  `).all(fromIso, toIso).map((row) => ({
+    date: row.day,
+    visitors: Number(row.visitors || 0),
+    pageviews: Number(row.pageviews || 0),
+  }));
+
+  const referrers = db.prepare(`
+    SELECT referrer_source AS source,
+      COUNT(*) AS count,
+      COUNT(DISTINCT visitor_id) AS visitors
+    FROM analytics_events
+    WHERE created_at >= ? AND created_at <= ? AND event_type = 'pageview'
+    GROUP BY referrer_source
+    ORDER BY count DESC
+  `).all(fromIso, toIso).map((row) => ({
+    source: row.source || "direct",
+    count: Number(row.count || 0),
+    visitors: Number(row.visitors || 0),
+  }));
+
+  const topPages = db.prepare(`
+    SELECT path,
+      COUNT(*) AS views,
+      COUNT(DISTINCT visitor_id) AS visitors
+    FROM analytics_events
+    WHERE created_at >= ? AND created_at <= ? AND event_type = 'pageview'
+    GROUP BY path
+    ORDER BY views DESC
+    LIMIT 10
+  `).all(fromIso, toIso).map((row) => ({
+    path: row.path || "/",
+    views: Number(row.views || 0),
+    visitors: Number(row.visitors || 0),
+  }));
+
+  const devices = db.prepare(`
+    SELECT device_type AS device,
+      COUNT(DISTINCT visitor_id) AS visitors
+    FROM analytics_events
+    WHERE created_at >= ? AND created_at <= ? AND event_type = 'pageview'
+    GROUP BY device_type
+    ORDER BY visitors DESC
+  `).all(fromIso, toIso).map((row) => ({
+    device: row.device || "desktop",
+    visitors: Number(row.visitors || 0),
+  }));
+
+  const funnelTypes = [
+    "pageview",
+    "open_transaction_link",
+    "create_transaction_click",
+    "create_transaction_success",
+    "login_success",
+    "join_transaction",
+  ];
+  const funnel = {};
+  funnelTypes.forEach((eventType) => {
+    funnel[eventType] = Number(db.prepare(`
+      SELECT COUNT(DISTINCT visitor_id) AS count
+      FROM analytics_events
+      WHERE created_at >= ? AND created_at <= ? AND event_type = ?
+    `).get(fromIso, toIso, eventType)?.count || 0);
+  });
+
+  const pageviewBase = funnel.pageview || 0;
+  return {
+    range: {
+      from: fromIso.slice(0, 10),
+      to: toIso.slice(0, 10),
+    },
+    uniqueVisitors,
+    totalPageviews,
+    daily,
+    referrers,
+    topPages,
+    devices,
+    funnel,
+    conversion: {
+      loginRate: pageviewBase ? Number(((funnel.login_success / pageviewBase) * 100).toFixed(1)) : 0,
+      transactionRate: pageviewBase ? Number(((funnel.create_transaction_success / pageviewBase) * 100).toFixed(1)) : 0,
+      joinRate: pageviewBase ? Number(((funnel.join_transaction / pageviewBase) * 100).toFixed(1)) : 0,
+    },
+  };
 }

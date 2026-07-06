@@ -36,6 +36,14 @@ const elements = {
   adminProfitList: document.getElementById("admin-profit-list"),
   profitDateFrom: document.getElementById("profit-date-from"),
   profitDateTo: document.getElementById("profit-date-to"),
+  analyticsDateFrom: document.getElementById("analytics-date-from"),
+  analyticsDateTo: document.getElementById("analytics-date-to"),
+  analyticsRefreshBtn: document.getElementById("analytics-refresh-btn"),
+  adminAnalyticsSummary: document.getElementById("admin-analytics-summary"),
+  adminAnalyticsFunnel: document.getElementById("admin-analytics-funnel"),
+  adminAnalyticsReferrers: document.getElementById("admin-analytics-referrers"),
+  adminAnalyticsPages: document.getElementById("admin-analytics-pages"),
+  adminAnalyticsDaily: document.getElementById("admin-analytics-daily"),
   adminUserList: document.getElementById("admin-user-list"),
   adminVerificationList: document.getElementById("admin-verification-list"),
   adminUserSearch: document.getElementById("admin-user-search"),
@@ -208,6 +216,9 @@ elements.adminVerificationSearch?.addEventListener("input", () => {
 });
 elements.profitDateFrom?.addEventListener("input", () => renderSummary(state.users, state.transactions));
 elements.profitDateTo?.addEventListener("input", () => renderSummary(state.users, state.transactions));
+elements.analyticsDateFrom?.addEventListener("input", () => loadAdminAnalytics());
+elements.analyticsDateTo?.addEventListener("input", () => loadAdminAnalytics());
+elements.analyticsRefreshBtn?.addEventListener("click", () => loadAdminAnalytics());
 elements.adminNavButtons.forEach((button) => {
   button.addEventListener("click", () => openAdminPage(button.dataset.adminPage));
 });
@@ -263,6 +274,7 @@ async function refreshDashboardData() {
   }
 
   renderSummary(state.users, state.transactions);
+  await loadAdminAnalytics();
   renderUsers(state.users);
   renderVerificationQueue(state.users);
   if (isSettingsFormProtected()) {
@@ -700,6 +712,141 @@ function renderSummary(users, transactions) {
     <article><p class="mini-label">Transaksi selesai</p><strong>${completed}</strong></article>
   `;
   renderProfitSummary(transactions);
+}
+
+function ensureAnalyticsDateDefaults() {
+  if (!elements.analyticsDateTo?.value) {
+    const today = new Date();
+    elements.analyticsDateTo.value = today.toISOString().slice(0, 10);
+  }
+  if (!elements.analyticsDateFrom?.value) {
+    const from = new Date();
+    from.setDate(from.getDate() - 30);
+    elements.analyticsDateFrom.value = from.toISOString().slice(0, 10);
+  }
+}
+
+const ANALYTICS_REFERRER_LABELS = {
+  direct: "Langsung",
+  whatsapp: "WhatsApp",
+  telegram: "Telegram",
+  google: "Google",
+  facebook: "Facebook",
+  other: "Lainnya",
+};
+
+const ANALYTICS_FUNNEL_LABELS = {
+  pageview: "Kunjungan halaman",
+  open_transaction_link: "Buka link transaksi",
+  create_transaction_click: "Klik buat transaksi",
+  create_transaction_success: "Transaksi dibuat",
+  login_success: "Login berhasil",
+  join_transaction: "Join ruang transaksi",
+};
+
+async function loadAdminAnalytics() {
+  if (!elements.adminAnalyticsSummary) return;
+  ensureAnalyticsDateDefaults();
+  try {
+    const params = new URLSearchParams();
+    if (elements.analyticsDateFrom?.value) params.set("from", elements.analyticsDateFrom.value);
+    if (elements.analyticsDateTo?.value) params.set("to", elements.analyticsDateTo.value);
+    const payload = await fetchJson(`/api/admin/analytics?${params.toString()}`);
+    renderAdminAnalytics(payload.analytics);
+  } catch (error) {
+    elements.adminAnalyticsSummary.innerHTML = `<p class="muted-text">${escapeHtml(error.message || "Gagal memuat analytics pengunjung.")}</p>`;
+  }
+}
+
+function renderAdminAnalytics(analytics) {
+  if (!analytics || !elements.adminAnalyticsSummary) return;
+  const mobileVisitors = (analytics.devices || []).find((item) => item.device === "mobile")?.visitors || 0;
+  const desktopVisitors = (analytics.devices || []).find((item) => item.device === "desktop")?.visitors || 0;
+
+  elements.adminAnalyticsSummary.innerHTML = `
+    <article><p class="mini-label">Pengunjung unik</p><strong>${analytics.uniqueVisitors || 0}</strong></article>
+    <article><p class="mini-label">Total pageview</p><strong>${analytics.totalPageviews || 0}</strong></article>
+    <article><p class="mini-label">Konversi login</p><strong>${analytics.conversion?.loginRate || 0}%</strong></article>
+    <article><p class="mini-label">Konversi buat transaksi</p><strong>${analytics.conversion?.transactionRate || 0}%</strong></article>
+    <article><p class="mini-label">Mobile / Desktop</p><strong>${mobileVisitors} / ${desktopVisitors}</strong></article>
+    <article><p class="mini-label">Konversi join transaksi</p><strong>${analytics.conversion?.joinRate || 0}%</strong></article>
+  `;
+
+  if (elements.adminAnalyticsFunnel) {
+    const funnelItems = Object.entries(analytics.funnel || {});
+    const maxValue = Math.max(...funnelItems.map(([, value]) => Number(value || 0)), 1);
+    elements.adminAnalyticsFunnel.innerHTML = `
+      <p class="eyebrow">Funnel pengunjung</p>
+      <div class="admin-analytics-funnel-list">
+        ${funnelItems.map(([key, value]) => `
+          <article class="admin-analytics-funnel-item">
+            <div class="admin-analytics-funnel-top">
+              <strong>${escapeHtml(ANALYTICS_FUNNEL_LABELS[key] || key)}</strong>
+              <span>${Number(value || 0)} pengunjung</span>
+            </div>
+            <div class="admin-analytics-bar-track">
+              <span style="width:${Math.max(8, (Number(value || 0) / maxValue) * 100)}%"></span>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  if (elements.adminAnalyticsReferrers) {
+    elements.adminAnalyticsReferrers.innerHTML = `
+      <p class="eyebrow">Sumber traffic</p>
+      ${(analytics.referrers || []).length
+        ? (analytics.referrers || []).map((item) => `
+          <article class="admin-item">
+            <div class="admin-item-top">
+              <h4>${escapeHtml(ANALYTICS_REFERRER_LABELS[item.source] || item.source)}</h4>
+              <span class="admin-tag">${Number(item.visitors || 0)} unik</span>
+            </div>
+            <p>${Number(item.count || 0)} pageview</p>
+          </article>
+        `).join("")
+        : "<p class=\"muted-text\">Belum ada data sumber traffic.</p>"}
+    `;
+  }
+
+  if (elements.adminAnalyticsPages) {
+    elements.adminAnalyticsPages.innerHTML = `
+      <p class="eyebrow">Halaman populer</p>
+      ${(analytics.topPages || []).length
+        ? (analytics.topPages || []).map((item) => `
+          <article class="admin-item">
+            <div class="admin-item-top">
+              <h4>${escapeHtml(item.path || "/")}</h4>
+              <span class="admin-tag">${Number(item.views || 0)} view</span>
+            </div>
+            <p>${Number(item.visitors || 0)} pengunjung unik</p>
+          </article>
+        `).join("")
+        : "<p class=\"muted-text\">Belum ada data halaman populer.</p>"}
+    `;
+  }
+
+  if (elements.adminAnalyticsDaily) {
+    const daily = analytics.daily || [];
+    const maxDaily = Math.max(...daily.map((item) => Number(item.visitors || 0)), 1);
+    elements.adminAnalyticsDaily.innerHTML = `
+      <p class="eyebrow">Tren harian (${escapeHtml(analytics.range?.from || "-")} s/d ${escapeHtml(analytics.range?.to || "-")})</p>
+      ${daily.length
+        ? `<div class="admin-analytics-daily-list">${daily.map((item) => `
+          <article class="admin-analytics-daily-item">
+            <div class="admin-analytics-funnel-top">
+              <strong>${escapeHtml(item.date || "-")}</strong>
+              <span>${Number(item.visitors || 0)} unik • ${Number(item.pageviews || 0)} view</span>
+            </div>
+            <div class="admin-analytics-bar-track">
+              <span style="width:${Math.max(8, (Number(item.visitors || 0) / maxDaily) * 100)}%"></span>
+            </div>
+          </article>
+        `).join("")}</div>`
+        : "<p class=\"muted-text\">Belum ada tren harian pada rentang tanggal ini.</p>"}
+    `;
+  }
 }
 
 function renderProfitSummary(transactions) {

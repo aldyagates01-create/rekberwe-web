@@ -1005,9 +1005,11 @@ function handleProviderAuthCallback() {
     try {
       sessionStorage.setItem("rekberwe-open-dashboard", "1");
     } catch {}
+    window.RekberAnalytics?.track?.("login_success");
     setAuthStatus(`Login atau penghubungan ${label} berhasil.`);
   } else {
     const message = params.get("message");
+    window.RekberAnalytics?.track?.("login_failed");
     setAuthStatus(`Login ${label} gagal${message ? `: ${message}` : "."}`, true);
   }
 
@@ -1071,6 +1073,8 @@ async function handleCreateTransaction(event) {
     return;
   }
 
+  window.RekberAnalytics?.track?.("create_transaction_click");
+
   const payload = await fetchJson("/api/transactions", {
     method: "POST",
     body: JSON.stringify({
@@ -1086,6 +1090,8 @@ async function handleCreateTransaction(event) {
 
   await refreshTransactions();
   await refreshDashboard();
+
+  window.RekberAnalytics?.track?.("create_transaction_success", { transactionCode: payload.transaction.code });
 
   const shareLink = buildTransactionLink(payload.transaction.code);
   state.activeTransaction = payload.transaction;
@@ -1307,6 +1313,7 @@ async function handleRoleJoin(role) {
     }
     state.activeTransaction = joined.transaction;
     state.transactionScreen = "room";
+    window.RekberAnalytics?.track?.("join_transaction", { transactionCode: code });
     await refreshTransactions();
     await refreshDashboard();
     openWorkspaceSection("transactions");

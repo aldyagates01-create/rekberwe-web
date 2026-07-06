@@ -21,6 +21,7 @@ import {
   getAllSupportThreads,
   getAllTransactions,
   getAllUsers,
+  getAnalyticsSummary,
   getSupportThreadForGuest,
   getSupportThreadForUser,
   removePushSubscription,
@@ -35,6 +36,7 @@ import {
   getUserByProviderSocial,
   joinTransaction,
   linkProviderToUser,
+  recordAnalyticsEvent,
   saveAdminFeeSettings,
   updateTransactionStatus,
   updateTransactionWorkflow,
@@ -45,6 +47,12 @@ import {
   upsertUser,
 } from "./database.js";
 import { dispatchPushForEvent, getVapidPublicKey, initPushService, isPushEnabled } from "./push-service.js";
+import {
+  ANALYTICS_EVENT_TYPES,
+  classifyReferrerSource,
+  detectDeviceType,
+  isValidVisitorId,
+} from "./analytics-utils.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -176,6 +184,7 @@ const typingState = new Map();
 const PRESENCE_ONLINE_MS = 30000;
 const PRESENCE_SWEEP_MS = 5000;
 const TYPING_ACTIVE_MS = 5000;
+const analyticsRateLimits = new Map();
 
 const providers = {
   Telegram: {
@@ -347,6 +356,39 @@ app.post("/api/logout", (req, res) => {
     res.clearCookie("rekberwe.sid");
     res.json({ ok: true });
   });
+});
+
+app.post("/api/analytics/collect", async (req, res) => {
+  try {
+    const visitorId = String(req.body.visitorId || "").trim();
+    const eventType = String(req.body.eventType || "").trim();
+    if (!isValidVisitorId(visitorId)) {
+      res.status(400).json({ message: "Visitor ID tidak valid." });
+      return;
+    }
+    if (!ANALYTICS_EVENT_TYPES.has(eventType)) {
+      res.status(400).json({ message: "Event analytics tidak dikenali." });
+      return;
+    }
+    if (isAnalyticsRateLimited(visitorId)) {
+      res.status(429).json({ message: "Terlalu banyak event analytics." });
+      return;
+    }
+    const referrerUrl = String(req.body.referrer || "").trim().slice(0, 500);
+    await recordAnalyticsEvent({
+      visitorId,
+      eventType,
+      path: String(req.body.path || "").trim().slice(0, 500),
+      referrerSource: classifyReferrerSource(referrerUrl),
+      referrerUrl,
+      transactionCode: String(req.body.transactionCode || "").trim().toUpperCase(),
+      userId: req.session.user?.id || null,
+      deviceType: detectDeviceType(req.get("user-agent") || ""),
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Gagal menyimpan analytics." });
+  }
 });
 
 app.get("/api/events", requireAuth, (req, res) => {
@@ -1042,6 +1084,12 @@ app.post("/api/admin/settings/notification-sounds", requireAdmin, audioUpload.fi
     notificationSounds: nextSounds,
   });
   res.json({ settings });
+});
+
+app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
+  const from = String(req.query.from || "").trim();
+  const to = String(req.query.to || "").trim();
+  res.json({ analytics: await getAnalyticsSummary(from || null, to || null) });
 });
 
 app.get("/api/admin/users", requireAdmin, async (_req, res) => {
@@ -2218,6 +2266,17 @@ function getRequestIp(req) {
     .map((item) => item.trim())
     .filter(Boolean);
   return forwarded[0] || req.ip || req.socket?.remoteAddress || "";
+}
+
+function isAnalyticsRateLimited(visitorId) {
+  const now = Date.now();
+  const entry = analyticsRateLimits.get(visitorId);
+  if (!entry || now > entry.resetAt) {
+    analyticsRateLimits.set(visitorId, { count: 1, resetAt: now + 60000 });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > 120;
 }
 
 function renderSimpleContentPage(title, heading, bodyText) {

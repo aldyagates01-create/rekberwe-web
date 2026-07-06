@@ -55,6 +55,31 @@
           <h3>Ringkasan aktivitas admin</h3>
         </div>
         <div class="admin-summary" id="admin-summary"></div>
+        <div class="card admin-analytics-card">
+          <div class="section-head">
+            <p class="eyebrow">Pengunjung website</p>
+            <h3>Analytics pengunjung (termasuk yang belum login)</h3>
+          </div>
+          <p class="mini-note">Data anonim berdasarkan browser pengunjung. Tidak menyimpan nama, email, atau KTP.</p>
+          <div class="admin-toolbar admin-analytics-toolbar">
+            <label>
+              Dari tanggal
+              <input type="date" id="analytics-date-from" />
+            </label>
+            <label>
+              Sampai tanggal
+              <input type="date" id="analytics-date-to" />
+            </label>
+            <button type="button" class="ghost-btn" id="analytics-refresh-btn">Muat ulang</button>
+          </div>
+          <div class="admin-summary" id="admin-analytics-summary"></div>
+          <div class="admin-analytics-funnel" id="admin-analytics-funnel"></div>
+          <div class="admin-analytics-columns">
+            <div class="admin-analytics-panel" id="admin-analytics-referrers"></div>
+            <div class="admin-analytics-panel" id="admin-analytics-pages"></div>
+          </div>
+          <div class="admin-analytics-panel" id="admin-analytics-daily"></div>
+        </div>
         <div class="card admin-profit-card">
           <div class="section-head">
             <p class="eyebrow">Profit transaksi</p>
@@ -558,6 +583,7 @@
       </div>
     </div>
   </div>
+  <script src="analytics-client.js?v=1"></script>
   <script src="push-client.js?v=1"></script>
   <script src="admin.js"></script>
 </body>
