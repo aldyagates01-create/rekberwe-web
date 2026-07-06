@@ -317,6 +317,9 @@ export async function updateUserAdminStatus(id, action, reason = "") {
     `,
     [id, next.verified, next.verificationStatus, next.verifiedAt, next.verificationNote, next.banned, next.bannedReason, new Date().toISOString()],
   );
+  if (action === "unverify") {
+    return resetUserPhoneVerification(id, "Admin unverify akun");
+  }
   return getUserById(id);
 }
 
@@ -1723,6 +1726,34 @@ export async function clearOtpVerification(userId) {
   if (!postgresEnabled) return sqliteDb.clearOtpVerification(userId);
   await ensureReady();
   await query("DELETE FROM otp_verifications WHERE user_id = $1", [userId]);
+}
+
+export async function resetUserPhoneVerification(userId, detail = "Phone verification reset") {
+  if (!postgresEnabled) return sqliteDb.resetUserPhoneVerification(userId, detail);
+  await ensureReady();
+  const now = new Date().toISOString();
+  await query(
+    `
+      UPDATE users
+      SET phone_verified = FALSE,
+          phone_verified_at = NULL,
+          updated_at = $2
+      WHERE id = $1
+    `,
+    [userId, now],
+  );
+  await clearOtpVerification(userId);
+  await logOtpVerificationAction(userId, "", "admin_reset", String(detail || "Phone verification reset").slice(0, 500));
+  return getUserById(userId);
+}
+
+export async function reconcileStalePhoneVerification(user) {
+  if (!postgresEnabled) return sqliteDb.reconcileStalePhoneVerification(user);
+  if (!user) return null;
+  if (user.verificationStatus === "unverified" && user.phoneVerified) {
+    return resetUserPhoneVerification(user.id, "Stale phone verification cleared for unverified account");
+  }
+  return user;
 }
 
 export async function markUserPhoneVerified(userId, phoneNumber) {

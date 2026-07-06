@@ -36,6 +36,7 @@ import {
   getUserByProviderSocial,
   joinTransaction,
   linkProviderToUser,
+  reconcileStalePhoneVerification,
   recordAnalyticsEvent,
   saveAdminFeeSettings,
   updateTransactionStatus,
@@ -351,9 +352,15 @@ app.get("/api/config", async (_req, res) => {
 });
 
 app.get("/api/session", async (req, res) => {
+  let user = null;
+  if (req.session.user?.id) {
+    const freshUser = await getUserById(req.session.user.id);
+    user = freshUser ? await withAdminFlag(await reconcileStalePhoneVerification(freshUser)) : null;
+    req.session.user = user;
+  }
   res.json({
-    authenticated: Boolean(req.session.user),
-    user: req.session.user ? await withAdminFlag(req.session.user) : null,
+    authenticated: Boolean(user),
+    user,
   });
 });
 
@@ -668,6 +675,11 @@ app.post("/api/me/verification", requireAuth, verificationUpload.fields([
   const whatsapp = String(req.body.whatsapp || "").trim();
   if (!legalName || !ktp || !whatsapp) {
     res.status(400).json({ message: "Nama sesuai KTP, nomor KTP, dan WhatsApp wajib diisi." });
+    return;
+  }
+
+  if (!req.session.user.phoneVerified) {
+    res.status(400).json({ message: "Nomor WhatsApp harus diverifikasi via OTP terlebih dahulu." });
     return;
   }
 
@@ -1671,7 +1683,7 @@ async function requireAuth(req, res, next) {
     res.status(401).json({ message: "Session user tidak ditemukan." });
     return;
   }
-  req.session.user = await withAdminFlag(freshUser);
+  req.session.user = await withAdminFlag(await reconcileStalePhoneVerification(freshUser));
   if (!req.session.user.isAdmin && req.session.user.banned && req.method !== "GET") {
     res.status(403).json({ message: req.session.user.bannedReason || "Akun Anda sedang diblokir admin." });
     return;

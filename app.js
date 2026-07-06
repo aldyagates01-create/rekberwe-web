@@ -416,7 +416,13 @@ function formatOtpTimer(totalSeconds) {
 
 function getProfileWhatsappInputValue() {
   const input = document.getElementById("profile-whatsapp-input");
-  return String(input?.value || state.currentUser?.whatsapp || "").trim();
+  return String(input?.value || state.currentUser?.whatsapp || state.currentUser?.phoneNumber || "").trim();
+}
+
+function isWhatsappOtpLocked() {
+  if (!state.currentUser) return true;
+  if (state.currentUser.verificationStatus === "unverified") return false;
+  return Boolean(state.currentUser.phoneVerified);
 }
 
 function syncProfileWhatsappInput() {
@@ -547,7 +553,7 @@ async function refreshWhatsappOtpState() {
 }
 
 async function openWhatsappOtpModal() {
-  if (!state.currentUser || state.currentUser.phoneVerified) return;
+  if (!state.currentUser || isWhatsappOtpLocked()) return;
   const phone = getProfileWhatsappInputValue();
   if (!phone) {
     window.alert("Isi nomor WhatsApp aktif terlebih dahulu.");
@@ -2437,8 +2443,7 @@ function renderProfile() {
 
 function buildProfileVerificationMarkup(isVerificationLocked) {
   if (!state.currentUser) return "";
-  const phoneVerified = Boolean(state.currentUser.phoneVerified);
-  const whatsappDisabled = isVerificationLocked || phoneVerified;
+  const phoneVerified = isWhatsappOtpLocked();
   const whatsappValue = escapeHtml(state.currentUser.whatsapp || state.currentUser.phoneNumber || "");
   const whatsappField = phoneVerified
     ? `
@@ -2468,7 +2473,7 @@ function buildProfileVerificationMarkup(isVerificationLocked) {
         <label>
           No. WhatsApp aktif
           ${whatsappField}
-          ${phoneVerified ? '<p class="mini-note">Nomor WhatsApp sudah terverifikasi dan tidak dapat diubah.</p>' : '<p class="mini-note">Klik tombol OTP untuk verifikasi nomor WhatsApp Anda.</p>'}
+          ${phoneVerified ? '<p class="mini-note">Nomor WhatsApp sudah terverifikasi dan tidak dapat diubah.</p>' : `<p class="mini-note">${state.currentUser.verificationStatus === "unverified" ? "Verifikasi akun di-reset admin. Klik OTP untuk verifikasi ulang nomor WhatsApp." : "Klik tombol OTP untuk verifikasi nomor WhatsApp Anda."}</p>`}
         </label>
         <label>
           Foto KTP
@@ -2755,7 +2760,8 @@ async function handleProfileVerificationSave(event) {
     const formData = new FormData(event.currentTarget);
     const legalName = String(formData.get("legalName") || "").trim();
     const ktp = String(formData.get("ktp") || "").trim();
-    const whatsapp = String(formData.get("whatsapp") || "").trim();
+    let whatsapp = String(formData.get("whatsapp") || "").trim();
+    if (!whatsapp) whatsapp = getProfileWhatsappInputValue();
     const payloadForm = new FormData();
     payloadForm.append("legalName", legalName);
     payloadForm.append("ktp", ktp);
@@ -2764,6 +2770,9 @@ async function handleProfileVerificationSave(event) {
     const ktpVideoFile = formData.get("ktpVideo");
     if (!legalName || !ktp || !whatsapp) {
       throw new Error("Nama sesuai KTP, nomor KTP, dan WhatsApp wajib diisi.");
+    }
+    if (!isWhatsappOtpLocked()) {
+      throw new Error("Verifikasi WhatsApp via OTP wajib dilakukan terlebih dahulu.");
     }
     if (!(ktpPhotoFile instanceof File) || ktpPhotoFile.size <= 0 || !(ktpVideoFile instanceof File) || ktpVideoFile.size <= 0) {
       throw new Error("Foto KTP dan video selfie memegang KTP wajib diunggah.");

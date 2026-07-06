@@ -539,6 +539,9 @@ export function updateUserAdminStatus(id, action, reason = "") {
     updated.verification_note = String(reason || "").trim();
   }
   statements.updateUserAdminStatus.run(updated);
+  if (action === "unverify") {
+    resetUserPhoneVerification(id, "Admin unverify akun");
+  }
   return getUserById(id);
 }
 
@@ -1479,6 +1482,28 @@ export function setOtpVerificationLock(userId, lockedUntil) {
 
 export function clearOtpVerification(userId) {
   db.prepare("DELETE FROM otp_verifications WHERE user_id = ?").run(userId);
+}
+
+export function resetUserPhoneVerification(userId, detail = "Phone verification reset") {
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE users
+    SET phone_verified = 0,
+        phone_verified_at = '',
+        updated_at = ?
+    WHERE id = ?
+  `).run(now, userId);
+  clearOtpVerification(userId);
+  logOtpVerificationAction(userId, "", "admin_reset", String(detail || "Phone verification reset").slice(0, 500));
+  return getUserById(userId);
+}
+
+export function reconcileStalePhoneVerification(user) {
+  if (!user) return null;
+  if (user.verificationStatus === "unverified" && user.phoneVerified) {
+    return resetUserPhoneVerification(user.id, "Stale phone verification cleared for unverified account");
+  }
+  return user;
 }
 
 export function markUserPhoneVerified(userId, phoneNumber) {
