@@ -1012,7 +1012,14 @@ function showResult(form, message, isError) {
 
 function buildTransactionLink(code) {
   const path = `${window.location.origin}/?trx=${code}`;
-  elements.sampleLink.textContent = `${window.location.host || "contohnamasitus.com"}/t/${code}`;
+  const sampleText = `${window.location.host || "contohnamasitus.com"}/t/${code}`;
+  if (elements.sampleLink) {
+    elements.sampleLink.textContent = sampleText;
+  }
+  const workspaceSampleLink = document.getElementById("workspace-sample-link");
+  if (workspaceSampleLink) {
+    workspaceSampleLink.textContent = sampleText;
+  }
   return path;
 }
 

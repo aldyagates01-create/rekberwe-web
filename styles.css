@@ -8510,3 +8510,61 @@ body.is-member-view .topbar {
     margin-top: 0;
   }
 }
+
+/* Workspace dashboard: langkah transaksi (PC) */
+.workspace-transaction-steps {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(82, 110, 255, 0.12);
+}
+
+.workspace-steps-head {
+  margin-bottom: 0;
+}
+
+.workspace-steps {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.workspace-step-item {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(16, 27, 45, 0.98), rgba(12, 21, 35, 0.98));
+  border: 1px solid rgba(143, 164, 205, 0.1);
+}
+
+.workspace-step-item strong {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 0.92rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--brand-blue), #7a61ff);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(68, 109, 255, 0.25);
+  border: 1px solid rgba(167, 190, 229, 0.12);
+}
+
+.workspace-step-item h4 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.workspace-step-item p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+@media (max-width: 768px) {
+  .workspace-desktop-only {
+    display: none !important;
+  }
+}
