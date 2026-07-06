@@ -4,6 +4,8 @@ import fs from "node:fs";
 
 import Database from "better-sqlite3";
 
+import { phoneToLocalWhatsapp } from "./phone-utils.js";
+
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), "data"));
@@ -192,6 +194,36 @@ ensureColumn("support_messages", "attachment_type", "TEXT DEFAULT ''");
 ensureColumn("support_threads", "guest_key", "TEXT DEFAULT ''");
 ensureColumn("users", "banned", "INTEGER DEFAULT 0");
 ensureColumn("users", "banned_reason", "TEXT DEFAULT ''");
+ensureColumn("users", "phone_number", "TEXT DEFAULT ''");
+ensureColumn("users", "phone_verified", "INTEGER DEFAULT 0");
+ensureColumn("users", "phone_verified_at", "TEXT DEFAULT ''");
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS otp_verifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL UNIQUE,
+    phone_number TEXT NOT NULL,
+    otp_code_hash TEXT NOT NULL,
+    expired_at TEXT NOT NULL,
+    attempt_count INTEGER DEFAULT 0,
+    send_count INTEGER DEFAULT 1,
+    last_sent_at TEXT NOT NULL,
+    locked_until TEXT DEFAULT '',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS otp_verification_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    phone_number TEXT NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT DEFAULT '',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_otp_verifications_user ON otp_verifications(user_id);
+  CREATE INDEX IF NOT EXISTS idx_otp_logs_user ON otp_verification_logs(user_id, created_at);
+`);
 
 const statements = {
   getUserById: db.prepare("SELECT * FROM users WHERE id = ?"),
@@ -540,11 +572,12 @@ export function updateUserVerificationFiles(id, attachments = {}) {
 export function updateUserProfile(id, displayName, legalName, whatsapp) {
   const current = getUserById(id);
   const locked = current?.verificationStatus === "verified";
+  const phoneLocked = Boolean(current?.phoneVerified);
   statements.updateProfile.run({
     id,
     display_name: displayName,
     legal_name: locked ? current.legalName : legalName,
-    whatsapp: locked ? current.whatsapp : whatsapp,
+    whatsapp: locked || phoneLocked ? current.whatsapp : whatsapp,
     updated_at: new Date().toISOString(),
   });
   return getUserById(id);
@@ -1073,6 +1106,9 @@ function mapUser(row) {
     verifiedAt: row.verified_at || "",
     ktp: row.ktp,
     whatsapp: row.whatsapp,
+    phoneNumber: row.phone_number || row.whatsapp || "",
+    phoneVerified: Boolean(row.phone_verified),
+    phoneVerifiedAt: row.phone_verified_at || "",
     verificationNote: row.verification_note || "",
     banned: Boolean(row.banned),
     bannedReason: row.banned_reason || "",
@@ -1366,4 +1402,108 @@ export function getAnalyticsSummary(fromInput, toInput) {
       joinRate: pageviewBase ? Number(((funnel.join_transaction / pageviewBase) * 100).toFixed(1)) : 0,
     },
   };
+}
+
+function normalizeOtpVerificationRow(row) {
+  if (!row) return null;
+  return {
+    id: Number(row.id),
+    userId: row.user_id,
+    phoneNumber: row.phone_number,
+    otpCodeHash: row.otp_code_hash,
+    expiredAt: row.expired_at,
+    attemptCount: Number(row.attempt_count || 0),
+    sendCount: Number(row.send_count || 0),
+    lastSentAt: row.last_sent_at,
+    lockedUntil: row.locked_until || "",
+    createdAt: row.created_at,
+  };
+}
+
+export function logOtpVerificationAction(userId, phoneNumber, action, detail = "") {
+  db.prepare(`
+    INSERT INTO otp_verification_logs (user_id, phone_number, action, detail, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(userId, phoneNumber, action, String(detail || "").slice(0, 500), new Date().toISOString());
+}
+
+export function getOtpVerificationByUserId(userId) {
+  const row = db.prepare("SELECT * FROM otp_verifications WHERE user_id = ?").get(userId);
+  return normalizeOtpVerificationRow(row);
+}
+
+export function upsertOtpVerification(input) {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO otp_verifications (
+      user_id, phone_number, otp_code_hash, expired_at, attempt_count, send_count, last_sent_at, locked_until, created_at
+    ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      phone_number = excluded.phone_number,
+      otp_code_hash = excluded.otp_code_hash,
+      expired_at = excluded.expired_at,
+      attempt_count = 0,
+      send_count = excluded.send_count,
+      last_sent_at = excluded.last_sent_at,
+      locked_until = excluded.locked_until
+  `).run(
+    input.userId,
+    input.phoneNumber,
+    input.otpCodeHash,
+    input.expiredAt,
+    input.sendCount,
+    input.lastSentAt,
+    input.lockedUntil || "",
+    now,
+  );
+  return getOtpVerificationByUserId(input.userId);
+}
+
+export function incrementOtpVerificationAttempt(userId) {
+  db.prepare(`
+    UPDATE otp_verifications
+    SET attempt_count = attempt_count + 1
+    WHERE user_id = ?
+  `).run(userId);
+  return getOtpVerificationByUserId(userId);
+}
+
+export function setOtpVerificationLock(userId, lockedUntil) {
+  db.prepare(`
+    UPDATE otp_verifications
+    SET locked_until = ?
+    WHERE user_id = ?
+  `).run(lockedUntil, userId);
+  return getOtpVerificationByUserId(userId);
+}
+
+export function clearOtpVerification(userId) {
+  db.prepare("DELETE FROM otp_verifications WHERE user_id = ?").run(userId);
+}
+
+export function markUserPhoneVerified(userId, phoneNumber) {
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE users
+    SET phone_number = ?,
+        phone_verified = 1,
+        phone_verified_at = ?,
+        whatsapp = ?,
+        updated_at = ?
+    WHERE id = ?
+  `).run(phoneNumber, now, phoneToLocalWhatsapp(phoneNumber), now, userId);
+  clearOtpVerification(userId);
+  return getUserById(userId);
+}
+
+export function updateUserPhoneNumberDraft(userId, phoneNumber) {
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE users
+    SET phone_number = ?,
+        updated_at = ?
+    WHERE id = ?
+  `).run(phoneNumber, now, userId);
+  clearOtpVerification(userId);
+  return getUserById(userId);
 }

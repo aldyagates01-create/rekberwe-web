@@ -53,6 +53,12 @@ import {
   detectDeviceType,
   isValidVisitorId,
 } from "./analytics-utils.js";
+import {
+  getWhatsappOtpStatus,
+  resetWhatsappOtpPhone,
+  sendWhatsappOtp,
+  verifyWhatsappOtp,
+} from "./whatsapp-otp-service.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -715,6 +721,49 @@ app.post("/api/me/verification", requireAuth, verificationUpload.fields([
     pushTrigger: "verification_submitted",
   });
   res.json({ user: req.session.user });
+});
+
+app.get("/api/me/whatsapp/status", requireAuth, async (req, res) => {
+  try {
+    const payload = await getWhatsappOtpStatus(req.session.user.id);
+    res.json(payload);
+  } catch (error) {
+    res.status(400).json({ message: error.message || "Gagal memuat status WhatsApp." });
+  }
+});
+
+app.post("/api/me/whatsapp/send-otp", requireAuth, async (req, res) => {
+  try {
+    const payload = await sendWhatsappOtp(req.session.user.id, req.body.phoneNumber);
+    req.session.user = await withAdminFlag(payload.user);
+    res.json(payload);
+  } catch (error) {
+    const status = error.code === "OTP_COOLDOWN" ? 429 : error.code === "OTP_LOCKED" || error.code === "OTP_MAX_RESEND" ? 423 : 400;
+    res.status(status).json({
+      message: error.message || "Gagal mengirim OTP WhatsApp.",
+      state: error.state || null,
+    });
+  }
+});
+
+app.post("/api/me/whatsapp/verify-otp", requireAuth, async (req, res) => {
+  try {
+    const payload = await verifyWhatsappOtp(req.session.user.id, req.body.otp);
+    req.session.user = await withAdminFlag(payload.user);
+    res.json(payload);
+  } catch (error) {
+    res.status(400).json({ message: error.message || "Verifikasi OTP gagal." });
+  }
+});
+
+app.post("/api/me/whatsapp/change-number", requireAuth, async (req, res) => {
+  try {
+    const payload = await resetWhatsappOtpPhone(req.session.user.id, req.body.phoneNumber);
+    req.session.user = await withAdminFlag(payload.user);
+    res.json(payload);
+  } catch (error) {
+    res.status(400).json({ message: error.message || "Gagal mengganti nomor WhatsApp." });
+  }
 });
 
 app.get("/api/transactions", requireAuth, async (req, res) => {
@@ -1557,7 +1606,7 @@ if (useNextFrontend) {
       nextMiddleware();
       return;
     }
-    if (req.path.startsWith("/transaksi") || req.path.startsWith("/_next")) {
+    if (req.path.startsWith("/transaksi") || req.path.startsWith("/profil") || req.path.startsWith("/_next")) {
       nextHandler(req, res);
       return;
     }

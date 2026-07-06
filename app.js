@@ -281,7 +281,17 @@ async function bootstrap() {
   updateProviderAvailability();
   await hydrateCurrentSession();
   renderAll();
-  const hasTransactionRoute = new URLSearchParams(window.location.search).has("trx");
+  const routeParams = new URLSearchParams(window.location.search);
+  const returnTo = routeParams.get("returnTo");
+  if (state.currentUser && returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+    routeParams.delete("returnTo");
+    const cleanQuery = routeParams.toString();
+    history.replaceState({}, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
+    window.location.href = returnTo;
+    return;
+  }
+  const hasTransactionRoute = routeParams.has("trx");
+  const hasSupportRoute = routeParams.get("support") === "1";
   if (hasTransactionRoute) {
     try {
       await handleInitialRoute();
@@ -301,6 +311,13 @@ async function bootstrap() {
     throw failedInitialJob.reason;
   }
   renderAll();
+  if (hasSupportRoute) {
+    try {
+      await handleSupportRoute();
+    } catch (supportRouteError) {
+      console.warn("Gagal membuka live chat dari URL:", supportRouteError);
+    }
+  }
   if (!hasTransactionRoute) {
     try {
       await handleInitialRoute();
@@ -2011,7 +2028,7 @@ function renderProfile() {
       <div class="profile-row"><span>Nama sesuai KTP</span><strong>${state.currentUser.legalName || "-"}</strong></div>
       <div class="profile-row"><span>Provider utama</span><strong>${state.currentUser.provider}</strong></div>
       <div class="profile-row"><span>Email</span><strong>${state.currentUser.email || "-"}</strong></div>
-      <div class="profile-row"><span>WhatsApp</span><strong>${state.currentUser.whatsapp || "-"}</strong></div>
+      <div class="profile-row"><span>WhatsApp</span><strong>${state.currentUser.phoneVerified ? `<span class="verified-inline-badge">Terverifikasi</span> ${escapeHtml(state.currentUser.whatsapp || state.currentUser.phoneNumber || "-")}` : escapeHtml(state.currentUser.whatsapp || "-")}</strong></div>
       <div class="profile-row"><span>Lokasi terverifikasi</span><strong>${state.currentUser.locationVerified ? "Ya" : "Tidak"}</strong></div>
       <div class="profile-row"><span>Status verifikasi</span><strong>${verificationStatusLabel(state.currentUser.verificationStatus, state.currentUser.verified)}</strong></div>
       ${state.currentUser.banned ? `<div class="profile-row"><span>Status akun</span><strong>Diblokir admin</strong></div>` : ""}
@@ -2036,8 +2053,15 @@ function renderProfile() {
         </label>
         <label>
           No. WhatsApp
-          <input type="text" name="whatsapp" value="${escapeHtml(state.currentUser.whatsapp || "")}" placeholder="08xxxxxxxxxx" ${isVerificationLocked ? "disabled" : ""} />
+          <input type="text" name="whatsapp" value="${escapeHtml(state.currentUser.whatsapp || "")}" placeholder="08xxxxxxxxxx" ${isVerificationLocked || state.currentUser.phoneVerified ? "disabled" : ""} />
         </label>
+        <div class="profile-subsection profile-side-card">
+          <h5>Verifikasi WhatsApp (OTP)</h5>
+          <p class="mini-note">${state.currentUser.phoneVerified
+    ? "Nomor WhatsApp sudah terverifikasi dan terkunci."
+    : "Verifikasi nomor WhatsApp sekali untuk keamanan transaksi."}</p>
+          <a class="primary-btn profile-verify-whatsapp-btn" href="/profil">Buka Verifikasi WhatsApp</a>
+        </div>
         <button type="submit" class="primary-btn" ${isVerificationLocked ? "disabled" : ""}>Simpan Profil</button>
       </form>
       ${isVerificationLocked ? "<p class=\"mini-note\">Data identitas sedang dikunci selama proses review / setelah diverifikasi. Hubungi admin melalui live chat bila perlu revisi.</p>" : ""}
@@ -2061,7 +2085,7 @@ function renderProfile() {
     <div class="profile-list">
       <div class="profile-row"><span>Provider utama</span><strong>${state.currentUser.provider}</strong></div>
       <div class="profile-row"><span>Email</span><strong>${state.currentUser.email || "-"}</strong></div>
-      <div class="profile-row"><span>WhatsApp</span><strong>${state.currentUser.whatsapp || "-"}</strong></div>
+      <div class="profile-row"><span>WhatsApp</span><strong>${state.currentUser.phoneVerified ? `<span class="verified-inline-badge">Terverifikasi</span> ${escapeHtml(state.currentUser.whatsapp || state.currentUser.phoneNumber || "-")}` : escapeHtml(state.currentUser.whatsapp || "-")}</strong></div>
       <div class="profile-row"><span>Lokasi terverifikasi</span><strong>${state.currentUser.locationVerified ? "Ya" : "Tidak"}</strong></div>
       <div class="profile-row"><span>Status verifikasi</span><strong>${verificationStatusLabel(state.currentUser.verificationStatus, state.currentUser.verified)}</strong></div>
     </div>
@@ -3504,6 +3528,28 @@ function formatDate(date) {
 
 function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+async function handleSupportRoute() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("support") !== "1") return;
+  const prefill = String(params.get("prefill") || "").trim();
+  if (!state.currentUser) {
+    setAuthStatus("Silakan login terlebih dahulu untuk membuka live chat admin.");
+    openLoginModal();
+    return;
+  }
+  openWorkspaceSection("home");
+  if (elements.supportWidgetPanel?.classList.contains("hidden")) {
+    toggleSupportWidget();
+  }
+  if (prefill && elements.supportWidgetInput) {
+    elements.supportWidgetInput.value = prefill;
+  }
+  params.delete("support");
+  params.delete("prefill");
+  const cleanQuery = params.toString();
+  history.replaceState({}, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
 }
 
 async function handleInitialRoute() {

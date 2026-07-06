@@ -4,6 +4,9 @@ export type User = {
   legalName?: string;
   email?: string;
   whatsapp?: string;
+  phoneNumber?: string;
+  phoneVerified?: boolean;
+  phoneVerifiedAt?: string;
   avatar?: string;
   verified?: boolean;
   verificationStatus?: string;

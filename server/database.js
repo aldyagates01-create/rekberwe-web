@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 import pg from "pg";
 
 import * as sqliteDb from "./database.sqlite.js";
+import { phoneToLocalWhatsapp } from "./phone-utils.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -180,6 +181,7 @@ export async function updateUserProfile(id, displayName, legalName, whatsapp) {
   await ensureReady();
   const current = await getUserById(id);
   const locked = current?.verificationStatus === "verified";
+  const phoneLocked = Boolean(current?.phoneVerified);
   await query(
     `
       UPDATE users
@@ -189,7 +191,7 @@ export async function updateUserProfile(id, displayName, legalName, whatsapp) {
           updated_at = $5
       WHERE id = $1
     `,
-    [id, displayName, locked ? current.legalName : legalName, locked ? current.whatsapp : whatsapp, new Date().toISOString()],
+    [id, displayName, locked ? current.legalName : legalName, locked || phoneLocked ? current.whatsapp : whatsapp, new Date().toISOString()],
   );
   return getUserById(id);
 }
@@ -879,12 +881,42 @@ async function initializePostgres() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_note TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN DEFAULT FALSE;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_reason TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMPTZ NULL;
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS seller_payout_bank_name TEXT DEFAULT '';
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS seller_payout_bank_number TEXT DEFAULT '';
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS seller_payout_bank_holder TEXT DEFAULT '';
     ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS attachment_name TEXT DEFAULT '';
     ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS attachment_url TEXT DEFAULT '';
     ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS attachment_type TEXT DEFAULT '';
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS otp_verifications (
+      id BIGSERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE,
+      phone_number TEXT NOT NULL,
+      otp_code_hash TEXT NOT NULL,
+      expired_at TIMESTAMPTZ NOT NULL,
+      attempt_count INTEGER DEFAULT 0,
+      send_count INTEGER DEFAULT 1,
+      last_sent_at TIMESTAMPTZ NOT NULL,
+      locked_until TIMESTAMPTZ NULL,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS otp_verification_logs (
+      id BIGSERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      phone_number TEXT NOT NULL,
+      action TEXT NOT NULL,
+      detail TEXT DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_otp_verifications_user ON otp_verifications(user_id);
+    CREATE INDEX IF NOT EXISTS idx_otp_logs_user ON otp_verification_logs(user_id, created_at);
   `);
 
   if (sqliteImportEnabled) {
@@ -1231,6 +1263,9 @@ async function mapUser(row) {
     verifiedAt: toIsoString(row.verified_at),
     ktp: row.ktp || "",
     whatsapp: row.whatsapp || "",
+    phoneNumber: row.phone_number || row.whatsapp || "",
+    phoneVerified: Boolean(row.phone_verified),
+    phoneVerifiedAt: toIsoString(row.phone_verified_at),
     verificationNote: row.verification_note || "",
     banned: Boolean(row.banned),
     bannedReason: row.banned_reason || "",
@@ -1608,4 +1643,113 @@ export async function getAnalyticsSummary(fromInput, toInput) {
       joinRate: pageviewBase ? Number(((funnel.join_transaction / pageviewBase) * 100).toFixed(1)) : 0,
     },
   };
+}
+
+export async function logOtpVerificationAction(userId, phoneNumber, action, detail = "") {
+  if (!postgresEnabled) return sqliteDb.logOtpVerificationAction(userId, phoneNumber, action, detail);
+  await ensureReady();
+  await query(
+    "INSERT INTO otp_verification_logs (user_id, phone_number, action, detail, created_at) VALUES ($1, $2, $3, $4, $5)",
+    [userId, phoneNumber, action, String(detail || "").slice(0, 500), new Date().toISOString()],
+  );
+}
+
+export async function getOtpVerificationByUserId(userId) {
+  if (!postgresEnabled) return sqliteDb.getOtpVerificationByUserId(userId);
+  await ensureReady();
+  const row = await queryOne("SELECT * FROM otp_verifications WHERE user_id = $1", [userId]);
+  if (!row) return null;
+  return {
+    id: Number(row.id),
+    userId: row.user_id,
+    phoneNumber: row.phone_number,
+    otpCodeHash: row.otp_code_hash,
+    expiredAt: toIsoString(row.expired_at),
+    attemptCount: Number(row.attempt_count || 0),
+    sendCount: Number(row.send_count || 0),
+    lastSentAt: toIsoString(row.last_sent_at),
+    lockedUntil: toIsoString(row.locked_until),
+    createdAt: toIsoString(row.created_at),
+  };
+}
+
+export async function upsertOtpVerification(input) {
+  if (!postgresEnabled) return sqliteDb.upsertOtpVerification(input);
+  await ensureReady();
+  const now = new Date().toISOString();
+  await query(
+    `
+      INSERT INTO otp_verifications (
+        user_id, phone_number, otp_code_hash, expired_at, attempt_count, send_count, last_sent_at, locked_until, created_at
+      ) VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8)
+      ON CONFLICT (user_id) DO UPDATE SET
+        phone_number = EXCLUDED.phone_number,
+        otp_code_hash = EXCLUDED.otp_code_hash,
+        expired_at = EXCLUDED.expired_at,
+        attempt_count = 0,
+        send_count = EXCLUDED.send_count,
+        last_sent_at = EXCLUDED.last_sent_at,
+        locked_until = EXCLUDED.locked_until
+    `,
+    [
+      input.userId,
+      input.phoneNumber,
+      input.otpCodeHash,
+      input.expiredAt,
+      input.sendCount,
+      input.lastSentAt,
+      input.lockedUntil || null,
+      now,
+    ],
+  );
+  return getOtpVerificationByUserId(input.userId);
+}
+
+export async function incrementOtpVerificationAttempt(userId) {
+  if (!postgresEnabled) return sqliteDb.incrementOtpVerificationAttempt(userId);
+  await ensureReady();
+  await query("UPDATE otp_verifications SET attempt_count = attempt_count + 1 WHERE user_id = $1", [userId]);
+  return getOtpVerificationByUserId(userId);
+}
+
+export async function setOtpVerificationLock(userId, lockedUntil) {
+  if (!postgresEnabled) return sqliteDb.setOtpVerificationLock(userId, lockedUntil);
+  await ensureReady();
+  await query("UPDATE otp_verifications SET locked_until = $1 WHERE user_id = $2", [lockedUntil, userId]);
+  return getOtpVerificationByUserId(userId);
+}
+
+export async function clearOtpVerification(userId) {
+  if (!postgresEnabled) return sqliteDb.clearOtpVerification(userId);
+  await ensureReady();
+  await query("DELETE FROM otp_verifications WHERE user_id = $1", [userId]);
+}
+
+export async function markUserPhoneVerified(userId, phoneNumber) {
+  if (!postgresEnabled) return sqliteDb.markUserPhoneVerified(userId, phoneNumber);
+  await ensureReady();
+  const now = new Date().toISOString();
+  await query(
+    `
+      UPDATE users
+      SET phone_number = $2,
+          phone_verified = TRUE,
+          phone_verified_at = $3,
+          whatsapp = $4,
+          updated_at = $3
+      WHERE id = $1
+    `,
+    [userId, phoneNumber, now, phoneToLocalWhatsapp(phoneNumber)],
+  );
+  await clearOtpVerification(userId);
+  return getUserById(userId);
+}
+
+export async function updateUserPhoneNumberDraft(userId, phoneNumber) {
+  if (!postgresEnabled) return sqliteDb.updateUserPhoneNumberDraft(userId, phoneNumber);
+  await ensureReady();
+  const now = new Date().toISOString();
+  await query("UPDATE users SET phone_number = $2, updated_at = $3 WHERE id = $1", [userId, phoneNumber, now]);
+  await clearOtpVerification(userId);
+  return getUserById(userId);
 }

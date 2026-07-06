@@ -74,6 +74,7 @@ export function buildProfileStatusRows(
     { label: "Facebook", done: connectedProviders.has("Facebook") },
     { label: "Discord", done: connectedProviders.has("Discord") },
     { label: "Telegram", done: connectedProviders.has("Telegram") },
+    { label: "Nomor WhatsApp terverifikasi", done: Boolean(profile.phoneVerified || profile.whatsapp) },
     { label: "Lokasi terverifikasi", done: Boolean(profile.locationVerified) },
     { label: "Foto KTP", done: Boolean(profile.ktpPhotoUrl) },
     { label: "Video selfie KTP", done: Boolean(profile.ktpVideoUrl) },
