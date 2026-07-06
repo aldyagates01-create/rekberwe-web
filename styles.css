@@ -4065,13 +4065,12 @@ a.primary-btn.submit-btn {
 
 .chat-typing-indicator {
   flex-shrink: 0;
-  order: 90;
   padding: 8px 16px 6px;
   font-size: 0.75rem;
   font-weight: 500;
   color: #79a8ff;
   background: rgba(11, 17, 31, 0.98);
-  border-top: 1px solid rgba(121, 168, 255, 0.12);
+  border-bottom: 1px solid rgba(121, 168, 255, 0.12);
   min-height: 28px;
 }
 
@@ -5613,10 +5612,8 @@ a.primary-btn.submit-btn {
 
 .room-chat-main .chat-typing-indicator {
   flex-shrink: 0 !important;
-  margin-top: auto !important;
-  position: sticky;
-  bottom: 58px;
-  z-index: 4;
+  position: static !important;
+  margin: 0 !important;
 }
 
 .chat-form,

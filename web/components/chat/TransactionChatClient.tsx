@@ -506,17 +506,17 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
         </form>
       ) : null}
 
+      {typingIndicatorText ? (
+        <p className="shrink-0 border-b border-white/5 bg-[#0d1524] px-4 py-2 text-[11px] font-medium text-accent-blue">
+          {typingIndicatorText}
+        </p>
+      ) : null}
+
       <QuickActionChips
         actions={actionButtons}
         onAction={handleTransactionAction}
         disabled={sending}
       />
-
-      {typingIndicatorText ? (
-        <p className="shrink-0 border-t border-white/5 bg-[#0d1524] px-4 py-2 text-[11px] font-medium text-accent-blue">
-          {typingIndicatorText}
-        </p>
-      ) : null}
 
       <ChatInput
         value={message}
