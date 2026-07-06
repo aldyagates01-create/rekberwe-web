@@ -126,80 +126,86 @@
           <p class="eyebrow">Pengaturan website</p>
           <h3>Fee, syarat ketentuan, pengamanan akun, dan suara notif</h3>
         </div>
-        <div class="settings-section-card">
-          <h4>Pengaturan fee</h4>
-        <form id="admin-fee-form" class="profile-form">
-          <label>
-            Rekening admin untuk transfer pembeli
-            <input type="text" id="admin-payout-account" placeholder="Contoh: BCA 1234567890 a.n Qhead Gold" />
-          </label>
-          <label>
-            Telegram customer care
-            <input type="text" id="customer-care-telegram" placeholder="@rekberadmin atau link Telegram" />
-          </label>
-          <label>
-            Gmail customer care
-            <input type="email" id="customer-care-gmail" placeholder="admin@rekberwe.id" />
-          </label>
-          <label>
-            Alamat kantor RekberWE.id
-            <textarea id="office-address" rows="3" placeholder="Contoh: Ruko ABC Lt.2, Jl. Contoh No. 123, Jakarta"></textarea>
-          </label>
-          <label>
-            Fee tetap rekber gold
-            <input type="number" id="gold-flat-fee" min="0" placeholder="10000" />
-          </label>
-          <div class="history-split">
+        <form id="admin-fee-form" class="profile-form admin-settings-form">
+          <div class="settings-section-card">
+            <h4>Pengaturan fee & kontak</h4>
             <label>
-              Maks nominal tier 1
-              <input type="number" id="tier-1-max" min="1" placeholder="500000" />
+              Rekening admin untuk transfer pembeli
+              <input type="text" id="admin-payout-account" placeholder="Contoh: BCA 1234567890 a.n Qhead Gold" />
             </label>
             <label>
-              Fee tier 1
-              <input type="number" id="tier-1-fee" min="0" placeholder="25000" />
+              Telegram customer care
+              <input type="text" id="customer-care-telegram" placeholder="@rekberadmin atau link Telegram" />
             </label>
             <label>
-              Maks nominal tier 2
-              <input type="number" id="tier-2-max" min="1" placeholder="1000000" />
+              Gmail customer care
+              <input type="email" id="customer-care-gmail" placeholder="admin@rekberwe.id" />
             </label>
             <label>
-              Fee tier 2
-              <input type="number" id="tier-2-fee" min="0" placeholder="50000" />
+              Fee tetap rekber gold
+              <input type="number" id="gold-flat-fee" min="0" placeholder="10000" />
             </label>
+            <div class="history-split">
+              <label>
+                Maks nominal tier 1
+                <input type="number" id="tier-1-max" min="1" placeholder="500000" />
+              </label>
+              <label>
+                Fee tier 1
+                <input type="number" id="tier-1-fee" min="0" placeholder="25000" />
+              </label>
+              <label>
+                Maks nominal tier 2
+                <input type="number" id="tier-2-max" min="1" placeholder="1000000" />
+              </label>
+              <label>
+                Fee tier 2
+                <input type="number" id="tier-2-fee" min="0" placeholder="50000" />
+              </label>
+              <label>
+                Maks nominal tier 3
+                <input type="number" id="tier-3-max" min="1" placeholder="5000000" />
+              </label>
+              <label>
+                Fee tier 3
+                <input type="number" id="tier-3-fee" min="0" placeholder="100000" />
+              </label>
+              <label>
+                Maks nominal tier 4
+                <input type="number" id="tier-4-max" min="1" placeholder="999999999999" />
+              </label>
+              <label>
+                Fee tier 4
+                <input type="number" id="tier-4-fee" min="0" placeholder="150000" />
+              </label>
+            </div>
+          </div>
+          <div class="settings-section-card">
+            <h4>Alamat kantor RekberWE.id</h4>
             <label>
-              Maks nominal tier 3
-              <input type="number" id="tier-3-max" min="1" placeholder="5000000" />
+              Alamat lengkap kantor
+              <textarea id="admin-office-address" rows="4" placeholder="Contoh: Ruko ABC Lt.2, Jl. Contoh No. 123, Jakarta"></textarea>
             </label>
+            <p class="mini-note">Alamat ini tampil di homepage dan dashboard pengguna setelah disimpan.</p>
+          </div>
+          <div class="settings-section-card">
+            <h4>Syarat dan ketentuan</h4>
             <label>
-              Fee tier 3
-              <input type="number" id="tier-3-fee" min="0" placeholder="100000" />
-            </label>
-            <label>
-              Maks nominal tier 4
-              <input type="number" id="tier-4-max" min="1" placeholder="999999999999" />
-            </label>
-            <label>
-              Fee tier 4
-              <input type="number" id="tier-4-fee" min="0" placeholder="150000" />
+              Isi syarat dan ketentuan website
+              <textarea id="terms-and-conditions" rows="8" placeholder="Satu baris satu ketentuan"></textarea>
             </label>
           </div>
-          <button type="submit" class="primary-btn">Simpan Pengaturan Fee</button>
+          <div class="settings-section-card">
+            <h4>Panduan pengamanan akun</h4>
+            <label>
+              Isi panduan pengamanan akun / rekber gold
+              <textarea id="account-security-guide" rows="8" placeholder="Tulis panduan pengamanan akun di sini"></textarea>
+            </label>
+          </div>
+          <div class="topbar-actions settings-save-actions">
+            <button type="submit" class="primary-btn">Simpan Semua Pengaturan</button>
+          </div>
         </form>
-        </div>
-        <div class="settings-section-card">
-          <h4>Syarat dan ketentuan</h4>
-          <label>
-            Isi syarat dan ketentuan website
-            <textarea id="terms-and-conditions" rows="8" placeholder="Satu baris satu ketentuan"></textarea>
-          </label>
-        </div>
-        <div class="settings-section-card">
-          <h4>Panduan pengamanan akun</h4>
-          <label>
-            Isi panduan pengamanan akun / rekber gold
-            <textarea id="account-security-guide" rows="8" placeholder="Tulis panduan pengamanan akun di sini"></textarea>
-          </label>
-        </div>
         <div class="settings-section-card">
           <h4>Suara notifikasi</h4>
           <label>
@@ -211,9 +217,6 @@
             <input type="file" id="admin-notification-sound" accept="audio/*" />
           </label>
           <div class="storage-link-list" id="notification-sound-status"></div>
-        </div>
-        <div class="topbar-actions">
-          <button type="submit" form="admin-fee-form" class="primary-btn">Simpan Semua Pengaturan</button>
         </div>
         <div class="card storage-info-card" id="admin-storage-info"></div>
       </section>
@@ -370,7 +373,7 @@
                     <span class="chat-room-alert-icon">i</span>
                     <p>Semua chat, bukti transfer, dan tindakan admin terekam di ruang transaksi ini untuk kebutuhan sengketa.</p>
                   </div>
-                  <div class="chat-box" id="admin-chat-box"></div>
+                  <div class="chat-box admin-chat-scroll-area" id="admin-chat-box"></div>
                   <div class="chat-typing-indicator hidden" id="admin-chat-typing-indicator">Sedang mengetik...</div>
                   <div class="room-summary-actions room-chat-actions-top room-chat-actions-inline">
                     <button type="button" class="ghost-btn" id="admin-request-payment">Minta transfer ke admin</button>

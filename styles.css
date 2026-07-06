@@ -8492,20 +8492,60 @@ body.is-member-view .topbar {
   }
 
   body.in-room-mode .room-chat-main {
-    display: block !important;
-    min-height: auto !important;
-    max-height: none !important;
-    height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: clamp(540px, calc(100vh - 280px), 860px) !important;
+    max-height: calc(100vh - 200px) !important;
+    overflow: hidden !important;
+    gap: 10px !important;
   }
 
   body.in-room-mode .room-chat-main .chat-box,
-  body.in-room-mode .room-chat-main #chat-box {
-    display: grid !important;
-    flex: none !important;
-    overflow: visible !important;
+  body.in-room-mode .room-chat-main #chat-box,
+  body.in-room-mode .user-chat-scroll-area {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
     max-height: none !important;
-    min-height: 240px !important;
-    height: auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain;
+    scroll-behavior: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    align-content: flex-start !important;
+    padding: 14px 10px 14px 8px !important;
+    border-radius: 16px;
+    background: rgba(4, 9, 18, 0.42);
+    border: 1px solid rgba(143, 164, 205, 0.1);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102, 116, 255, 0.55) rgba(255, 255, 255, 0.04);
+  }
+
+  body.in-room-mode .room-chat-main .chat-box::-webkit-scrollbar,
+  body.in-room-mode .room-chat-main #chat-box::-webkit-scrollbar,
+  body.in-room-mode .user-chat-scroll-area::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  body.in-room-mode .room-chat-main .chat-box::-webkit-scrollbar-thumb,
+  body.in-room-mode .room-chat-main #chat-box::-webkit-scrollbar-thumb,
+  body.in-room-mode .user-chat-scroll-area::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(90, 102, 255, 0.55), rgba(122, 97, 255, 0.45));
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  body.in-room-mode .room-chat-main .telegram-chat-head,
+  body.in-room-mode .room-chat-main .chat-room-alert,
+  body.in-room-mode .room-chat-main .seller-bank-form,
+  body.in-room-mode .room-chat-main .chat-typing-indicator,
+  body.in-room-mode .room-chat-main .room-chat-actions-inline,
+  body.in-room-mode .room-chat-main #chat-form,
+  body.in-room-mode .room-chat-main .mobile-room-shortcuts {
+    flex-shrink: 0 !important;
   }
 
   body.in-room-mode .room-chat-main #chat-form,
@@ -8526,6 +8566,11 @@ body.is-member-view .topbar {
     position: static !important;
     top: auto !important;
     align-self: start;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102, 116, 255, 0.45) rgba(255, 255, 255, 0.04);
   }
 
   body.in-room-mode .room-chat-actions-inline,
@@ -8629,6 +8674,115 @@ body.is-member-view .topbar {
   font-size: 0.88rem;
   line-height: 1.5;
   color: var(--muted);
+}
+
+.admin-settings-form {
+  display: grid;
+  gap: 0;
+}
+
+.admin-settings-form > .settings-section-card {
+  margin-bottom: 16px;
+}
+
+.admin-settings-form .settings-save-actions {
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+#admin-office-address {
+  min-height: 108px;
+  resize: vertical;
+  line-height: 1.55;
+}
+/* Admin PC: chat room transaksi scroll area */
+@media (min-width: 769px) {
+  .admin-shell .admin-workspace .room-chat-main {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: clamp(540px, calc(100vh - 260px), 860px) !important;
+    max-height: calc(100vh - 200px) !important;
+    overflow: hidden !important;
+    gap: 10px !important;
+  }
+
+  .admin-shell .admin-workspace .room-chat-main .telegram-chat-head,
+  .admin-shell .admin-workspace .room-chat-main .chat-room-alert {
+    flex-shrink: 0;
+  }
+
+  .admin-shell .admin-chat-scroll-area,
+  .admin-shell #admin-chat-box {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain;
+    scroll-behavior: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    align-content: flex-start !important;
+    padding: 14px 10px 14px 8px !important;
+    border-radius: 16px;
+    background: rgba(4, 9, 18, 0.5);
+    border: 1px solid rgba(143, 164, 205, 0.1);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102, 116, 255, 0.55) rgba(255, 255, 255, 0.04);
+  }
+
+  .admin-shell .admin-chat-scroll-area::-webkit-scrollbar,
+  .admin-shell #admin-chat-box::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .admin-shell .admin-chat-scroll-area::-webkit-scrollbar-track,
+  .admin-shell #admin-chat-box::-webkit-scrollbar-track {
+    margin: 6px 0;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 999px;
+  }
+
+  .admin-shell .admin-chat-scroll-area::-webkit-scrollbar-thumb,
+  .admin-shell #admin-chat-box::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(90, 102, 255, 0.55), rgba(122, 97, 255, 0.45));
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .admin-shell .admin-chat-scroll-area::-webkit-scrollbar-thumb:hover,
+  .admin-shell #admin-chat-box::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(110, 122, 255, 0.72), rgba(142, 117, 255, 0.62));
+    background-clip: padding-box;
+  }
+
+  .admin-shell .admin-workspace .room-chat-main .chat-typing-indicator,
+  .admin-shell .admin-workspace .room-chat-main .room-chat-actions-inline,
+  .admin-shell .admin-workspace #admin-chat-form {
+    flex-shrink: 0 !important;
+    position: static !important;
+    bottom: auto !important;
+  }
+
+  .admin-shell .admin-workspace .room-summary-panel {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102, 116, 255, 0.45) rgba(255, 255, 255, 0.04);
+  }
+
+  .admin-shell .admin-workspace .room-summary-panel::-webkit-scrollbar {
+    width: 7px;
+  }
+
+  .admin-shell .admin-workspace .room-summary-panel::-webkit-scrollbar-thumb {
+    background: rgba(102, 116, 255, 0.4);
+    border-radius: 999px;
+  }
 }
 
 @media (max-width: 768px) {

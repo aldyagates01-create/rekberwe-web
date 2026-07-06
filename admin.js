@@ -43,7 +43,7 @@ const elements = {
   adminPayoutAccount: document.getElementById("admin-payout-account"),
   customerCareTelegram: document.getElementById("customer-care-telegram"),
   customerCareGmail: document.getElementById("customer-care-gmail"),
-  officeAddress: document.getElementById("office-address"),
+  officeAddress: document.getElementById("admin-office-address"),
   goldFlatFee: document.getElementById("gold-flat-fee"),
   termsAndConditions: document.getElementById("terms-and-conditions"),
   accountSecurityGuide: document.getElementById("account-security-guide"),

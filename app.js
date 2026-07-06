@@ -63,7 +63,7 @@ const elements = {
   telegramStatus: document.getElementById("telegram-status"),
   currentUserCard: document.getElementById("current-user-card"),
   officeBox: document.getElementById("office-box"),
-  officeAddress: document.getElementById("office-address"),
+  officeAddressDisplay: document.getElementById("public-office-address"),
   workspaceOfficeBox: document.getElementById("workspace-office-box"),
   workspaceOfficeAddress: document.getElementById("workspace-office-address"),
   inlineTransactionPanel: document.getElementById("inline-transaction-panel"),
@@ -1583,8 +1583,8 @@ function renderAccountSection() {
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(officeAddress)}`
       : "#";
     elements.officeBox.classList.toggle("hidden", !officeAddress);
-    if (elements.officeAddress) {
-      elements.officeAddress.textContent = officeAddress || "Alamat kantor belum diatur admin.";
+    if (elements.officeAddressDisplay) {
+      elements.officeAddressDisplay.textContent = officeAddress || "Alamat kantor belum diatur admin.";
     }
     const officeMapLink = document.getElementById("office-map-link");
     if (officeMapLink) {
