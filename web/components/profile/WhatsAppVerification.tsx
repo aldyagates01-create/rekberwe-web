@@ -138,8 +138,12 @@ export function WhatsAppVerification({
             <p className="text-xs uppercase tracking-[0.12em] text-white/50">Nomor WhatsApp</p>
             <h2 className="mt-1 text-lg font-semibold">{state.phoneDisplay || phoneInput}</h2>
           </div>
-          <span className="rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
-            Terverifikasi
+          <span
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-success/15 text-sm font-bold text-success"
+            aria-label="WhatsApp terverifikasi"
+            title="WhatsApp terverifikasi"
+          >
+            ✓
           </span>
         </div>
         <p className="mt-3 text-sm text-success">✅ Nomor WhatsApp berhasil diverifikasi.</p>

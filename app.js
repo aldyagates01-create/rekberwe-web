@@ -101,6 +101,7 @@ const elements = {
   mobileQuickCreate: document.getElementById("mobile-quick-create"),
   mobileQuickTransactions: document.getElementById("mobile-quick-transactions"),
   mobileQuickGuide: document.getElementById("mobile-quick-guide"),
+  desktopQuickGuide: document.getElementById("desktop-quick-guide"),
   mobileQuickSecurity: document.getElementById("mobile-quick-security"),
   mobileHeaderNotifications: document.getElementById("mobile-header-notifications"),
   mobileHeaderNotificationsBadge: document.getElementById("mobile-header-notifications-badge"),
@@ -423,6 +424,10 @@ function formatOtpTimer(totalSeconds) {
 function getProfileWhatsappInputValue() {
   const input = document.getElementById("profile-whatsapp-input");
   return String(input?.value || state.currentUser?.whatsapp || state.currentUser?.phoneNumber || "").trim();
+}
+
+function renderWhatsappVerifiedBadge() {
+  return '<span class="verified-inline-badge is-verified whatsapp-verified-badge" aria-label="WhatsApp terverifikasi">✓</span>';
 }
 
 function isWhatsappOtpLocked() {
@@ -1225,7 +1230,37 @@ function bindScrollButtons() {
   });
 }
 
+function bindBrandHomeNavigation() {
+  document.querySelectorAll(".brand-block, .workspace-sidebar-brand, .mobile-workspace-brand").forEach((brand) => {
+    if (brand.dataset.homeBound === "true") return;
+    brand.dataset.homeBound = "true";
+    brand.classList.add("brand-home-trigger");
+    brand.setAttribute("role", "button");
+    brand.setAttribute("tabindex", "0");
+    brand.setAttribute("aria-label", "Kembali ke beranda");
+    brand.addEventListener("click", handleBrandHomeClick);
+    brand.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      handleBrandHomeClick();
+    });
+  });
+}
+
+function handleBrandHomeClick() {
+  if (state.transactionScreen === "room") {
+    exitRoomMode();
+    state.transactionScreen = "list";
+  }
+  openHomeView();
+}
+
+function openJaminanRekberPage() {
+  window.open("/jaminan-rekber", "_blank", "noopener,noreferrer");
+}
+
 function bindForms() {
+  bindBrandHomeNavigation();
   elements.homeNavButton?.addEventListener("click", openHomeView);
   elements.openLogin?.addEventListener("click", openLoginModal);
   elements.heroLoginButton?.addEventListener("click", openLoginModal);
@@ -1279,9 +1314,8 @@ function bindForms() {
     state.transactionScreen = "list";
     openWorkspaceSection("transactions");
   });
-  elements.mobileQuickGuide?.addEventListener("click", () => {
-    window.open("/jaminan-rekber", "_blank", "noopener,noreferrer");
-  });
+  elements.mobileQuickGuide?.addEventListener("click", openJaminanRekberPage);
+  elements.desktopQuickGuide?.addEventListener("click", openJaminanRekberPage);
   elements.mobileQuickSecurity?.addEventListener("click", () => {
     openMobileDashboardDetail("workspace-terms-list");
   });
@@ -2448,7 +2482,7 @@ function renderProfile() {
       <div class="profile-row"><span>Nama sesuai KTP</span><strong>${state.currentUser.legalName || "-"}</strong></div>
       <div class="profile-row"><span>Provider utama</span><strong>${state.currentUser.provider}</strong></div>
       <div class="profile-row"><span>Email</span><strong>${state.currentUser.email || "-"}</strong></div>
-      <div class="profile-row"><span>WhatsApp</span><strong>${state.currentUser.phoneVerified ? `<span class="verified-inline-badge">Terverifikasi</span> ${escapeHtml(state.currentUser.whatsapp || state.currentUser.phoneNumber || "-")}` : escapeHtml(state.currentUser.whatsapp || "-")}</strong></div>
+      <div class="profile-row"><span>WhatsApp</span><strong>${state.currentUser.phoneVerified ? `${renderWhatsappVerifiedBadge()} ${escapeHtml(state.currentUser.whatsapp || state.currentUser.phoneNumber || "-")}` : escapeHtml(state.currentUser.whatsapp || "-")}</strong></div>
       <div class="profile-row"><span>Lokasi terverifikasi</span><strong>${state.currentUser.locationVerified ? "Ya" : "Tidak"}</strong></div>
       <div class="profile-row"><span>Status verifikasi</span><strong>${verificationStatusLabel(state.currentUser.verificationStatus, state.currentUser.verified)}</strong></div>
       ${state.currentUser.banned ? `<div class="profile-row"><span>Status akun</span><strong>Diblokir admin</strong></div>` : ""}
@@ -2485,7 +2519,7 @@ function renderProfile() {
     <div class="profile-list">
       <div class="profile-row"><span>Provider utama</span><strong>${state.currentUser.provider}</strong></div>
       <div class="profile-row"><span>Email</span><strong>${state.currentUser.email || "-"}</strong></div>
-      <div class="profile-row"><span>WhatsApp</span><strong>${state.currentUser.phoneVerified ? `<span class="verified-inline-badge">Terverifikasi</span> ${escapeHtml(state.currentUser.whatsapp || state.currentUser.phoneNumber || "-")}` : escapeHtml(state.currentUser.whatsapp || "-")}</strong></div>
+      <div class="profile-row"><span>WhatsApp</span><strong>${state.currentUser.phoneVerified ? `${renderWhatsappVerifiedBadge()} ${escapeHtml(state.currentUser.whatsapp || state.currentUser.phoneNumber || "-")}` : escapeHtml(state.currentUser.whatsapp || "-")}</strong></div>
       <div class="profile-row"><span>Lokasi terverifikasi</span><strong>${state.currentUser.locationVerified ? "Ya" : "Tidak"}</strong></div>
       <div class="profile-row"><span>Status verifikasi</span><strong>${verificationStatusLabel(state.currentUser.verificationStatus, state.currentUser.verified)}</strong></div>
     </div>
@@ -2525,7 +2559,7 @@ function buildProfileVerificationMarkup(isVerificationLocked) {
     ? `
         <div class="whatsapp-field-row whatsapp-field-row-verified">
           <input type="text" name="whatsapp" id="profile-whatsapp-input" value="${whatsappValue}" placeholder="08xxxxxxxxxx" disabled />
-          ${isWhatsappOtpLocked() ? '<span class="verified-inline-badge whatsapp-verified-badge">Terverifikasi</span>' : ""}
+          ${isWhatsappOtpLocked() ? renderWhatsappVerifiedBadge() : ""}
         </div>
       `
     : `
