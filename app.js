@@ -307,6 +307,9 @@ async function bootstrap() {
     }
   }
   startRoomRefresh();
+  if (state.currentUser) {
+    window.RekberPush?.ensurePushEnabled?.({ audience: "user" }).catch(() => {});
+  }
 }
 
 async function fetchJson(url, options = {}) {
@@ -518,6 +521,7 @@ function unlockUserNotificationAudio() {
   if ("Notification" in window && Notification.permission === "default") {
     Notification.requestPermission().catch(() => {});
   }
+  window.RekberPush?.ensurePushEnabled?.({ audience: "user" }).catch(() => {});
   window.removeEventListener("pointerdown", unlockUserNotificationAudio);
   window.removeEventListener("keydown", unlockUserNotificationAudio);
 }

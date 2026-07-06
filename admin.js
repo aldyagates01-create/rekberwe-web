@@ -241,6 +241,7 @@ async function bootstrap() {
     renderUsers(state.users);
     renderVerificationQueue(state.users);
   }, 15000);
+  window.RekberPush?.ensurePushEnabled?.({ audience: "admin" }).catch(() => {});
 }
 
 async function refreshDashboardData() {
@@ -395,6 +396,7 @@ function unlockAdminNotificationAudio() {
   if ("Notification" in window && Notification.permission === "default") {
     Notification.requestPermission().catch(() => {});
   }
+  window.RekberPush?.ensurePushEnabled?.({ audience: "admin" }).catch(() => {});
   window.removeEventListener("pointerdown", unlockAdminNotificationAudio);
   window.removeEventListener("keydown", unlockAdminNotificationAudio);
 }

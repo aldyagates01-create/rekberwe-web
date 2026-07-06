@@ -134,6 +134,20 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_uploads_transaction ON transaction_uploads(transaction_code, id);
   CREATE INDEX IF NOT EXISTS idx_support_messages_thread ON support_messages(thread_id, id);
   CREATE INDEX IF NOT EXISTS idx_user_locations_user ON user_locations(user_id);
+
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    audience TEXT NOT NULL DEFAULT 'user',
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    user_agent TEXT DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id, audience);
 `);
 
 ensureColumn("users", "legal_name", "TEXT DEFAULT ''");
@@ -1140,4 +1154,69 @@ function normalizeFeeSettings(input) {
       },
     },
   };
+}
+
+function normalizePushSubscriptionRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    audience: row.audience || "user",
+    endpoint: row.endpoint,
+    p256dh: row.p256dh,
+    auth: row.auth,
+    userAgent: row.user_agent || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function upsertPushSubscription(userId, audience, subscription, userAgent = "") {
+  const endpoint = String(subscription?.endpoint || "").trim();
+  const p256dh = String(subscription?.keys?.p256dh || "").trim();
+  const auth = String(subscription?.keys?.auth || "").trim();
+  if (!userId || !endpoint || !p256dh || !auth) return null;
+  const now = new Date().toISOString();
+  const existing = db.prepare("SELECT id FROM push_subscriptions WHERE endpoint = ?").get(endpoint);
+  if (existing) {
+    db.prepare(`
+      UPDATE push_subscriptions
+      SET user_id = ?, audience = ?, p256dh = ?, auth = ?, user_agent = ?, updated_at = ?
+      WHERE endpoint = ?
+    `).run(userId, audience || "user", p256dh, auth, userAgent, now, endpoint);
+  } else {
+    db.prepare(`
+      INSERT INTO push_subscriptions (user_id, audience, endpoint, p256dh, auth, user_agent, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(userId, audience || "user", endpoint, p256dh, auth, userAgent, now, now);
+  }
+  return normalizePushSubscriptionRow(db.prepare("SELECT * FROM push_subscriptions WHERE endpoint = ?").get(endpoint));
+}
+
+export function removePushSubscription(userId, endpoint) {
+  const target = String(endpoint || "").trim();
+  if (!userId || !target) return false;
+  const result = db.prepare("DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?").run(userId, target);
+  return result.changes > 0;
+}
+
+export function removePushSubscriptionByEndpoint(endpoint) {
+  const target = String(endpoint || "").trim();
+  if (!target) return false;
+  const result = db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").run(target);
+  return result.changes > 0;
+}
+
+export function getPushSubscriptionsForUser(userId, audience = "user") {
+  const rows = db.prepare("SELECT * FROM push_subscriptions WHERE user_id = ? AND audience = ?").all(userId, audience || "user");
+  return rows.map(normalizePushSubscriptionRow);
+}
+
+export function getAdminPushSubscriptions(adminUserIds = []) {
+  const ids = Array.from(adminUserIds || []).filter(Boolean);
+  if (!ids.length) {
+    return db.prepare("SELECT * FROM push_subscriptions WHERE audience = 'admin'").all().map(normalizePushSubscriptionRow);
+  }
+  const placeholders = ids.map(() => "?").join(", ");
+  return db.prepare(`SELECT * FROM push_subscriptions WHERE audience = 'admin' AND user_id IN (${placeholders})`).all(...ids).map(normalizePushSubscriptionRow);
 }

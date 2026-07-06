@@ -834,12 +834,25 @@ async function initializePostgres() {
       created_at TIMESTAMPTZ NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id BIGSERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      audience TEXT NOT NULL DEFAULT 'user',
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_agent TEXT DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_users_social ON users(provider, social_id);
     CREATE INDEX IF NOT EXISTS idx_linked_user ON linked_providers(user_id);
     CREATE INDEX IF NOT EXISTS idx_messages_transaction ON transaction_messages(transaction_code, id);
     CREATE INDEX IF NOT EXISTS idx_uploads_transaction ON transaction_uploads(transaction_code, id);
     CREATE INDEX IF NOT EXISTS idx_user_locations_user ON user_locations(user_id);
     CREATE INDEX IF NOT EXISTS idx_support_messages_thread ON support_messages(thread_id, id);
+    CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id, audience);
   `);
 
   await query(`
@@ -1366,4 +1379,80 @@ function normalizeFeeSettings(input) {
       },
     },
   };
+}
+
+function normalizePushSubscriptionRow(row) {
+  if (!row) return null;
+  return {
+    id: Number(row.id),
+    userId: row.user_id,
+    audience: row.audience || "user",
+    endpoint: row.endpoint,
+    p256dh: row.p256dh,
+    auth: row.auth,
+    userAgent: row.user_agent || "",
+    createdAt: toIsoString(row.created_at),
+    updatedAt: toIsoString(row.updated_at),
+  };
+}
+
+export async function upsertPushSubscription(userId, audience, subscription, userAgent = "") {
+  if (!postgresEnabled) return sqliteDb.upsertPushSubscription(userId, audience, subscription, userAgent);
+  await ensureReady();
+  const endpoint = String(subscription?.endpoint || "").trim();
+  const p256dh = String(subscription?.keys?.p256dh || "").trim();
+  const auth = String(subscription?.keys?.auth || "").trim();
+  if (!userId || !endpoint || !p256dh || !auth) return null;
+  const now = new Date().toISOString();
+  await query(
+    `
+      INSERT INTO push_subscriptions (user_id, audience, endpoint, p256dh, auth, user_agent, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+      ON CONFLICT (endpoint) DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        audience = EXCLUDED.audience,
+        p256dh = EXCLUDED.p256dh,
+        auth = EXCLUDED.auth,
+        user_agent = EXCLUDED.user_agent,
+        updated_at = EXCLUDED.updated_at
+    `,
+    [userId, audience || "user", endpoint, p256dh, auth, userAgent, now],
+  );
+  return normalizePushSubscriptionRow(await queryOne("SELECT * FROM push_subscriptions WHERE endpoint = $1", [endpoint]));
+}
+
+export async function removePushSubscription(userId, endpoint) {
+  if (!postgresEnabled) return sqliteDb.removePushSubscription(userId, endpoint);
+  await ensureReady();
+  const result = await query("DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = $2", [userId, endpoint]);
+  return (result.rowCount || 0) > 0;
+}
+
+export async function removePushSubscriptionByEndpoint(endpoint) {
+  if (!postgresEnabled) return sqliteDb.removePushSubscriptionByEndpoint(endpoint);
+  await ensureReady();
+  const result = await query("DELETE FROM push_subscriptions WHERE endpoint = $1", [endpoint]);
+  return (result.rowCount || 0) > 0;
+}
+
+export async function getPushSubscriptionsForUser(userId, audience = "user") {
+  if (!postgresEnabled) return sqliteDb.getPushSubscriptionsForUser(userId, audience);
+  await ensureReady();
+  const rows = await queryRows("SELECT * FROM push_subscriptions WHERE user_id = $1 AND audience = $2", [userId, audience || "user"]);
+  return rows.map(normalizePushSubscriptionRow);
+}
+
+export async function getAdminPushSubscriptions(adminUserIds = []) {
+  if (!postgresEnabled) return sqliteDb.getAdminPushSubscriptions(adminUserIds);
+  await ensureReady();
+  const ids = Array.from(adminUserIds || []).filter(Boolean);
+  if (!ids.length) {
+    const rows = await queryRows("SELECT * FROM push_subscriptions WHERE audience = 'admin'");
+    return rows.map(normalizePushSubscriptionRow);
+  }
+  const rows = await queryRows(
+    "SELECT * FROM push_subscriptions WHERE audience = 'admin' AND user_id = ANY($1::text[])",
+    [ids],
+  );
+  return rows.map(normalizePushSubscriptionRow);
 }

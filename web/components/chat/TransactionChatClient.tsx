@@ -24,6 +24,7 @@ import {
 } from "@/lib/transaction";
 import type { TransactionActionKey } from "@/lib/transaction";
 import type { SessionUser, Transaction, TransactionMessage } from "@/lib/types";
+import { ensureWebPushEnabled } from "@/lib/push";
 
 type TransactionChatClientProps = {
   code: string;
@@ -116,6 +117,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
         if (active) {
           setUser(session.user);
           await refresh();
+          ensureWebPushEnabled("user").catch(() => {});
         }
       } catch (loadError) {
         if (active) {
@@ -144,6 +146,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
       if ("Notification" in window && Notification.permission === "default") {
         Notification.requestPermission().catch(() => {});
       }
+      ensureWebPushEnabled("user").catch(() => {});
     };
     window.addEventListener("pointerdown", unlock, { once: true });
     window.addEventListener("keydown", unlock, { once: true });

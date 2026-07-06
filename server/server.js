@@ -23,7 +23,9 @@ import {
   getAllUsers,
   getSupportThreadForGuest,
   getSupportThreadForUser,
+  removePushSubscription,
   reviewUserVerification,
+  upsertPushSubscription,
   getLinkedProvidersForUser,
   saveUserLocation,
   getTransactionByCode,
@@ -42,6 +44,7 @@ import {
   updateUserVerificationFiles,
   upsertUser,
 } from "./database.js";
+import { dispatchPushForEvent, getVapidPublicKey, initPushService, isPushEnabled } from "./push-service.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -279,6 +282,47 @@ app.post("/api/presence/heartbeat", requireAuth, async (req, res) => {
   res.json({ presence: getUserPresence(req.session.user.id) });
 });
 
+app.get("/api/push/public-key", (_req, res) => {
+  res.json({
+    enabled: isPushEnabled(),
+    publicKey: getVapidPublicKey(),
+  });
+});
+
+app.post("/api/push/subscribe", requireAuth, async (req, res) => {
+  if (!isPushEnabled()) {
+    res.status(503).json({ message: "Web Push belum dikonfigurasi di server." });
+    return;
+  }
+  const audience = String(req.body.audience || "user").trim() === "admin" ? "admin" : "user";
+  if (audience === "admin" && !req.session.user.isAdmin) {
+    res.status(403).json({ message: "Hanya admin yang bisa mendaftarkan notifikasi admin." });
+    return;
+  }
+  const subscription = req.body.subscription;
+  if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+    res.status(400).json({ message: "Data subscription push tidak valid." });
+    return;
+  }
+  const saved = await upsertPushSubscription(
+    req.session.user.id,
+    audience,
+    subscription,
+    String(req.headers["user-agent"] || "").trim(),
+  );
+  res.json({ ok: true, subscription: saved });
+});
+
+app.post("/api/push/unsubscribe", requireAuth, async (req, res) => {
+  const endpoint = String(req.body.endpoint || "").trim();
+  if (!endpoint) {
+    res.status(400).json({ message: "Endpoint push wajib diisi." });
+    return;
+  }
+  await removePushSubscription(req.session.user.id, endpoint);
+  res.json({ ok: true });
+});
+
 app.post("/api/transactions/:code/typing", requireAuth, async (req, res) => {
   const code = String(req.params.code || "").toUpperCase();
   const isTyping = Boolean(req.body.isTyping);
@@ -370,7 +414,11 @@ app.post("/api/support-thread/messages", requireAuth, async (req, res) => {
   }
   const thread = await getSupportThreadForUser(req.session.user.id);
   const updated = await addSupportThreadMessage(thread.id, req.session.user.id, req.session.user.displayName, "user", text);
-  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(updated, { forUser: true }), userId: req.session.user.id });
+  await broadcastEvent("support_updated", null, {
+    thread: enrichSupportThread(updated, { forUser: true }),
+    userId: req.session.user.id,
+    ...buildSupportPushExtras(updated),
+  });
   res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
@@ -383,7 +431,11 @@ app.post("/api/public-support-thread/messages", async (req, res) => {
   const guestKey = getGuestSupportKey(req);
   const thread = await getSupportThreadForGuest(guestKey);
   const updated = await addSupportThreadMessage(thread.id, `guest:${guestKey}`, "Guest", "guest", text);
-  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(updated, { forUser: true }), userId: `guest:${guestKey}` });
+  await broadcastEvent("support_updated", null, {
+    thread: enrichSupportThread(updated, { forUser: true }),
+    userId: `guest:${guestKey}`,
+    ...buildSupportPushExtras(updated),
+  });
   res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
@@ -403,7 +455,11 @@ app.post("/api/support-thread/uploads", requireAuth, upload.array("supportFiles"
       attachmentType: file.mimetype || "",
     });
   }
-  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(updated, { forUser: true }), userId: req.session.user.id });
+  await broadcastEvent("support_updated", null, {
+    thread: enrichSupportThread(updated, { forUser: true }),
+    userId: req.session.user.id,
+    ...buildSupportPushExtras(updated),
+  });
   res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
@@ -424,7 +480,11 @@ app.post("/api/public-support-thread/uploads", upload.array("supportFiles", 5), 
       attachmentType: file.mimetype || "",
     });
   }
-  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(updated, { forUser: true }), userId: `guest:${guestKey}` });
+  await broadcastEvent("support_updated", null, {
+    thread: enrichSupportThread(updated, { forUser: true }),
+    userId: `guest:${guestKey}`,
+    ...buildSupportPushExtras(updated),
+  });
   res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
@@ -518,7 +578,11 @@ app.post("/api/me/verification", requireAuth, upload.fields([
     ktpVideoName: ktpVideo.originalname,
   });
   req.session.user = await withAdminFlag(updated);
-  await broadcastEvent("verification_updated", null, { user: req.session.user, userId: req.session.user.id });
+  await broadcastEvent("verification_updated", null, {
+    user: req.session.user,
+    userId: req.session.user.id,
+    pushTrigger: "verification_submitted",
+  });
   res.json({ user: req.session.user });
 });
 
@@ -651,7 +715,12 @@ app.post("/api/transactions/:code/messages", requireAuth, async (req, res) => {
     return;
   }
   const updated = await addTransactionMessage(code, req.session.user.id, req.session.user.displayName, text);
-  await broadcastEvent("transaction_updated", code, { transaction: updated });
+  const lastMessage = updated.messages?.[updated.messages.length - 1] || null;
+  await broadcastEvent("transaction_updated", code, {
+    transaction: updated,
+    pushTrigger: "new_message",
+    pushMeta: { message: lastMessage },
+  });
   res.json({ transaction: updated });
 });
 
@@ -676,7 +745,12 @@ app.post("/api/transactions/:code/uploads", requireAuth, upload.array("proofFile
         storedFile.fileUrl,
       );
     }
-    await broadcastEvent("transaction_updated", code, { transaction: updated });
+    const lastUpload = updated.uploads?.[updated.uploads.length - 1] || null;
+    await broadcastEvent("transaction_updated", code, {
+      transaction: updated,
+      pushTrigger: "new_upload",
+      pushMeta: { upload: lastUpload },
+    });
     res.json({ transaction: updated });
   } catch (error) {
     res.status(500).json({ message: error.message || "Upload file gagal." });
@@ -798,7 +872,10 @@ app.post("/api/transactions/:code/actions", requireAuth, async (req, res) => {
     return;
   }
 
-  await broadcastEvent("transaction_updated", code, { transaction: updated });
+  await broadcastEvent("transaction_updated", code, {
+    transaction: updated,
+    ...buildStatusPushExtras(updated, `Update transaksi — ${code}`, updated.paymentStatus),
+  });
   res.json({ transaction: updated });
 });
 
@@ -914,7 +991,11 @@ app.post("/api/admin/support-threads/:id/messages", requireAdmin, async (req, re
     res.status(404).json({ message: "Live chat tidak ditemukan." });
     return;
   }
-  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(updated, { forUser: false }), userId: updated.user?.id || null });
+  await broadcastEvent("support_updated", null, {
+    thread: enrichSupportThread(updated, { forUser: false }),
+    userId: updated.user?.id || null,
+    ...buildSupportPushExtras(updated),
+  });
   res.json({ thread: enrichSupportThread(updated, { forUser: false }) });
 });
 
@@ -938,7 +1019,11 @@ app.post("/api/admin/support-threads/:id/uploads", requireAdmin, upload.array("s
       attachmentType: file.mimetype || "",
     });
   }
-  await broadcastEvent("support_updated", null, { thread: enrichSupportThread(thread, { forUser: false }), userId: thread.user?.id || null });
+  await broadcastEvent("support_updated", null, {
+    thread: enrichSupportThread(thread, { forUser: false }),
+    userId: thread.user?.id || null,
+    ...buildSupportPushExtras(thread),
+  });
   res.json({ thread: enrichSupportThread(thread, { forUser: false }) });
 });
 
@@ -962,7 +1047,11 @@ app.post("/api/admin/users/:id/verification", requireAdmin, async (req, res) => 
     return;
   }
 
-  await broadcastEvent("verification_updated", null, { user: updated, userId: userId });
+  await broadcastEvent("verification_updated", null, {
+    user: updated,
+    userId: userId,
+    pushTrigger: "verification_reviewed",
+  });
   res.json({ user: updated });
 });
 
@@ -1001,7 +1090,12 @@ app.post("/api/admin/transactions/:code/messages", requireAdmin, async (req, res
   }
 
   const updated = await addAdminTransactionMessage(code, text);
-  await broadcastEvent("transaction_updated", code, { transaction: updated });
+  const lastMessage = updated.messages?.[updated.messages.length - 1] || null;
+  await broadcastEvent("transaction_updated", code, {
+    transaction: updated,
+    pushTrigger: "new_message",
+    pushMeta: { message: lastMessage },
+  });
   res.json({ transaction: updated });
 });
 
@@ -1033,7 +1127,12 @@ app.post("/api/admin/transactions/:code/uploads", requireAdmin, upload.array("pr
       );
     }
 
-    await broadcastEvent("transaction_updated", code, { transaction: updated });
+    const lastUpload = updated.uploads?.[updated.uploads.length - 1] || null;
+    await broadcastEvent("transaction_updated", code, {
+      transaction: updated,
+      pushTrigger: "new_upload",
+      pushMeta: { upload: lastUpload },
+    });
     res.json({ transaction: updated });
   } catch (error) {
     res.status(500).json({ message: error.message || "Upload file admin gagal." });
@@ -1126,7 +1225,10 @@ app.post("/api/admin/transactions/:code/actions", requireAdmin, async (req, res)
     return;
   }
 
-  await broadcastEvent("transaction_updated", code, { transaction: updated });
+  await broadcastEvent("transaction_updated", code, {
+    transaction: updated,
+    ...buildStatusPushExtras(updated, `Update admin — ${code}`, updated.paymentStatus),
+  });
   res.json({ transaction: updated });
 });
 
@@ -1300,6 +1402,7 @@ app.use(express.static(webRoot));
 app.get("*", (_req, res) => res.sendFile(path.join(webRoot, "index.html")));
 
 async function startServer() {
+  initPushService();
   if (useNextFrontend) {
     try {
       const nextModule = await import("next");
@@ -1317,6 +1420,9 @@ async function startServer() {
 
   app.listen(port, () => {
     console.log(`RekberWE.id running on ${appBaseUrl}`);
+    if (isPushEnabled()) {
+      console.log("Web Push aktif");
+    }
   });
 }
 
@@ -1749,6 +1855,34 @@ async function broadcastEvent(type, code, payload = {}) {
     }
     client.res.write(`data: ${JSON.stringify({ type, code, ...eventPayload })}\n\n`);
   }
+
+  const pushPayload = {
+    ...payload,
+    transaction: payload.transaction || transaction,
+  };
+  dispatchPushForEvent(type, code, pushPayload, { adminUserIds, appBaseUrl }).catch((error) => {
+    console.error("Web Push dispatch gagal:", error.message);
+  });
+}
+
+function buildSupportPushExtras(thread) {
+  const message = thread?.messages?.[thread.messages.length - 1] || null;
+  return {
+    pushTrigger: "new_support_message",
+    pushMeta: { message },
+  };
+}
+
+function buildStatusPushExtras(transaction, title, body) {
+  const messages = transaction?.messages || [];
+  const lastMessage = messages[messages.length - 1];
+  return {
+    pushTrigger: "status_change",
+    pushMeta: {
+      title,
+      body: body || lastMessage?.text || `Status transaksi ${transaction?.code || ""} diperbarui.`,
+    },
+  };
 }
 
 function cleanupTransactionFiles(transaction) {
