@@ -1118,6 +1118,10 @@ app.post("/api/admin/transactions/:code/uploads", requireAdmin, upload.array("pr
     res.status(404).json({ message: "Transaksi tidak ditemukan." });
     return;
   }
+  if (isWarrantyStillActive(current) && current.adminFundsReceived && current.buyerConfirmedReceived) {
+    res.status(400).json({ message: `Upload transfer belum bisa dilakukan karena masa garansi masih aktif sampai ${formatDateId(current.warrantyEndsAt)}.` });
+    return;
+  }
 
   const files = req.files || [];
   if (!files.length) {
@@ -1218,6 +1222,10 @@ app.post("/api/admin/transactions/:code/actions", requireAdmin, async (req, res)
   } else if (action === "complete_transaction") {
     if (current.paymentStatus !== "Antrian transfer") {
       res.status(400).json({ message: "Transaksi belum masuk antrian transfer." });
+      return;
+    }
+    if (isWarrantyStillActive(current)) {
+      res.status(400).json({ message: `Transfer belum bisa diselesaikan karena masa garansi masih aktif sampai ${formatDateId(current.warrantyEndsAt)}.` });
       return;
     }
     updated = await updateTransactionWorkflow(code, {

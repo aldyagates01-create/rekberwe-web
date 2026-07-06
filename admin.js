@@ -374,7 +374,40 @@ function getAdminDisputeCount() {
 }
 
 function getAdminTransferQueueCount() {
-  return (state.transactions || []).filter((transaction) => transaction.paymentStatus === "Antrian transfer").length;
+  return (state.transactions || []).filter(isInTransferQueue).length;
+}
+
+function isTransferQueueExcluded(transaction) {
+  if (!transaction) return true;
+  if (transaction.paymentStatus === "Transaksi dibatalkan" || transaction.hasDispute) return true;
+  if (transaction.sellerPayoutSent || transaction.paymentStatus === "Selesai") return true;
+  return false;
+}
+
+function isTransferPrerequisiteMet(transaction) {
+  if (!transaction) return false;
+  return Boolean(
+    transaction.adminFundsReceived
+    && transaction.buyerConfirmedReceived
+    && transaction.sellerBankName
+    && transaction.sellerBankNumber
+    && transaction.sellerBankHolder,
+  );
+}
+
+function isWarrantyHoldTransaction(transaction) {
+  if (isTransferQueueExcluded(transaction)) return false;
+  if (!isTransferPrerequisiteMet(transaction)) return false;
+  return isWarrantyStillActive(transaction);
+}
+
+function isTransferQueueProcessable(transaction) {
+  if (isTransferQueueExcluded(transaction)) return false;
+  return transaction.paymentStatus === "Antrian transfer" && !isWarrantyStillActive(transaction);
+}
+
+function isInTransferQueue(transaction) {
+  return isWarrantyHoldTransaction(transaction) || isTransferQueueProcessable(transaction);
 }
 
 function setAdminButtonBadge(button, count) {
@@ -605,8 +638,8 @@ function getTransactionPageMeta() {
     return {
       title: "Antrian Transfer",
       eyebrow: "Transfer ke penjual",
-      empty: "Belum ada transaksi dalam antrian transfer.",
-      filter: (transaction) => transaction.paymentStatus === "Antrian transfer",
+      empty: "Belum ada transaksi dalam antrian transfer atau masa garansi.",
+      filter: isInTransferQueue,
     };
   }
   if (state.currentPage === "transactions-dispute") {
@@ -680,30 +713,59 @@ function renderProfitSummary(transactions) {
     return true;
   });
   const completed = filtered.filter((transaction) => transaction.paymentStatus === "Selesai");
-  const hold = filtered.filter((transaction) => transaction.adminFundsReceived && !transaction.sellerPayoutSent);
+  const warrantyHold = filtered.filter(isWarrantyHoldTransaction);
+  const readyTransfer = filtered.filter(isTransferQueueProcessable);
   const canceled = filtered.filter((transaction) => transaction.paymentStatus === "Transaksi dibatalkan");
   const totalProfit = completed.reduce((sum, transaction) => sum + Number(transaction.feeAmount || 0), 0);
-  const holdProfit = hold.reduce((sum, transaction) => sum + Number(transaction.feeAmount || 0), 0);
+  const warrantyHoldProfit = warrantyHold.reduce((sum, transaction) => sum + Number(transaction.feeAmount || 0), 0);
 
   elements.adminProfitSummary.innerHTML = `
     <article><p class="mini-label">Profit masuk</p><strong>${formatCurrency(totalProfit)}</strong></article>
     <article><p class="mini-label">Transaksi selesai</p><strong>${completed.length}</strong></article>
-    <article><p class="mini-label">Hold garansi</p><strong>${hold.length} / ${formatCurrency(holdProfit)}</strong></article>
+    <article><p class="mini-label">Hold masa garansi</p><strong>${warrantyHold.length} / ${formatCurrency(warrantyHoldProfit)}</strong></article>
+    <article><p class="mini-label">Siap transfer</p><strong>${readyTransfer.length}</strong></article>
     <article><p class="mini-label">Dibatalkan</p><strong>${canceled.length}</strong></article>
   `;
 
-  elements.adminProfitList.innerHTML = completed.length
-    ? completed.map((transaction) => `
-      <article class="admin-item">
-        <div class="admin-item-top">
-          <h4>${escapeHtml(transaction.title)}</h4>
-          <span class="admin-tag">Profit ${escapeHtml(formatCurrency(transaction.feeAmount || 0))}</span>
-        </div>
-        <p>${escapeHtml(transaction.code)} • ${escapeHtml(formatDate(transaction.createdAt || transaction.updatedAt))}</p>
-        <p>Total transaksi: ${escapeHtml(formatCurrency(transaction.price || 0))}</p>
-      </article>
-    `).join("")
-    : "<p>Belum ada transaksi selesai dalam rentang tanggal ini.</p>";
+  const warrantyListHtml = warrantyHold.length
+    ? `
+      <div class="profit-list-section">
+        <p class="eyebrow">Masih masa garansi (belum masuk profit)</p>
+        ${warrantyHold.map((transaction) => `
+          <article class="admin-item">
+            <div class="admin-item-top">
+              <h4>${escapeHtml(transaction.title)}</h4>
+              <span class="admin-tag admin-tag-warning">Hold garansi</span>
+            </div>
+            <p>${escapeHtml(transaction.code)} • Berakhir ${escapeHtml(formatDateTime(new Date(transaction.warrantyEndsAt)))}</p>
+            <p>Fee tertahan: ${escapeHtml(formatCurrency(transaction.feeAmount || 0))}</p>
+          </article>
+        `).join("")}
+      </div>
+    `
+    : "";
+
+  const completedListHtml = completed.length
+    ? `
+      <div class="profit-list-section">
+        <p class="eyebrow">Profit masuk (transaksi selesai)</p>
+        ${completed.map((transaction) => `
+          <article class="admin-item">
+            <div class="admin-item-top">
+              <h4>${escapeHtml(transaction.title)}</h4>
+              <span class="admin-tag">Profit ${escapeHtml(formatCurrency(transaction.feeAmount || 0))}</span>
+            </div>
+            <p>${escapeHtml(transaction.code)} • ${escapeHtml(formatDate(transaction.createdAt || transaction.updatedAt))}</p>
+            <p>Total transaksi: ${escapeHtml(formatCurrency(transaction.price || 0))}</p>
+          </article>
+        `).join("")}
+      </div>
+    `
+    : "";
+
+  elements.adminProfitList.innerHTML = warrantyListHtml || completedListHtml
+    ? `${warrantyListHtml}${completedListHtml}`
+    : "<p>Belum ada transaksi selesai atau hold garansi dalam rentang tanggal ini.</p>";
 }
 
 function renderUsers(users) {
@@ -853,18 +915,40 @@ function renderTransactionsPage() {
 
 function renderTransferQueuePage() {
   const meta = getTransactionPageMeta();
-  const filtered = state.transactions.filter(meta.filter);
+  const warrantyHold = state.transactions.filter(isWarrantyHoldTransaction);
+  const readyTransfer = state.transactions.filter(isTransferQueueProcessable);
+  const allQueue = [...warrantyHold, ...readyTransfer];
   if (elements.adminTransferQueueList) {
-    elements.adminTransferQueueList.innerHTML = filtered.length
-      ? filtered.map(renderTransferQueueListItem).join("")
+    const listParts = [];
+    if (warrantyHold.length) {
+      listParts.push(`
+        <div class="queue-section-head">
+          <p class="eyebrow">Masa garansi aktif</p>
+          <h4>Menunggu masa garansi (${warrantyHold.length})</h4>
+          <p class="mini-note">Rekening disembunyikan — admin belum bisa memproses transfer.</p>
+        </div>
+      `);
+      listParts.push(...warrantyHold.map((transaction) => renderTransferQueueListItem(transaction, { warrantyHold: true })));
+    }
+    if (readyTransfer.length) {
+      listParts.push(`
+        <div class="queue-section-head">
+          <p class="eyebrow">Siap diproses</p>
+          <h4>Antrian transfer (${readyTransfer.length})</h4>
+        </div>
+      `);
+      listParts.push(...readyTransfer.map((transaction) => renderTransferQueueListItem(transaction, { warrantyHold: false })));
+    }
+    elements.adminTransferQueueList.innerHTML = listParts.length
+      ? listParts.join("")
       : `<p class="muted-text">${meta.empty}</p>`;
   }
 
-  if (state.activeTransaction && state.activeTransaction.paymentStatus !== "Antrian transfer") {
+  if (state.activeTransaction && !isInTransferQueue(state.activeTransaction)) {
     state.activeTransaction = null;
   }
-  if (!state.activeTransaction && filtered.length) {
-    state.activeTransaction = filtered[0];
+  if (!state.activeTransaction && allQueue.length) {
+    state.activeTransaction = allQueue[0];
   }
 
   document.querySelectorAll(".admin-open-transfer-queue").forEach((button) => {
@@ -880,16 +964,20 @@ function renderTransferQueuePage() {
   renderTransferQueueDetail(state.activeTransaction);
 }
 
-function renderTransferQueueListItem(transaction) {
-  const sellerAccount = [transaction.sellerBankName, transaction.sellerBankNumber]
-    .filter(Boolean)
-    .join(" • ") || "Menunggu rekening";
+function renderTransferQueueListItem(transaction, options = {}) {
+  const warrantyHold = options.warrantyHold ?? isWarrantyHoldTransaction(transaction);
+  const sellerAccount = warrantyHold
+    ? "Rekening disembunyikan (masa garansi)"
+    : [transaction.sellerBankName, transaction.sellerBankNumber].filter(Boolean).join(" • ") || "Menunggu rekening";
+  const statusTag = warrantyHold
+    ? `<span class="admin-tag admin-tag-warning">Masa garansi</span>`
+    : `<span class="admin-tag">Antrian transfer</span>`;
   return `
-    <article class="activity-item ${state.activeTransaction?.code === transaction.code ? "is-active" : ""}">
+    <article class="activity-item ${state.activeTransaction?.code === transaction.code ? "is-active" : ""} ${warrantyHold ? "queue-item-warranty" : ""}">
       <button type="button" class="ghost-btn admin-open-transfer-queue transaction-title-btn queue-title-btn" data-code="${escapeHtml(transaction.code)}">
         <div class="transaction-list-top">
           <strong class="transaction-list-title">${escapeHtml(transaction.title)}</strong>
-          <span class="admin-tag">Antrian transfer</span>
+          ${statusTag}
         </div>
         <span class="transaction-list-code">${escapeHtml(transaction.code)}</span>
         <span class="transaction-list-meta">
@@ -903,21 +991,27 @@ function renderTransferQueueListItem(transaction) {
 
 function renderTransferQueueDetail(transaction) {
   if (!elements.adminTransferQueueDetail || !elements.adminTransferQueueEmpty) return;
-  if (!transaction || transaction.paymentStatus !== "Antrian transfer") {
+  if (!transaction || !isInTransferQueue(transaction)) {
     elements.adminTransferQueueDetail.classList.add("hidden");
     elements.adminTransferQueueEmpty.classList.remove("hidden");
     if (elements.adminTransferQueueTitle) elements.adminTransferQueueTitle.textContent = "Pilih transaksi";
     if (elements.adminTransferQueueSubtitle) elements.adminTransferQueueSubtitle.textContent = "Klik judul transaksi di panel kiri untuk melihat detail transfer.";
     if (elements.adminTransferQueueSummary) elements.adminTransferQueueSummary.innerHTML = "";
     if (elements.adminTransferQueueUploads) elements.adminTransferQueueUploads.innerHTML = "";
+    setTransferQueueActionState(true);
     return;
   }
 
+  const warrantyHold = isWarrantyHoldTransaction(transaction);
   elements.adminTransferQueueEmpty.classList.add("hidden");
   elements.adminTransferQueueDetail.classList.remove("hidden");
   if (elements.adminTransferQueueTitle) elements.adminTransferQueueTitle.textContent = transaction.title;
   if (elements.adminTransferQueueSubtitle) {
-    elements.adminTransferQueueSubtitle.textContent = `${transaction.code} | ${formatCurrency(transaction.settlement?.sellerReceiveAmount || transaction.price)} | ${escapeHtml(transaction.sellerBankName || "Bank belum diisi")}`;
+    const amount = formatCurrency(transaction.settlement?.sellerReceiveAmount || transaction.price);
+    const detail = warrantyHold
+      ? `Masa garansi aktif sampai ${formatDateTime(new Date(transaction.warrantyEndsAt))}`
+      : `Masa garansi selesai • ${transaction.sellerBankName || "Bank belum diisi"}`;
+    elements.adminTransferQueueSubtitle.textContent = `${transaction.code} | ${amount} | ${detail}`;
   }
   renderAdminTransferQueuePanel(transaction);
   if (elements.adminTransferQueueUploads) {
@@ -925,9 +1019,24 @@ function renderTransferQueueDetail(transaction) {
       ? transaction.uploads.map(renderUploadItem).join("")
       : "<div class=\"upload-empty-state\">Belum ada file transaksi.</div>";
   }
-  if (elements.adminTransferCompleteInline) {
-    elements.adminTransferCompleteInline.disabled = false;
+  setTransferQueueActionState(warrantyHold);
+}
+
+function setTransferQueueActionState(warrantyHold) {
+  const proofForm = elements.adminTransferProofForm;
+  const proofUpload = elements.adminTransferProofUpload;
+  const proofSubmit = proofForm?.querySelector('button[type="submit"]');
+  if (warrantyHold) {
+    proofForm?.classList.add("is-disabled");
+    if (proofUpload) proofUpload.disabled = true;
+    if (proofSubmit) proofSubmit.disabled = true;
+    if (elements.adminTransferCompleteInline) elements.adminTransferCompleteInline.disabled = true;
+    return;
   }
+  proofForm?.classList.remove("is-disabled");
+  if (proofUpload) proofUpload.disabled = false;
+  if (proofSubmit) proofSubmit.disabled = false;
+  if (elements.adminTransferCompleteInline) elements.adminTransferCompleteInline.disabled = false;
 }
 
 function renderTransactionListItem(transaction) {
@@ -1081,7 +1190,7 @@ function renderActiveTransaction() {
     : payoutBlockReason
       ? "Cek syarat transfer"
       : "Segera di transfer";
-  elements.adminCompleteTransaction.disabled = transaction.paymentStatus !== "Antrian transfer";
+  elements.adminCompleteTransaction.disabled = transaction.paymentStatus !== "Antrian transfer" || isWarrantyStillActive(transaction);
   if (elements.adminCancelTransaction) {
     elements.adminCancelTransaction.disabled = transaction.paymentStatus === "Transaksi dibatalkan" || transaction.paymentStatus === "Selesai";
   }
@@ -1454,6 +1563,10 @@ async function handleAdminAction(action) {
         return;
       }
     }
+    if (action === "complete_transaction" && isWarrantyHoldTransaction(state.activeTransaction)) {
+      showStatus(`Transfer belum bisa diselesaikan. Masa garansi aktif sampai ${formatDateTime(new Date(state.activeTransaction.warrantyEndsAt))}.`, true);
+      return;
+    }
     const confirmation = getAdminActionConfirmation(action);
     if (confirmation && !window.confirm(confirmation)) return;
     const body = action === "request_buyer_payment"
@@ -1667,14 +1780,64 @@ function buildAdminTransactionProfileDetails(role, transaction) {
 
 function renderAdminTransferQueuePanel(transaction) {
   if (!elements.adminTransferQueueSummary) return;
-  const isQueue = transaction?.paymentStatus === "Antrian transfer";
-  if (!isQueue) {
-    elements.adminTransferQueueSummary.innerHTML = "";
+  const onQueuePage = state.currentPage === "transactions-transfer-queue";
+  if (!onQueuePage || !transaction || !isInTransferQueue(transaction)) {
+    if (onQueuePage) elements.adminTransferQueueSummary.innerHTML = "";
     return;
   }
-  if (elements.adminTransferCompleteInline) {
-    elements.adminTransferCompleteInline.disabled = false;
-  }
+  const warrantyHold = isWarrantyHoldTransaction(transaction);
+  const warrantyStatusStep = transaction.warrantyEndsAt
+    ? `
+      <article class="step-item queue-step-item ${warrantyHold ? "queue-step-locked" : ""}">
+        <strong>!</strong>
+        <div>
+          <h4>Status garansi</h4>
+          <p>${warrantyHold
+      ? `Masa garansi masih aktif sampai ${formatDateTime(new Date(transaction.warrantyEndsAt))}. Transfer belum bisa diproses.`
+      : "Masa garansi selesai — admin bisa memproses transfer ke penjual."}</p>
+        </div>
+      </article>
+    `
+    : "";
+  const bankStep = warrantyHold
+    ? `
+      <article class="step-item queue-step-item queue-step-locked">
+        <strong>C</strong>
+        <div>
+          <h4>No rekening tujuan</h4>
+          <p class="muted-text">Disembunyikan selama masa garansi aktif agar admin tidak salah transfer.</p>
+        </div>
+      </article>
+    `
+    : `
+      <article class="step-item queue-step-item">
+        <strong>C</strong>
+        <div>
+          <h4>No rekening tujuan</h4>
+          <p>${escapeHtml(transaction.sellerBankName || "-")} • ${escapeHtml(transaction.sellerBankNumber || "-")} • ${escapeHtml(transaction.sellerBankHolder || "-")}</p>
+          <button type="button" class="ghost-btn" data-copy-transfer-account="${escapeAttribute(`${transaction.sellerBankName || ""} | ${transaction.sellerBankNumber || ""} | ${transaction.sellerBankHolder || ""}`)}">Copy rekening</button>
+        </div>
+      </article>
+    `;
+  const uploadStep = warrantyHold
+    ? `
+      <article class="step-item compact-guide-item queue-step-item queue-step-item-note queue-step-locked">
+        <strong>D</strong>
+        <div>
+          <h4>Upload bukti transfer</h4>
+          <p>Tersedia setelah masa garansi selesai.</p>
+        </div>
+      </article>
+    `
+    : `
+      <article class="step-item compact-guide-item queue-step-item queue-step-item-note">
+        <strong>D</strong>
+        <div>
+          <h4>Upload bukti transfer</h4>
+          <p>Unggah bukti TF agar otomatis terkirim juga ke ruang transaksi.</p>
+        </div>
+      </article>
+    `;
   elements.adminTransferQueueSummary.innerHTML = `
     <article class="step-item queue-step-item">
       <strong>A</strong>
@@ -1690,21 +1853,9 @@ function renderAdminTransferQueuePanel(transaction) {
         <p>${formatCurrency(transaction.settlement?.sellerReceiveAmount || transaction.price)}</p>
       </div>
     </article>
-    <article class="step-item queue-step-item">
-      <strong>C</strong>
-      <div>
-        <h4>No rekening tujuan</h4>
-        <p>${escapeHtml(transaction.sellerBankName || "-")} • ${escapeHtml(transaction.sellerBankNumber || "-")} • ${escapeHtml(transaction.sellerBankHolder || "-")}</p>
-        <button type="button" class="ghost-btn" data-copy-transfer-account="${escapeAttribute(`${transaction.sellerBankName || ""} | ${transaction.sellerBankNumber || ""} | ${transaction.sellerBankHolder || ""}`)}">Copy rekening</button>
-      </div>
-    </article>
-    <article class="step-item compact-guide-item queue-step-item queue-step-item-note">
-      <strong>D</strong>
-      <div>
-        <h4>Upload bukti transfer</h4>
-        <p>Unggah bukti TF agar otomatis terkirim juga ke ruang transaksi.</p>
-      </div>
-    </article>
+    ${warrantyStatusStep}
+    ${bankStep}
+    ${uploadStep}
   `;
 }
 
@@ -1714,6 +1865,10 @@ async function handleAdminTransferProofSubmit(event) {
   try {
     if (!state.activeTransaction) {
       showStatus("Pilih antrian transfer dulu.", true);
+      return;
+    }
+    if (isWarrantyHoldTransaction(state.activeTransaction)) {
+      showStatus(`Transfer belum bisa diproses. Masa garansi aktif sampai ${formatDateTime(new Date(state.activeTransaction.warrantyEndsAt))}.`, true);
       return;
     }
     if (!transferUploadInput?.files?.length) {

@@ -54,18 +54,30 @@ export type ProfileStatusRow = {
   done: boolean;
 };
 
-export function buildProfileStatusRows(profile: TransactionProfile): ProfileStatusRow[] {
+export function buildProfileStatusRows(
+  profile: TransactionProfile,
+  options: { includePrivateChannels?: boolean } = {},
+) {
   const connectedProviders = new Set(
     [profile.provider, ...(profile.linkedProviders || []).map((item) => item.provider)].filter(Boolean),
   );
-  return [
-    { label: "Google / Gmail", done: connectedProviders.has("Google") },
+  const rows: ProfileStatusRow[] = [];
+
+  if (options.includePrivateChannels) {
+    rows.push(
+      { label: "Google / Gmail", done: connectedProviders.has("Google") },
+      { label: "WhatsApp", done: Boolean(profile.whatsapp) },
+    );
+  }
+
+  rows.push(
     { label: "Facebook", done: connectedProviders.has("Facebook") },
     { label: "Discord", done: connectedProviders.has("Discord") },
     { label: "Telegram", done: connectedProviders.has("Telegram") },
-    { label: "WhatsApp", done: Boolean(profile.whatsapp) },
     { label: "Lokasi terverifikasi", done: Boolean(profile.locationVerified) },
     { label: "Foto KTP", done: Boolean(profile.ktpPhotoUrl) },
     { label: "Video selfie KTP", done: Boolean(profile.ktpVideoUrl) },
-  ];
+  );
+
+  return rows;
 }

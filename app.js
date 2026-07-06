@@ -2281,11 +2281,9 @@ function buildUserProfileModalGrid(profile, transactions) {
   }
   const connectedProviders = new Set([profile.provider, ...(profile.linkedProviders || []).map((item) => item.provider)].filter(Boolean));
   const statuses = [
-    buildProfileStatusRow("google", "Google / Gmail", connectedProviders.has("Google")),
     buildProfileStatusRow("facebook", "Facebook", connectedProviders.has("Facebook")),
     buildProfileStatusRow("discord", "Discord", connectedProviders.has("Discord")),
     buildProfileStatusRow("telegram", "Telegram", connectedProviders.has("Telegram")),
-    buildProfileStatusRow("whatsapp", "WhatsApp", Boolean(profile.whatsapp)),
     buildProfileStatusRow("location", "Lokasi terverifikasi", Boolean(profile.locationVerified)),
     buildProfileStatusRow("ktp", "Foto KTP", Boolean(profile.ktpPhotoUrl)),
     buildProfileStatusRow("video", "Video selfie KTP", Boolean(profile.ktpVideoUrl)),

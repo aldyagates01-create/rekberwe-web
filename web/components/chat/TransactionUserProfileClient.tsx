@@ -118,8 +118,8 @@ export function TransactionUserProfileClient({ code, role }: TransactionUserProf
         <section className="grid grid-cols-2 gap-3">
           <StatCard label="Status akun" value={profile.verified ? "Verified ✓" : "Unverified ✕"} />
           <StatCard label="Provider utama" value={profile.provider || "-"} />
-          <StatCard label="WhatsApp" value={profile.whatsapp || "Belum diisi"} />
-          <StatCard label="Email" value={profile.email || "Belum diisi"} />
+          <StatCard label="Peran transaksi" value={profile.title} />
+          <StatCard label="Transaksi" value={transaction?.code || "-"} />
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-4">

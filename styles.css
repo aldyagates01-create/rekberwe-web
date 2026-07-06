@@ -2627,6 +2627,11 @@ select {
   color: var(--danger);
 }
 
+.admin-tag-warning {
+  background: rgba(194, 138, 45, 0.16);
+  color: #9a6a12;
+}
+
 .admin-tag-muted {
   background: rgba(46, 36, 26, 0.08);
   color: var(--muted);
@@ -2707,6 +2712,48 @@ select {
 .transfer-queue-summary {
   display: grid;
   gap: 12px;
+}
+
+.queue-section-head {
+  display: grid;
+  gap: 4px;
+  padding: 14px 4px 6px;
+  border-top: 1px solid rgba(143, 164, 205, 0.12);
+}
+
+.queue-section-head:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.queue-section-head h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #eef4ff;
+}
+
+.queue-item-warranty.is-active,
+.queue-item-warranty .transaction-title-btn:hover {
+  border-color: rgba(194, 138, 45, 0.35);
+}
+
+.queue-step-locked {
+  opacity: 0.72;
+}
+
+.queue-step-locked strong {
+  background: linear-gradient(135deg, #8a6a2b, #a07a2f);
+}
+
+.queue-proof-form.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.profit-list-section + .profit-list-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(143, 164, 205, 0.12);
 }
 
 .queue-action-row {
@@ -9270,4 +9317,104 @@ select:disabled,
   .brand-byline {
     font-size: 0.62rem;
   }
+}
+
+/* User profile modal — match current dark workspace theme */
+#user-profile-modal .modal-card,
+#admin-user-profile-modal .modal-card {
+  background: linear-gradient(180deg, rgba(12, 20, 35, 0.98) 0%, rgba(10, 18, 32, 0.99) 100%);
+  border: 1px solid rgba(143, 164, 205, 0.14);
+  box-shadow: 0 28px 60px rgba(2, 8, 23, 0.48);
+  color: #e7eefc;
+}
+
+#user-profile-modal .user-profile-modal-head h3,
+#admin-user-profile-modal .user-profile-modal-head h3 {
+  color: #f4f8ff;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+#user-profile-modal .user-profile-modal-head .eyebrow,
+#admin-user-profile-modal .user-profile-modal-head .eyebrow {
+  color: #8ea2c3;
+}
+
+#user-profile-modal .user-profile-modal-head .mini-note,
+#admin-user-profile-modal .user-profile-modal-head .mini-note {
+  color: #dbe7ff;
+}
+
+#user-profile-modal .user-profile-modal-avatar,
+#admin-user-profile-modal .user-profile-modal-avatar {
+  background: rgba(93, 104, 255, 0.16);
+  border: 1px solid rgba(143, 164, 205, 0.14);
+}
+
+#user-profile-modal .user-profile-modal-avatar img,
+#admin-user-profile-modal .user-profile-modal-avatar img {
+  background: transparent;
+  padding: 0;
+  object-fit: cover;
+}
+
+#user-profile-modal .profile-stat-card,
+#admin-user-profile-modal .profile-stat-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(143, 164, 205, 0.12);
+  border-radius: 16px;
+}
+
+#user-profile-modal .profile-stat-card strong,
+#admin-user-profile-modal .profile-stat-card strong {
+  color: #f4f8ff;
+}
+
+#user-profile-modal .profile-stat-card span,
+#admin-user-profile-modal .profile-stat-card span {
+  color: #8ea2c3;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+#user-profile-modal .profile-status-row,
+#admin-user-profile-modal .profile-status-row {
+  border-bottom-color: rgba(143, 164, 205, 0.12);
+}
+
+#user-profile-modal .profile-status-label,
+#admin-user-profile-modal .profile-status-label {
+  color: #dbe7ff;
+  font-weight: 600;
+}
+
+#user-profile-modal .profile-status-badge.done,
+#admin-user-profile-modal .profile-status-badge.done {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+#user-profile-modal .profile-status-badge.pending,
+#admin-user-profile-modal .profile-status-badge.pending {
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+}
+
+#user-profile-modal .chat-badge-verified,
+#admin-user-profile-modal .chat-badge-verified {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+
+#user-profile-modal .chat-badge-unverified,
+#admin-user-profile-modal .chat-badge-unverified {
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+}
+
+#user-profile-modal .ghost-btn,
+#admin-user-profile-modal .ghost-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(143, 164, 205, 0.16);
+  color: #f4f8ff;
 }
