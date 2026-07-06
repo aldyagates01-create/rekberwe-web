@@ -54,6 +54,16 @@ import {
   isValidVisitorId,
 } from "./analytics-utils.js";
 import {
+  dispatchEmail,
+  sendAdminVerifiedEmail,
+  sendDisputeOpenedEmail,
+  sendFundsReleasedEmail,
+  sendFundsSecuredEmail,
+  sendRegistrationSuccessEmail,
+  sendTestEmail,
+  sendTransactionCreatedEmail,
+} from "../lib/email/sendEmail.ts";
+import {
   getWhatsappOtpStatus,
   resetWhatsappOtpPhone,
   sendWhatsappOtp,
@@ -845,6 +855,13 @@ app.post("/api/transactions", requireAuth, async (req, res) => {
 
   await broadcastEvent("transaction_updated", transaction.code, { transaction });
 
+  dispatchEmail(() => sendTransactionCreatedEmail(
+    transaction,
+    transaction.buyer,
+    transaction.seller,
+    getRequestBaseUrl(req),
+  ));
+
   res.status(201).json({ transaction });
 });
 
@@ -1090,6 +1107,15 @@ app.post("/api/transactions/:code/actions", requireAuth, async (req, res) => {
     transaction: updated,
     ...buildStatusPushExtras(updated, `Update transaksi — ${getTransactionDisplayTitle(updated)}`, updated.paymentStatus),
   });
+  if (action === "open_dispute") {
+    dispatchEmail(() => sendDisputeOpenedEmail(
+      updated,
+      updated.buyer,
+      updated.seller,
+      null,
+      getRequestBaseUrl(req),
+    ));
+  }
   res.json({ transaction: updated });
 });
 
@@ -1113,6 +1139,20 @@ app.get("/api/admin/settings", requireAdmin, async (_req, res) => {
 app.post("/api/admin/settings", requireAdmin, async (req, res) => {
   const settings = await saveAdminFeeSettings(req.body || {});
   res.json({ settings });
+});
+
+app.post("/api/admin/email/test", requireAdmin, async (req, res) => {
+  const email = String(req.body.email || "").trim();
+  if (!email || !email.includes("@")) {
+    res.status(400).json({ message: "Alamat email test wajib diisi dengan format yang valid." });
+    return;
+  }
+  try {
+    await sendTestEmail(email);
+    res.json({ message: `Test email berhasil dikirim ke ${email}.` });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Gagal mengirim test email." });
+  }
 });
 
 app.get("/terms", async (_req, res) => {
@@ -1276,6 +1316,9 @@ app.post("/api/admin/users/:id/verification", requireAdmin, async (req, res) => 
     userId: userId,
     pushTrigger: "verification_reviewed",
   });
+  if (action === "approve" && updated.verificationStatus === "verified") {
+    dispatchEmail(() => sendAdminVerifiedEmail(updated, getRequestBaseUrl(req)));
+  }
   res.json({ user: updated });
 });
 
@@ -1461,6 +1504,21 @@ app.post("/api/admin/transactions/:code/actions", requireAdmin, async (req, res)
     transaction: updated,
     ...buildStatusPushExtras(updated, `Update admin — ${getTransactionDisplayTitle(updated)}`, updated.paymentStatus),
   });
+  if (action === "funds_received") {
+    dispatchEmail(() => sendFundsSecuredEmail(
+      updated,
+      updated.buyer,
+      updated.seller,
+      getRequestBaseUrl(req),
+    ));
+  } else if (action === "complete_transaction") {
+    dispatchEmail(() => sendFundsReleasedEmail(
+      updated,
+      updated.buyer,
+      updated.seller,
+      getRequestBaseUrl(req),
+    ));
+  }
   res.json({ transaction: updated });
 });
 
@@ -1593,6 +1651,7 @@ app.get("/auth/:provider/callback", async (req, res) => {
     }
 
     const existingLinkedUser = await getUserByProviderSocial(profile.provider, profile.socialId);
+    const isNewUser = !existingLinkedUser;
     const user = existingLinkedUser || await upsertUser({
       id: `${profile.provider.toLowerCase()}-${profile.socialId}`,
       provider: profile.provider,
@@ -1610,6 +1669,9 @@ app.get("/auth/:provider/callback", async (req, res) => {
     });
 
     req.session.user = await withAdminFlag(user);
+    if (isNewUser) {
+      dispatchEmail(() => sendRegistrationSuccessEmail(user, getRequestBaseUrl(req)));
+    }
     clearAuthSession(req);
     res.redirect(buildAuthRedirectUrl(savedAuth.returnTo, providerName, "success"));
   } catch (error) {

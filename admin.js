@@ -62,6 +62,9 @@ const elements = {
   userNotificationSound: document.getElementById("user-notification-sound"),
   adminNotificationSound: document.getElementById("admin-notification-sound"),
   notificationSoundStatus: document.getElementById("notification-sound-status"),
+  adminTestEmailTo: document.getElementById("admin-test-email-to"),
+  adminSendTestEmail: document.getElementById("admin-send-test-email"),
+  adminTestEmailStatus: document.getElementById("admin-test-email-status"),
   adminTransactionRoom: document.getElementById("admin-transaction-room"),
   adminTransactionEmpty: document.getElementById("admin-transaction-empty"),
   adminRoomTitle: document.getElementById("admin-room-title"),
@@ -199,6 +202,7 @@ elements.adminLogout?.addEventListener("click", async () => {
 
 elements.adminFeeForm.addEventListener("submit", handleSaveFeeSettings);
 bindSettingsFormProtection();
+elements.adminSendTestEmail?.addEventListener("click", handleAdminSendTestEmail);
 elements.adminChatForm.addEventListener("submit", handleAdminSendMessage);
 elements.adminChatInput?.addEventListener("input", () => {
   if (!state.activeTransaction?.code) return;
@@ -1534,6 +1538,36 @@ function renderAdminChatUploadItem(item, transaction = state.activeTransaction) 
       </div>
     </div>
   `;
+}
+
+async function handleAdminSendTestEmail() {
+  const email = String(elements.adminTestEmailTo?.value || "").trim();
+  if (!email || !email.includes("@")) {
+    if (elements.adminTestEmailStatus) {
+      elements.adminTestEmailStatus.textContent = "Masukkan alamat email test yang valid.";
+    }
+    return;
+  }
+  const button = elements.adminSendTestEmail;
+  if (button) button.disabled = true;
+  if (elements.adminTestEmailStatus) {
+    elements.adminTestEmailStatus.textContent = "Mengirim test email...";
+  }
+  try {
+    const payload = await fetchJson("/api/admin/email/test", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+    if (elements.adminTestEmailStatus) {
+      elements.adminTestEmailStatus.textContent = payload.message || `Test email berhasil dikirim ke ${email}.`;
+    }
+  } catch (error) {
+    if (elements.adminTestEmailStatus) {
+      elements.adminTestEmailStatus.textContent = error.message || "Gagal mengirim test email.";
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 async function handleSaveFeeSettings(event) {

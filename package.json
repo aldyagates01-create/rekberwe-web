@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "npm install --prefix web && npm run build --prefix web",
-    "start": "node server/server.js",
-    "dev": "node --watch server/server.js",
+    "start": "node --import tsx server/server.js",
+    "dev": "node --import tsx --watch server/server.js",
     "dev:web": "npm run dev --prefix web",
     "check": "node --check app.js && node --check server/server.js"
   },
@@ -22,6 +22,8 @@
     "pg": "^8.22.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "resend": "^4.5.1",
+    "tsx": "^4.19.3",
     "web-push": "^3.6.7"
   }
 }

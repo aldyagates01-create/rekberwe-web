@@ -1,0 +1,248 @@
+import { getAdminEmailAddress, getEmailFromAddress, getResendClient, isEmailEnabled } from "./resend.ts";
+import {
+  buildAdminVerifiedEmail,
+  buildDisputeOpenedEmail,
+  buildFundsReleasedEmail,
+  buildFundsSecuredEmail,
+  buildRegistrationSuccessEmail,
+  buildTestEmail,
+  buildTransactionCreatedEmail,
+} from "./templates.ts";
+
+export type EmailUserLike = {
+  email?: string | null;
+  displayName?: string | null;
+};
+
+export type EmailTransactionLike = {
+  code: string;
+  title?: string | null;
+  price?: number | null;
+  buyer?: EmailUserLike | null;
+  seller?: EmailUserLike | null;
+};
+
+type SendEmailInput = {
+  to: string;
+  subject: string;
+  html: string;
+  event: string;
+};
+
+function logEmailResult(to: string, event: string, status: "sent" | "skipped" | "failed", detail = "") {
+  const timestamp = formatDateWib(new Date());
+  const suffix = detail ? ` detail=${detail}` : "";
+  console.log(`[email] ${timestamp} event=${event} to=${to} status=${status}${suffix}`);
+}
+
+function formatDateWib(value: string | Date): string {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+    timeZoneName: "short",
+  }).format(new Date(value));
+}
+
+function resolveRecipient(user?: EmailUserLike | null) {
+  const email = String(user?.email || "").trim();
+  if (!email || !email.includes("@")) return null;
+  return {
+    email,
+    name: String(user?.displayName || "Pengguna").trim() || "Pengguna",
+  };
+}
+
+function normalizeBaseUrl(baseUrl?: string) {
+  return String(baseUrl || process.env.APP_BASE_URL || "https://rekberwe.id").replace(/\/$/, "");
+}
+
+function buildTransactionUrl(baseUrl: string, code: string) {
+  return `${normalizeBaseUrl(baseUrl)}/?trx=${encodeURIComponent(code)}`;
+}
+
+function buildProfileUrl(baseUrl: string) {
+  return `${normalizeBaseUrl(baseUrl)}/profil`;
+}
+
+function buildHomeUrl(baseUrl: string) {
+  return normalizeBaseUrl(baseUrl);
+}
+
+function buildTransactionPayload(transaction: EmailTransactionLike) {
+  return {
+    code: String(transaction.code || "").trim(),
+    title: String(transaction.title || transaction.code || "Transaksi").trim(),
+    price: Number(transaction.price || 0),
+  };
+}
+
+async function sendUniqueEmails(
+  recipients: Array<{ email: string; name: string }>,
+  event: string,
+  buildMessage: (name: string) => { subject: string; html: string },
+) {
+  const seen = new Set<string>();
+  for (const recipient of recipients) {
+    const email = recipient.email.trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    const message = buildMessage(recipient.name);
+    await sendEmail({
+      to: recipient.email,
+      subject: message.subject,
+      html: message.html,
+      event,
+    });
+  }
+}
+
+export async function sendEmail({ to, subject, html, event }: SendEmailInput) {
+  const recipient = String(to || "").trim();
+  if (!recipient || !recipient.includes("@")) {
+    logEmailResult(recipient || "-", event, "skipped", "invalid_recipient");
+    return { ok: false, skipped: true };
+  }
+
+  if (!isEmailEnabled()) {
+    logEmailResult(recipient, event, "skipped", "resend_not_configured");
+    return { ok: false, skipped: true };
+  }
+
+  const client = getResendClient();
+  if (!client) {
+    logEmailResult(recipient, event, "skipped", "client_unavailable");
+    return { ok: false, skipped: true };
+  }
+
+  try {
+    const result = await client.emails.send({
+      from: getEmailFromAddress(),
+      to: recipient,
+      subject,
+      html,
+    });
+    logEmailResult(recipient, event, "sent");
+    return { ok: true, result };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logEmailResult(recipient, event, "failed", message);
+    throw error;
+  }
+}
+
+export async function sendRegistrationSuccessEmail(user: EmailUserLike, baseUrl?: string) {
+  const recipient = resolveRecipient(user);
+  if (!recipient) {
+    logEmailResult("-", "registration_success", "skipped", "missing_user_email");
+    return;
+  }
+  const message = buildRegistrationSuccessEmail(recipient.name, buildHomeUrl(baseUrl));
+  await sendEmail({
+    to: recipient.email,
+    subject: message.subject,
+    html: message.html,
+    event: "registration_success",
+  });
+}
+
+export async function sendTransactionCreatedEmail(
+  transaction: EmailTransactionLike,
+  buyer?: EmailUserLike | null,
+  seller?: EmailUserLike | null,
+  baseUrl?: string,
+) {
+  const payload = buildTransactionPayload(transaction);
+  const recipients = [resolveRecipient(buyer ?? transaction.buyer), resolveRecipient(seller ?? transaction.seller)]
+    .filter(Boolean) as Array<{ email: string; name: string }>;
+
+  await sendUniqueEmails(recipients, "transaction_created", (name) => (
+    buildTransactionCreatedEmail(name, payload, buildTransactionUrl(baseUrl || "", payload.code))
+  ));
+}
+
+export async function sendAdminVerifiedEmail(user: EmailUserLike, baseUrl?: string) {
+  const recipient = resolveRecipient(user);
+  if (!recipient) {
+    logEmailResult("-", "admin_verified", "skipped", "missing_user_email");
+    return;
+  }
+  const message = buildAdminVerifiedEmail(recipient.name, buildProfileUrl(baseUrl));
+  await sendEmail({
+    to: recipient.email,
+    subject: message.subject,
+    html: message.html,
+    event: "admin_verified",
+  });
+}
+
+export async function sendFundsSecuredEmail(
+  transaction: EmailTransactionLike,
+  buyer?: EmailUserLike | null,
+  seller?: EmailUserLike | null,
+  baseUrl?: string,
+) {
+  const payload = buildTransactionPayload(transaction);
+  const recipients = [resolveRecipient(buyer ?? transaction.buyer), resolveRecipient(seller ?? transaction.seller)]
+    .filter(Boolean) as Array<{ email: string; name: string }>;
+
+  await sendUniqueEmails(recipients, "funds_secured", (name) => (
+    buildFundsSecuredEmail(name, payload, buildTransactionUrl(baseUrl || "", payload.code))
+  ));
+}
+
+export async function sendFundsReleasedEmail(
+  transaction: EmailTransactionLike,
+  buyer?: EmailUserLike | null,
+  seller?: EmailUserLike | null,
+  baseUrl?: string,
+) {
+  const payload = buildTransactionPayload(transaction);
+  const recipients = [resolveRecipient(buyer ?? transaction.buyer), resolveRecipient(seller ?? transaction.seller)]
+    .filter(Boolean) as Array<{ email: string; name: string }>;
+
+  await sendUniqueEmails(recipients, "funds_released", (name) => (
+    buildFundsReleasedEmail(name, payload, buildTransactionUrl(baseUrl || "", payload.code))
+  ));
+}
+
+export async function sendDisputeOpenedEmail(
+  transaction: EmailTransactionLike,
+  buyer?: EmailUserLike | null,
+  seller?: EmailUserLike | null,
+  adminEmail?: string | null,
+  baseUrl?: string,
+) {
+  const payload = buildTransactionPayload(transaction);
+  const recipients = [
+    resolveRecipient(buyer ?? transaction.buyer),
+    resolveRecipient(seller ?? transaction.seller),
+    { email: String(adminEmail || getAdminEmailAddress()).trim(), name: "Admin RekberWe.id" },
+  ].filter((item) => item && item.email.includes("@")) as Array<{ email: string; name: string }>;
+
+  await sendUniqueEmails(recipients, "dispute_opened", (name) => (
+    buildDisputeOpenedEmail(name, payload, buildTransactionUrl(baseUrl || "", payload.code))
+  ));
+}
+
+export async function sendTestEmail(to: string) {
+  const message = buildTestEmail();
+  await sendEmail({
+    to,
+    subject: message.subject,
+    html: message.html,
+    event: "test_email",
+  });
+}
+
+export function dispatchEmail(task: () => Promise<void>) {
+  Promise.resolve()
+    .then(task)
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[email] dispatch failed: ${message}`);
+    });
+}
