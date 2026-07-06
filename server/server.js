@@ -750,7 +750,9 @@ app.get("/api/me/whatsapp/status", requireAuth, async (req, res) => {
 
 app.post("/api/me/whatsapp/send-otp", requireAuth, async (req, res) => {
   try {
-    const payload = await sendWhatsappOtp(req.session.user.id, req.body.phoneNumber);
+    const payload = await sendWhatsappOtp(req.session.user.id, req.body.phoneNumber, {
+      forceResend: Boolean(req.body.forceResend),
+    });
     req.session.user = await withAdminFlag(payload.user);
     res.json(payload);
   } catch (error) {

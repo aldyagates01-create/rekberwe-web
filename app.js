@@ -593,7 +593,7 @@ async function handleWhatsappOtpResend() {
   try {
     const payload = await fetchWhatsappJson("/api/me/whatsapp/send-otp", {
       method: "POST",
-      body: JSON.stringify({ phoneNumber: phone }),
+      body: JSON.stringify({ phoneNumber: phone, forceResend: true }),
     });
     applyWhatsappOtpPayload(payload);
     if (elements.whatsappOtpInput) elements.whatsappOtpInput.value = "";

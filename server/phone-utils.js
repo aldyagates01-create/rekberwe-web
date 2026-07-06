@@ -23,8 +23,8 @@ export function formatPhoneDisplay(normalized) {
   return `+62${digits.replace(/^0/, "")}`;
 }
 
-export function phoneToFonnteTarget(normalized) {
-  return String(normalized || "").replace(/\D/g, "");
+export function phoneToFonnteTarget(normalizedPhone) {
+  return phoneToLocalWhatsapp(normalizedPhone);
 }
 
 export function phoneToLocalWhatsapp(normalizedPhone) {
@@ -38,6 +38,6 @@ export function generateOtpCode() {
 }
 
 export function hashOtpCode(otp, userId) {
-  const pepper = String(process.env.SESSION_SECRET || "rekberwe-otp-pepper");
+  const pepper = String(process.env.OTP_SECRET || process.env.SESSION_SECRET || "rekberwe-otp-pepper");
   return crypto.createHmac("sha256", pepper).update(`${userId}:${otp}`).digest("hex");
 }

@@ -65,19 +65,20 @@ function buildOtpState(user, record) {
     : 0;
   const maxResendReached = Number(record.sendCount || 0) >= MAX_RESEND_COUNT;
   const isLocked = lockRemainingSeconds > 0;
+  const active = isOtpRecordActive(record);
 
   return {
     ...base,
     phoneNumber: record.phoneNumber || phoneNumber,
     phoneDisplay: formatPhoneDisplay(record.phoneNumber || phoneNumber),
-    pending: true,
+    pending: active,
     sendCount: Number(record.sendCount || 0),
     attemptCount: Number(record.attemptCount || 0),
     resendCooldownSeconds,
     lockedUntil: record.lockedUntil || "",
     lockRemainingSeconds,
     canResend: !isLocked && !maxResendReached && resendCooldownSeconds <= 0,
-    canVerify: !isLocked && Number(record.attemptCount || 0) < MAX_VERIFY_ATTEMPTS,
+    canVerify: active && !isLocked && Number(record.attemptCount || 0) < MAX_VERIFY_ATTEMPTS,
     resendDisabled: isLocked || maxResendReached || resendCooldownSeconds > 0,
     maxResendReached: maxResendReached && isLocked,
   };
@@ -95,7 +96,14 @@ export async function getWhatsappOtpStatus(userId) {
   };
 }
 
-export async function sendWhatsappOtp(userId, rawPhone) {
+function isOtpRecordActive(record) {
+  if (!record) return false;
+  if (record.lockedUntil && new Date(record.lockedUntil).getTime() > nowMs()) return false;
+  return new Date(record.expiredAt).getTime() > nowMs();
+}
+
+export async function sendWhatsappOtp(userId, rawPhone, options = {}) {
+  const forceResend = Boolean(options.forceResend);
   const user = await getUserById(userId);
   if (!user) throw new Error("Pengguna tidak ditemukan.");
   if (user.phoneVerified) {
@@ -130,10 +138,18 @@ export async function sendWhatsappOtp(userId, rawPhone) {
     throw error;
   }
 
+  if (!forceResend && existing && !phoneChanged && isOtpRecordActive(existing)) {
+    return {
+      user,
+      state: buildOtpState(user, existing),
+      message: "Kode OTP masih aktif. Gunakan kode dari pesan WhatsApp terbaru.",
+    };
+  }
+
   if (existing && !phoneChanged) {
     const lastSentMs = new Date(existing.lastSentAt).getTime();
     const cooldownLeft = RESEND_COOLDOWN_MS - (nowMs() - lastSentMs);
-    if (cooldownLeft > 0) {
+    if (forceResend && cooldownLeft > 0) {
       const error = new Error(`Tunggu ${Math.ceil(cooldownLeft / 1000)} detik sebelum kirim ulang OTP.`);
       error.code = "OTP_COOLDOWN";
       error.state = buildOtpState(user, existing);
@@ -148,6 +164,13 @@ export async function sendWhatsappOtp(userId, rawPhone) {
 
   await updateUserPhoneNumberDraft(userId, normalized);
 
+  try {
+    await sendFonnteWhatsApp(normalized, buildOtpWhatsAppMessage(otp));
+  } catch (error) {
+    await logOtpVerificationAction(userId, normalized, "send_failed", String(error.message || "send_failed").slice(0, 500));
+    throw error;
+  }
+
   const record = await upsertOtpVerification({
     userId,
     phoneNumber: normalized,
@@ -157,8 +180,6 @@ export async function sendWhatsappOtp(userId, rawPhone) {
     lastSentAt,
     lockedUntil: phoneChanged ? "" : lockedUntil,
   });
-
-  await sendFonnteWhatsApp(normalized, buildOtpWhatsAppMessage(otp));
 
   await logOtpVerificationAction(userId, normalized, "send", `send_count=${sendCount}`);
 
@@ -207,7 +228,7 @@ export async function verifyWhatsappOtp(userId, rawOtp) {
     const updated = await incrementOtpVerificationAttempt(userId);
     await logOtpVerificationAction(userId, record.phoneNumber, "verify_failed", `attempt=${updated?.attemptCount || 0}`);
     const remaining = Math.max(0, MAX_VERIFY_ATTEMPTS - Number(updated?.attemptCount || 0));
-    throw new Error(`OTP salah. Sisa percobaan: ${remaining}.`);
+    throw new Error(`OTP salah. Gunakan kode dari pesan WhatsApp paling baru. Sisa percobaan: ${remaining}.`);
   }
 
   const verifiedUser = await markUserPhoneVerified(userId, record.phoneNumber);
