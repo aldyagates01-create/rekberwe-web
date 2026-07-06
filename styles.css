@@ -8483,3 +8483,30 @@ body.is-member-view .topbar {
   background: #0f1a2c;
   color: #edf3ff;
 }
+
+/* Workspace profile: verification form in right panel (PC) */
+@media (min-width: 769px) {
+  .profile-layout-workspace {
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.8fr);
+    align-items: start;
+  }
+
+  .profile-verification-aside {
+    display: block;
+    position: sticky;
+    top: 92px;
+    padding: 18px;
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(11, 17, 30, 0.99));
+    border: 1px solid rgba(120, 137, 173, 0.16);
+    box-shadow: 0 20px 50px rgba(2, 8, 23, 0.28);
+  }
+
+  .profile-verification-aside > .mini-label {
+    margin-bottom: 8px;
+  }
+
+  .profile-verification-panel {
+    margin-top: 0;
+  }
+}

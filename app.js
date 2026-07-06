@@ -174,9 +174,7 @@ const elements = {
   workspaceNotificationsView: document.getElementById("workspace-notifications-view"),
   workspaceMobileTransactionsView: document.getElementById("workspace-mobile-transactions-view"),
   profileCardWorkspace: document.getElementById("profile-card-workspace"),
-  profileLookupWorkspace: document.getElementById("profile-lookup-workspace"),
-  lookupProfileWorkspace: document.getElementById("lookup-profile-workspace"),
-  lookupResultWorkspace: document.getElementById("lookup-result-workspace"),
+  profileVerificationAsideWorkspace: document.getElementById("profile-verification-aside-workspace"),
   workspaceCreateTransactionButton: document.getElementById("workspace-create-transaction-button"),
   workspaceOpenTransactionsButton: document.getElementById("workspace-open-transactions-button"),
   activeRekberSection: document.getElementById("active-rekber-section"),
@@ -1723,7 +1721,7 @@ function renderMobileDashboard() {
     <div class="mobile-dashboard-summary-grid">
       <article><span>Total transaksi</span><strong>${totalTransactions}</strong></article>
       <article><span>Transaksi selesai</span><strong>${completedTransactions.length}</strong></article>
-      <article><span>Dana diproses</span><strong>${formatCurrency(activeFunds)}</strong></article>
+      <article><span>Dana diproses</span><strong>${formatCurrencyHtml(activeFunds)}</strong></article>
     </div>
   `;
 
@@ -1828,12 +1826,16 @@ function renderProfile() {
     if (elements.profileCardWorkspace) {
       elements.profileCardWorkspace.innerHTML = emptyProfileMarkup;
     }
+    if (elements.profileVerificationAsideWorkspace) {
+      elements.profileVerificationAsideWorkspace.innerHTML = "";
+    }
     return;
   }
 
   const linkedProviderRows = buildLinkedProviderRows();
   const isVerifiedLocked = state.currentUser.verificationStatus === "verified";
   const isVerificationLocked = state.currentUser.verificationStatus === "pending" || state.currentUser.verificationStatus === "verified";
+  const verificationMarkup = buildProfileVerificationMarkup(isVerificationLocked);
   const profileMarkup = `
     <p class="mini-label">Profil pengguna</p>
     <h4>${state.currentUser.displayName} ${state.currentUser.verificationStatus === "verified" ? '<span class="verified-inline-badge">&#10003;</span>' : ""}</h4>
@@ -1875,7 +1877,51 @@ function renderProfile() {
       </form>
       ${isVerificationLocked ? "<p class=\"mini-note\">Data identitas sedang dikunci selama proses review / setelah diverifikasi. Hubungi admin melalui live chat bila perlu revisi.</p>" : ""}
     </div>
-    <div class="profile-subsection">
+      </div>
+      <aside class="profile-side-stack">
+    <div class="profile-subsection profile-side-card">
+      <h5>Hubungkan social media lain</h5>
+      <p class="mini-note">Hubungkan semua social media yang tersedia untuk meyakinkan pembeli bahwa Anda penjual terpercaya.</p>
+      <div class="provider-list compact-provider-list">
+        ${buildLinkProviderButtons()}
+      </div>
+      <div class="linked-provider-list">${linkedProviderRows}</div>
+    </div>
+      </aside>
+    </div>
+  `;
+  const legacyProfileMarkup = `
+    <p class="mini-label">Profil pengguna</p>
+    <h4>${state.currentUser.displayName} ${state.currentUser.verificationStatus === "verified" ? '<span class="verified-inline-badge">&#10003;</span>' : ""}</h4>
+    <div class="profile-list">
+      <div class="profile-row"><span>Provider utama</span><strong>${state.currentUser.provider}</strong></div>
+      <div class="profile-row"><span>Email</span><strong>${state.currentUser.email || "-"}</strong></div>
+      <div class="profile-row"><span>WhatsApp</span><strong>${state.currentUser.whatsapp || "-"}</strong></div>
+      <div class="profile-row"><span>Lokasi terverifikasi</span><strong>${state.currentUser.locationVerified ? "Ya" : "Tidak"}</strong></div>
+      <div class="profile-row"><span>Status verifikasi</span><strong>${verificationStatusLabel(state.currentUser.verificationStatus, state.currentUser.verified)}</strong></div>
+    </div>
+    <p class="mini-note">Gunakan menu <strong>Akun Saya</strong> di sidebar kiri untuk mengelola profil lengkap, verifikasi, dan social media.</p>
+  `;
+  if (elements.profileCard) {
+    elements.profileCard.innerHTML = legacyProfileMarkup;
+  }
+  if (elements.profileCardWorkspace) {
+    elements.profileCardWorkspace.innerHTML = profileMarkup;
+  }
+  if (elements.profileVerificationAsideWorkspace) {
+    elements.profileVerificationAsideWorkspace.innerHTML = verificationMarkup;
+  }
+
+  bindLinkProviderButtons();
+  bindOpenTransactionButtons();
+  bindProfileForms();
+  renderActivityTabs();
+}
+
+function buildProfileVerificationMarkup(isVerificationLocked) {
+  if (!state.currentUser) return "";
+  return `
+    <div class="profile-subsection profile-verification-panel">
       <h5>Verifikasi identitas penjual</h5>
       <form id="profile-verification-form" class="profile-form">
         <label>
@@ -1914,42 +1960,7 @@ function renderProfile() {
       </form>
       <p class="mini-note">${verificationHelpText(state.currentUser.verificationStatus, state.currentUser.verified)}</p>
     </div>
-      </div>
-      <aside class="profile-side-stack">
-    <div class="profile-subsection profile-side-card">
-      <h5>Hubungkan social media lain</h5>
-      <p class="mini-note">Hubungkan semua social media yang tersedia untuk meyakinkan pembeli bahwa Anda penjual terpercaya.</p>
-      <div class="provider-list compact-provider-list">
-        ${buildLinkProviderButtons()}
-      </div>
-      <div class="linked-provider-list">${linkedProviderRows}</div>
-    </div>
-      </aside>
-    </div>
   `;
-  const legacyProfileMarkup = `
-    <p class="mini-label">Profil pengguna</p>
-    <h4>${state.currentUser.displayName} ${state.currentUser.verificationStatus === "verified" ? '<span class="verified-inline-badge">&#10003;</span>' : ""}</h4>
-    <div class="profile-list">
-      <div class="profile-row"><span>Provider utama</span><strong>${state.currentUser.provider}</strong></div>
-      <div class="profile-row"><span>Email</span><strong>${state.currentUser.email || "-"}</strong></div>
-      <div class="profile-row"><span>WhatsApp</span><strong>${state.currentUser.whatsapp || "-"}</strong></div>
-      <div class="profile-row"><span>Lokasi terverifikasi</span><strong>${state.currentUser.locationVerified ? "Ya" : "Tidak"}</strong></div>
-      <div class="profile-row"><span>Status verifikasi</span><strong>${verificationStatusLabel(state.currentUser.verificationStatus, state.currentUser.verified)}</strong></div>
-    </div>
-    <p class="mini-note">Gunakan menu <strong>Akun Saya</strong> di sidebar kiri untuk mengelola profil lengkap, verifikasi, dan social media.</p>
-  `;
-  if (elements.profileCard) {
-    elements.profileCard.innerHTML = legacyProfileMarkup;
-  }
-  if (elements.profileCardWorkspace) {
-    elements.profileCardWorkspace.innerHTML = profileMarkup;
-  }
-
-  bindLinkProviderButtons();
-  bindOpenTransactionButtons();
-  bindProfileForms();
-  renderActivityTabs();
 }
 
 function buildLinkedProviderRows() {
