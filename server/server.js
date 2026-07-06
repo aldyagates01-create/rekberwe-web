@@ -886,7 +886,7 @@ app.post("/api/transactions/:code/actions", requireAuth, async (req, res) => {
 
   await broadcastEvent("transaction_updated", code, {
     transaction: updated,
-    ...buildStatusPushExtras(updated, `Update transaksi — ${code}`, updated.paymentStatus),
+    ...buildStatusPushExtras(updated, `Update transaksi — ${getTransactionDisplayTitle(updated)}`, updated.paymentStatus),
   });
   res.json({ transaction: updated });
 });
@@ -1239,7 +1239,7 @@ app.post("/api/admin/transactions/:code/actions", requireAdmin, async (req, res)
 
   await broadcastEvent("transaction_updated", code, {
     transaction: updated,
-    ...buildStatusPushExtras(updated, `Update admin — ${code}`, updated.paymentStatus),
+    ...buildStatusPushExtras(updated, `Update admin — ${getTransactionDisplayTitle(updated)}`, updated.paymentStatus),
   });
   res.json({ transaction: updated });
 });
@@ -1907,14 +1907,21 @@ function buildSupportPushExtras(thread) {
   };
 }
 
+function getTransactionDisplayTitle(transaction) {
+  const title = String(transaction?.title || "").trim();
+  const code = String(transaction?.code || "").trim();
+  return title || code || "Transaksi";
+}
+
 function buildStatusPushExtras(transaction, title, body) {
   const messages = transaction?.messages || [];
   const lastMessage = messages[messages.length - 1];
+  const displayTitle = getTransactionDisplayTitle(transaction);
   return {
     pushTrigger: "status_change",
     pushMeta: {
-      title,
-      body: body || lastMessage?.text || `Status transaksi ${transaction?.code || ""} diperbarui.`,
+      title: title || `Update transaksi — ${displayTitle}`,
+      body: body || lastMessage?.text || `Status transaksi ${displayTitle} diperbarui.`,
     },
   };
 }

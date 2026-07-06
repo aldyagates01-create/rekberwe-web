@@ -1091,12 +1091,12 @@ function renderActiveTransaction() {
 function renderAdminParticipantAvatars(transaction) {
   if (elements.adminRoomBuyerAvatar) {
     elements.adminRoomBuyerAvatar.innerHTML = transaction.buyer
-      ? renderParticipantAvatarMini(transaction.buyer.displayName, transaction.buyer.avatarUrl)
+      ? renderParticipantAvatarMini(transaction.buyer.displayName, transaction.buyer.avatar)
       : "B";
   }
   if (elements.adminRoomSellerAvatar) {
     elements.adminRoomSellerAvatar.innerHTML = transaction.seller
-      ? renderParticipantAvatarMini(transaction.seller.displayName, transaction.seller.avatarUrl)
+      ? renderParticipantAvatarMini(transaction.seller.displayName, transaction.seller.avatar)
       : "S";
   }
 }

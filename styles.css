@@ -4568,6 +4568,12 @@ a.primary-btn.submit-btn {
   min-height: calc(100vh - 210px);
 }
 
+@media (min-width: 769px) {
+  .admin-page.admin-transactions-page .workspace-room.telegram-room-shell {
+    min-height: 0;
+  }
+}
+
 @media (max-width: 1100px) {
   .home-dashboard-shell,
   .home-content-grid {
@@ -9040,6 +9046,76 @@ body.is-member-view .topbar {
   .support-chat-main .chat-room-alert,
   .support-chat-main #admin-support-form {
     flex-shrink: 0 !important;
+  }
+}
+
+button:not(:disabled),
+input[type="button"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+a[href],
+label[for],
+select:not(:disabled),
+summary,
+[role="button"]:not([aria-disabled="true"]),
+.provider-btn,
+.workspace-menu-btn,
+.workspace-logout-btn,
+.sidebar-create-btn,
+.sidebar-support-btn,
+.admin-nav-btn,
+.admin-link,
+.transaction-title-btn,
+.transaction-list-item,
+.queue-list-item,
+.notification-card,
+.chat-file-picker,
+.chat-avatar-btn,
+.icon-nav-btn,
+.profile-nav-btn,
+.quick-provider-btn,
+.admin-open-transaction,
+.panel-resizer {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+@media (min-width: 769px) {
+  .admin-page.admin-transactions-page .workspace-room.telegram-room-shell {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding-top: 0;
+  }
+
+  .admin-page.admin-transactions-page .room-shell-head {
+    flex-shrink: 0;
+    margin-bottom: 0;
+    padding-bottom: 8px;
+  }
+
+  .admin-page.admin-transactions-page #admin-transaction-room.room {
+    flex: 0 1 auto;
+    min-height: 0;
+    padding-top: 0;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+  }
+
+  .admin-page.admin-transactions-page #admin-transaction-empty.room-empty-state:not(.hidden) {
+    flex: 1;
+    min-height: 280px;
+  }
+
+  .admin-page.admin-transactions-page #admin-transaction-empty.room-empty-state.hidden {
+    display: none !important;
   }
 }
 

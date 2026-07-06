@@ -2719,12 +2719,12 @@ function renderRoom(transaction) {
 function renderRoomParticipantAvatars(transaction) {
   if (elements.roomBuyerAvatar) {
     elements.roomBuyerAvatar.innerHTML = transaction.buyer
-      ? renderParticipantAvatarMini(transaction.buyer.displayName, transaction.buyer.avatarUrl)
+      ? renderParticipantAvatarMini(transaction.buyer.displayName, transaction.buyer.avatar)
       : "B";
   }
   if (elements.roomSellerAvatar) {
     elements.roomSellerAvatar.innerHTML = transaction.seller
-      ? renderParticipantAvatarMini(transaction.seller.displayName, transaction.seller.avatarUrl)
+      ? renderParticipantAvatarMini(transaction.seller.displayName, transaction.seller.avatar)
       : "S";
   }
 }

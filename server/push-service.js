@@ -61,6 +61,12 @@ function truncateText(value, max = 120) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+function getTransactionDisplayTitle(transaction) {
+  const title = String(transaction?.title || "").trim();
+  const code = String(transaction?.code || "").trim();
+  return title || code || "Transaksi";
+}
+
 async function sendPushToSubscription(subscription, payload) {
   if (!pushReady || !subscription?.endpoint) return;
   try {
@@ -115,8 +121,9 @@ async function handleTransactionPush(payload, adminUserIds, base) {
   const transaction = payload.transaction;
   const trigger = payload.pushTrigger;
   const code = transaction.code;
+  const displayTitle = getTransactionDisplayTitle(transaction);
   const recipients = new Set();
-  let title = `RekberWE.id — ${code}`;
+  let title = `RekberWE.id — ${displayTitle}`;
   let body = "Ada pembaruan transaksi.";
   let url = `${base}/?trx=${encodeURIComponent(code)}`;
   let tag = `trx-${code}`;
@@ -129,7 +136,7 @@ async function handleTransactionPush(payload, adminUserIds, base) {
     const senderTitle = message.senderTitle || message.sender || "Pengguna";
     const isAdmin = !senderUserId || senderTitle === "Admin";
     body = truncateText(`${senderTitle}: ${message.text || message.message || ""}`) || `${senderTitle} mengirim pesan.`;
-    title = `Pesan baru — ${code}`;
+    title = `Pesan baru — ${displayTitle}`;
     if (isAdmin) {
       if (transaction.buyer?.id) recipients.add(transaction.buyer.id);
       if (transaction.seller?.id) recipients.add(transaction.seller.id);
@@ -149,7 +156,7 @@ async function handleTransactionPush(payload, adminUserIds, base) {
     const senderTitle = upload.senderTitle || upload.sender || upload.senderName || "Pengguna";
     const isAdmin = !senderUserId || senderTitle === "Admin";
     body = `${senderTitle} mengirim lampiran.`;
-    title = `Lampiran baru — ${code}`;
+    title = `Lampiran baru — ${displayTitle}`;
     if (isAdmin) {
       if (transaction.buyer?.id) recipients.add(transaction.buyer.id);
       if (transaction.seller?.id) recipients.add(transaction.seller.id);
@@ -159,8 +166,8 @@ async function handleTransactionPush(payload, adminUserIds, base) {
       notifyAdmins = true;
     }
   } else if (trigger === "status_change") {
-    body = payload.pushMeta?.body || `Status transaksi ${code} diperbarui.`;
-    title = payload.pushMeta?.title || `Update transaksi — ${code}`;
+    body = payload.pushMeta?.body || `Status transaksi ${displayTitle} diperbarui.`;
+    title = payload.pushMeta?.title || `Update transaksi — ${displayTitle}`;
     if (transaction.buyer?.id) recipients.add(transaction.buyer.id);
     if (transaction.seller?.id) recipients.add(transaction.seller.id);
   } else {
