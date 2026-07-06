@@ -24,6 +24,7 @@ let adminPresenceTimer = null;
 let adminPresenceTickTimer = null;
 let adminTypingStopTimer = null;
 let adminRoomPresenceTickTimer = null;
+let settingsFormDirty = false;
 
 const elements = {
   adminUserCard: document.getElementById("admin-user-card"),
@@ -151,6 +152,7 @@ elements.adminLogout?.addEventListener("click", async () => {
 });
 
 elements.adminFeeForm.addEventListener("submit", handleSaveFeeSettings);
+bindSettingsFormProtection();
 elements.adminChatForm.addEventListener("submit", handleAdminSendMessage);
 elements.adminChatInput?.addEventListener("input", () => {
   if (!state.activeTransaction?.code) return;
@@ -245,7 +247,11 @@ async function refreshDashboardData() {
   renderSummary(state.users, state.transactions);
   renderUsers(state.users);
   renderVerificationQueue(state.users);
-  renderFeeSettings(state.settings);
+  if (isSettingsFormProtected()) {
+    renderFeeSettingsMeta(state.settings);
+  } else {
+    renderFeeSettings(state.settings);
+  }
   if (state.currentPage === "transactions-transfer-queue") {
     renderTransferQueuePage();
   } else {
@@ -547,6 +553,10 @@ function openAdminPage(page) {
       renderActiveTransaction();
     }
     updateAdminNotificationBadges();
+  }
+
+  if (page === "settings" && !settingsFormDirty) {
+    renderFeeSettings(state.settings);
   }
 }
 
@@ -921,6 +931,35 @@ function renderTransactionListItem(transaction) {
   `;
 }
 
+function bindSettingsFormProtection() {
+  if (!elements.adminFeeForm) return;
+  elements.adminFeeForm.addEventListener("input", () => {
+    settingsFormDirty = true;
+  });
+  elements.adminFeeForm.addEventListener("change", () => {
+    settingsFormDirty = true;
+  });
+}
+
+function isSettingsFormProtected() {
+  if (settingsFormDirty) return true;
+  if (state.currentPage === "settings") return true;
+  const active = document.activeElement;
+  return Boolean(active && elements.adminFeeForm?.contains(active));
+}
+
+function renderFeeSettingsMeta(settings) {
+  if (elements.notificationSoundStatus) {
+    const userSound = settings?.notificationSounds?.user;
+    const adminSound = settings?.notificationSounds?.admin;
+    elements.notificationSoundStatus.innerHTML = `
+      ${userSound?.url ? `<span>Suara notif pengguna: <a href="${escapeAttribute(userSound.url)}" target="_blank" rel="noreferrer">${escapeHtml(userSound.name || "Preview audio")}</a></span>` : "<span>Suara notif pengguna: default bawaan</span>"}
+      ${adminSound?.url ? `<span>Suara notif admin: <a href="${escapeAttribute(adminSound.url)}" target="_blank" rel="noreferrer">${escapeHtml(adminSound.name || "Preview audio")}</a></span>` : "<span>Suara notif admin: default bawaan</span>"}
+    `;
+  }
+  renderStorageInfo(settings?.storageInfo);
+}
+
 function renderFeeSettings(settings) {
   const tiers = settings?.accountFeeTiers || [];
   elements.adminPayoutAccount.value = settings?.adminPayoutAccount || "";
@@ -939,15 +978,7 @@ function renderFeeSettings(settings) {
     document.getElementById(`tier-${index + 1}-max`).value = tier.maxAmount ?? "";
     document.getElementById(`tier-${index + 1}-fee`).value = tier.fee ?? "";
   }
-  if (elements.notificationSoundStatus) {
-    const userSound = settings?.notificationSounds?.user;
-    const adminSound = settings?.notificationSounds?.admin;
-    elements.notificationSoundStatus.innerHTML = `
-      ${userSound?.url ? `<span>Suara notif pengguna: <a href="${escapeAttribute(userSound.url)}" target="_blank" rel="noreferrer">${escapeHtml(userSound.name || "Preview audio")}</a></span>` : "<span>Suara notif pengguna: default bawaan</span>"}
-      ${adminSound?.url ? `<span>Suara notif admin: <a href="${escapeAttribute(adminSound.url)}" target="_blank" rel="noreferrer">${escapeHtml(adminSound.name || "Preview audio")}</a></span>` : "<span>Suara notif admin: default bawaan</span>"}
-    `;
-  }
-  renderStorageInfo(settings?.storageInfo);
+  renderFeeSettingsMeta(settings);
 }
 
 function renderStorageInfo(storageInfo) {
@@ -1240,8 +1271,9 @@ async function handleSaveFeeSettings(event) {
     if (elements.userNotificationSound) elements.userNotificationSound.value = "";
     if (elements.adminNotificationSound) elements.adminNotificationSound.value = "";
   }
+  settingsFormDirty = false;
   renderFeeSettings(state.settings);
-  showStatus("Pengaturan fee berhasil disimpan.");
+  showStatus("Pengaturan berhasil disimpan.");
 }
 
 async function handleAdminSendMessage(event) {
