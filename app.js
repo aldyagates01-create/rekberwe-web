@@ -55,6 +55,12 @@ const whatsappOtpRuntime = {
   lockEndsAt: 0,
 };
 
+const profileVerificationDraft = {
+  legalName: "",
+  ktp: "",
+  whatsapp: "",
+};
+
 const elements = {
   homeNavButton: document.getElementById("home-nav-button"),
   openLogin: document.getElementById("open-login"),
@@ -432,8 +438,56 @@ function isIdentityVerificationLocked() {
 function syncProfileWhatsappInput() {
   const input = document.getElementById("profile-whatsapp-input");
   if (!input || input === document.activeElement) return;
+  if (profileVerificationDraft.whatsapp) return;
   const nextValue = state.currentUser?.whatsapp || state.currentUser?.phoneNumber || "";
   if (nextValue) input.value = nextValue;
+}
+
+function isProfileVerificationFormFocused() {
+  const active = document.activeElement;
+  return Boolean(active?.closest("#profile-verification-form"));
+}
+
+function captureProfileVerificationDraft() {
+  const form = document.getElementById("profile-verification-form");
+  if (!form) return;
+  const legalName = form.querySelector('[name="legalName"]');
+  const ktp = form.querySelector('[name="ktp"]');
+  const whatsapp = form.querySelector('[name="whatsapp"], #profile-whatsapp-input');
+  if (legalName && !legalName.disabled) profileVerificationDraft.legalName = String(legalName.value || "").trim();
+  if (ktp && !ktp.disabled) profileVerificationDraft.ktp = String(ktp.value || "").trim();
+  if (whatsapp && !whatsapp.disabled) profileVerificationDraft.whatsapp = String(whatsapp.value || "").trim();
+}
+
+function restoreProfileVerificationDraft() {
+  const form = document.getElementById("profile-verification-form");
+  if (!form) return;
+  const legalName = form.querySelector('[name="legalName"]');
+  const ktp = form.querySelector('[name="ktp"]');
+  const whatsapp = form.querySelector('[name="whatsapp"], #profile-whatsapp-input');
+  if (legalName && !legalName.disabled && profileVerificationDraft.legalName) {
+    legalName.value = profileVerificationDraft.legalName;
+  }
+  if (ktp && !ktp.disabled && profileVerificationDraft.ktp) {
+    ktp.value = profileVerificationDraft.ktp;
+  }
+  if (whatsapp && !whatsapp.disabled && profileVerificationDraft.whatsapp) {
+    whatsapp.value = profileVerificationDraft.whatsapp;
+  }
+}
+
+function bindProfileVerificationDraftTracking() {
+  const form = document.getElementById("profile-verification-form");
+  if (!form || form.dataset.draftBound === "true") return;
+  form.dataset.draftBound = "true";
+  form.addEventListener("input", captureProfileVerificationDraft);
+  form.addEventListener("change", captureProfileVerificationDraft);
+}
+
+function clearProfileVerificationDraft() {
+  profileVerificationDraft.legalName = "";
+  profileVerificationDraft.ktp = "";
+  profileVerificationDraft.whatsapp = "";
 }
 
 function applyWhatsappOtpPayload(payload) {
@@ -1226,7 +1280,7 @@ function bindForms() {
     openWorkspaceSection("transactions");
   });
   elements.mobileQuickGuide?.addEventListener("click", () => {
-    window.location.href = "/security-guide";
+    window.open("/jaminan-rekber", "_blank", "noopener,noreferrer");
   });
   elements.mobileQuickSecurity?.addEventListener("click", () => {
     openMobileDashboardDetail("workspace-terms-list");
@@ -2443,8 +2497,13 @@ function renderProfile() {
   if (elements.profileCardWorkspace) {
     elements.profileCardWorkspace.innerHTML = profileMarkup;
   }
+  captureProfileVerificationDraft();
   if (elements.profileVerificationAsideWorkspace) {
-    elements.profileVerificationAsideWorkspace.innerHTML = verificationMarkup;
+    if (!isProfileVerificationFormFocused()) {
+      elements.profileVerificationAsideWorkspace.innerHTML = verificationMarkup;
+      restoreProfileVerificationDraft();
+      bindProfileVerificationDraftTracking();
+    }
   }
 
   bindLinkProviderButtons();
@@ -2457,7 +2516,11 @@ function buildProfileVerificationMarkup(isVerificationLocked) {
   if (!state.currentUser) return "";
   const identityLocked = isVerificationLocked || isIdentityVerificationLocked();
   const phoneLocked = isWhatsappOtpLocked() || identityLocked;
-  const whatsappValue = escapeHtml(state.currentUser.whatsapp || state.currentUser.phoneNumber || "");
+  const whatsappValue = escapeHtml(
+    profileVerificationDraft.whatsapp || state.currentUser.whatsapp || state.currentUser.phoneNumber || "",
+  );
+  const legalNameValue = escapeHtml(profileVerificationDraft.legalName || state.currentUser.legalName || "");
+  const ktpValue = escapeHtml(profileVerificationDraft.ktp || state.currentUser.ktp || "");
   const whatsappField = phoneLocked
     ? `
         <div class="whatsapp-field-row whatsapp-field-row-verified">
@@ -2477,11 +2540,11 @@ function buildProfileVerificationMarkup(isVerificationLocked) {
       <form id="profile-verification-form" class="profile-form">
         <label>
           Nama sesuai KTP
-          <input type="text" name="legalName" value="${escapeHtml(state.currentUser.legalName || "")}" placeholder="Nama lengkap sesuai KTP" ${identityLocked ? "disabled" : ""} />
+          <input type="text" name="legalName" value="${legalNameValue}" placeholder="Nama lengkap sesuai KTP" ${identityLocked ? "disabled" : ""} />
         </label>
         <label>
           Nomor KTP
-          <input type="text" name="ktp" value="${escapeHtml(state.currentUser.ktp || "")}" placeholder="Nomor KTP aktif" ${identityLocked ? "disabled" : ""} />
+          <input type="text" name="ktp" value="${ktpValue}" placeholder="Nomor KTP aktif" ${identityLocked ? "disabled" : ""} />
         </label>
         <label>
           No. WhatsApp aktif
@@ -2814,6 +2877,7 @@ async function handleProfileVerificationSave(event) {
     });
     setVerificationUploadProgressState("Upload verifikasi selesai.", 100, "done", uploadDetail || "File verifikasi berhasil diunggah.");
     state.currentUser = payload.user;
+    clearProfileVerificationDraft();
     await refreshDashboard();
     renderAll();
     window.setTimeout(() => hideVerificationUploadProgress(), 1800);

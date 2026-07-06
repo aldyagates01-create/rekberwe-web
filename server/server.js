@@ -1125,6 +1125,10 @@ app.get("/security-guide", async (_req, res) => {
   res.type("html").send(renderSimpleContentPage("Panduan Pengamanan Akun", "Panduan pengamanan akun / rekber gold", String(settings.accountSecurityGuide || "").trim()));
 });
 
+app.get("/jaminan-rekber", (_req, res) => {
+  res.type("html").send(renderRekberWarrantyPage());
+});
+
 app.post("/api/admin/settings/notification-sounds", requireAdmin, audioUpload.fields([
   { name: "userNotificationSound", maxCount: 1 },
   { name: "adminNotificationSound", maxCount: 1 },
@@ -2344,6 +2348,154 @@ function isAnalyticsRateLimited(visitorId) {
   }
   entry.count += 1;
   return entry.count > 120;
+}
+
+function renderRekberWarrantyPage() {
+  const items = [
+    "Penjual wajib verifikasi identitas di profil dengan foto KTP dan video selfie memegang KTP. NIK disarankan di-blur.",
+    "Jika ada data akun yang tidak bisa di-remove / diganti, buyer berhak membatalkan transaksi. Garansi adalah kesepakatan personal antara seller dan buyer. Kami tidak bertanggung jawab setelah transaksi selesai.",
+    "Jika terjadi hackback oleh penjual, buyer berhak meminta identitas penjual dan semua kontak social media melalui admin, ajukan sengketa, atau live chat.",
+  ];
+  const rows = items
+    .map((item, index) => `<li><span class="item-index">${index + 1}</span><div class="item-copy">${escapeHtml(item)}</div></li>`)
+    .join("");
+  return `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jaminan Rekber</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #07111f;
+      --surface: #111c2d;
+      --surface-elevated: #1a2740;
+      --line: rgba(167, 190, 229, 0.12);
+      --text: #eff5ff;
+      --muted: #8ea2c5;
+      --brand-blue: #446dff;
+      --brand-gold: #dcb34d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Plus Jakarta Sans", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(67, 106, 255, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(220, 179, 77, 0.1), transparent 24%),
+        linear-gradient(180deg, #08111f 0%, #0b1321 100%);
+      padding: 20px;
+    }
+    .card {
+      max-width: 860px;
+      margin: 0 auto;
+      background: linear-gradient(180deg, rgba(26, 39, 64, 0.95), rgba(17, 28, 45, 0.98));
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 28px;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.42);
+    }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--brand-gold);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.7rem, 4vw, 2.4rem);
+      line-height: 1.2;
+    }
+    .lead {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    ul {
+      display: grid;
+      gap: 14px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    li {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(68, 109, 255, 0.08);
+      border: 1px solid rgba(68, 109, 255, 0.16);
+    }
+    .item-index {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #446dff, #7a61ff);
+      color: #fff;
+      font-weight: 800;
+      font-size: 1rem;
+    }
+    .item-copy {
+      line-height: 1.75;
+      color: var(--text);
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+    a.btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 18px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #446dff, #7a61ff);
+      color: #fff;
+    }
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+      .card { padding: 20px; border-radius: 22px; }
+      li { grid-template-columns: 36px 1fr; gap: 12px; padding: 14px; }
+      .item-index { width: 36px; height: 36px; border-radius: 12px; font-size: 0.95rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <p class="eyebrow">RekberWE.id</p>
+    <h1>Jaminan Rekber</h1>
+    <p class="lead">Ketentuan jaminan dan perlindungan buyer saat transaksi rekber. Baca sebelum melanjutkan transaksi.</p>
+    <ul>${rows}</ul>
+    <div class="actions">
+      <a class="btn btn-primary" href="/">Kembali ke website</a>
+      <a class="btn btn-ghost" href="/security-guide">Panduan pengamanan akun</a>
+    </div>
+  </div>
+</body>
+</html>`;
 }
 
 function renderSimpleContentPage(title, heading, bodyText) {
