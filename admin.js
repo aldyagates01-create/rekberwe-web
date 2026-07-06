@@ -2006,14 +2006,32 @@ function countAdminCompletedTransactionsForUser(userId) {
   return (state.transactions || []).filter((item) => item.paymentStatus === "Selesai" && (item.buyer?.id === userId || item.seller?.id === userId)).length;
 }
 
+function sanitizeExternalUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("/") && !raw.startsWith("//")) {
+    return raw.split(/[\s"'<>]/)[0];
+  }
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      return parsed.href;
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
 function renderUploadItem(item) {
   const mediaType = getUploadType(item);
   const preview = buildUploadPreview(item, mediaType);
+  const safeUrl = sanitizeExternalUrl(item.url);
   return `
     <div class="upload-item upload-item-${mediaType}">
       <div class="upload-preview-frame">${preview}</div>
       <div class="upload-item-body">
-        <strong>${item.url ? `<a href="${item.url}" target="_blank" rel="noreferrer">${escapeHtml(item.name)}</a>` : escapeHtml(item.name)}</strong>
+        <strong>${safeUrl ? `<a href="${escapeAttribute(safeUrl)}" target="_blank" rel="noreferrer">${escapeHtml(item.name)}</a>` : escapeHtml(item.name)}</strong>
         <span>Dikirim oleh ${escapeHtml(item.senderTitle || "Peserta")}: ${escapeHtml(item.sender)} • ${formatTime(new Date(item.time))}</span>
       </div>
     </div>
@@ -2030,8 +2048,9 @@ function getUploadType(item) {
 
 function buildUploadPreview(item, type) {
   const safeName = escapeHtml(item.name || "File");
-  const safeUrl = escapeAttribute(item.url || "#");
-  if (!item.url) {
+  const normalizedUrl = sanitizeExternalUrl(item.url);
+  const safeUrl = escapeAttribute(normalizedUrl || "#");
+  if (!normalizedUrl) {
     return `<div class="upload-file-fallback"><span>FILE</span><strong>${safeName}</strong></div>`;
   }
   if (type === "image") {

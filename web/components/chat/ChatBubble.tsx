@@ -106,12 +106,12 @@ export function ChatBubble({
 
 function MessageText({ text }: { text: string }) {
   const parts = text.split(/(https?:\/\/[^\s]+|\/(?:terms|security-guide)(?:[^\s]*)?)/g);
-  const shareUrl = parts.find((part) => /^https?:\/\//.test(part));
+  const shareUrl = parts.find((part) => isSafeHttpUrl(part));
   return (
     <div>
       <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
         {parts.map((part, index) => {
-          if (/^(https?:\/\/|\/(?:terms|security-guide))/.test(part)) {
+          if (isSafeHttpUrl(part)) {
             return (
               <a
                 key={`${part}-${index}`}
@@ -130,6 +130,20 @@ function MessageText({ text }: { text: string }) {
       {shareUrl ? <ShareLinkActions url={shareUrl} /> : null}
     </div>
   );
+}
+
+function isSafeHttpUrl(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  if (/^\/(?!\/)/.test(raw)) {
+    return /^\/(?:terms|security-guide)(?:[^\s]*)?$/.test(raw.split(/[\s"'<>]/)[0] || "");
+  }
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 function ShareLinkActions({ url }: { url: string }) {

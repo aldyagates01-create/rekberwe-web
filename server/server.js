@@ -54,6 +54,7 @@ const webRoot = path.resolve(__dirname, "..");
 
 const app = express();
 app.set("trust proxy", 1);
+const isProduction = process.env.NODE_ENV === "production";
 const port = Number(process.env.PORT || 3000);
 const webNextDir = path.resolve(__dirname, "..", "web");
 const useNextFrontend = String(process.env.USE_NEXT_FRONTEND || "true").trim().toLowerCase() !== "false";
@@ -96,7 +97,78 @@ const TELEGRAM_ISSUER = "https://oauth.telegram.org";
 const telegramJwks = createRemoteJWKSet(new URL(`${TELEGRAM_ISSUER}/.well-known/jwks.json`));
 const googleJwks = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
 const uploadStorage = multer.memoryStorage();
-const upload = multer({ storage: uploadStorage, limits: { fileSize: 10 * 1024 * 1024, files: 5 } });
+const uploadLimits = { fileSize: 10 * 1024 * 1024, files: 5 };
+const ALLOWED_WARRANTY_DAY_VALUES = new Set([0, 3, 7, 14, 30]);
+const MIME_TO_EXT = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+  "application/pdf": ".pdf",
+  "video/mp4": ".mp4",
+  "video/webm": ".webm",
+  "video/quicktime": ".mov",
+  "audio/mpeg": ".mp3",
+  "audio/wav": ".wav",
+  "audio/ogg": ".ogg",
+  "audio/mp4": ".m4a",
+};
+
+function createUploadMiddleware({ allowedMimeTypes, maxFiles = 5 }) {
+  const allowed = new Set(allowedMimeTypes);
+  return multer({
+    storage: uploadStorage,
+    limits: { ...uploadLimits, files: maxFiles },
+    fileFilter: (_req, file, callback) => {
+      const mime = String(file.mimetype || "").toLowerCase().split(";")[0].trim();
+      if (allowed.has(mime)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error("Tipe file tidak diizinkan."));
+    },
+  });
+}
+
+const upload = createUploadMiddleware({
+  allowedMimeTypes: [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "application/pdf",
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+  ],
+});
+const avatarUpload = createUploadMiddleware({
+  allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+  maxFiles: 1,
+});
+const verificationUpload = multer({
+  storage: uploadStorage,
+  limits: { fileSize: uploadLimits.fileSize, files: 2 },
+  fileFilter: (_req, file, callback) => {
+    const mime = String(file.mimetype || "").toLowerCase().split(";")[0].trim();
+    const field = String(file.fieldname || "");
+    const imageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+    const videoTypes = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+    if (field === "ktpPhoto" && imageTypes.has(mime)) {
+      callback(null, true);
+      return;
+    }
+    if (field === "ktpVideo" && videoTypes.has(mime)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error("File verifikasi harus foto KTP (gambar) dan video KTP (mp4/webm/mov)."));
+  },
+});
+const audioUpload = createUploadMiddleware({
+  allowedMimeTypes: ["audio/mpeg", "audio/wav", "audio/ogg", "audio/mp4"],
+  maxFiles: 2,
+});
 const eventClients = new Set();
 const presenceState = new Map();
 const presenceOnlineSnapshot = new Map();
@@ -217,16 +289,21 @@ const providers = {
 
 app.use(express.json());
 app.use("/uploads", express.static(uploadsDir));
+const sessionSecret = String(process.env.SESSION_SECRET || "").trim();
+if (!sessionSecret && isProduction) {
+  throw new Error("SESSION_SECRET wajib diset di production.");
+}
+
 app.use(
   session({
     name: "rekberwe.sid",
-    secret: process.env.SESSION_SECRET || "change-this-secret",
+    secret: sessionSecret || crypto.randomBytes(32).toString("hex"),
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,
+      secure: isProduction,
       maxAge: 1000 * 60 * 60 * 24 * 7,
     },
   }),
@@ -519,7 +596,7 @@ app.post("/api/me/profile", requireAuth, async (req, res) => {
   res.json({ user: req.session.user });
 });
 
-app.post("/api/me/profile/avatar", requireAuth, upload.single("avatar"), async (req, res) => {
+app.post("/api/me/profile/avatar", requireAuth, avatarUpload.single("avatar"), async (req, res) => {
   const file = req.file;
   if (!file) {
     res.status(400).json({ message: "File foto profil wajib dipilih." });
@@ -534,7 +611,7 @@ app.post("/api/me/profile/avatar", requireAuth, upload.single("avatar"), async (
   res.json({ user: req.session.user });
 });
 
-app.post("/api/me/verification", requireAuth, upload.fields([
+app.post("/api/me/verification", requireAuth, verificationUpload.fields([
   { name: "ktpPhoto", maxCount: 1 },
   { name: "ktpVideo", maxCount: 1 },
 ]), async (req, res) => {
@@ -598,17 +675,19 @@ app.post("/api/me/verification", requireAuth, upload.fields([
   res.json({ user: req.session.user });
 });
 
-app.get("/api/transactions", async (_req, res) => {
-  res.json({ transactions: await getAllTransactions() });
+app.get("/api/transactions", requireAuth, async (req, res) => {
+  const transactions = req.session.user.isAdmin
+    ? await getAllTransactions()
+    : await getTransactionsForUser(req.session.user.id);
+  res.json({ transactions });
 });
 
-app.get("/api/transactions/:code", async (req, res) => {
-  const transaction = await getTransactionByCode(String(req.params.code || "").toUpperCase());
-  if (!transaction) {
-    res.status(404).json({ message: "Transaksi tidak ditemukan." });
-    return;
-  }
-  res.json({ transaction: enrichTransactionPresence(transaction) });
+app.get("/api/transactions/:code", requireAuth, async (req, res) => {
+  const code = String(req.params.code || "").toUpperCase();
+  const transaction = await getTransactionByCode(code);
+  const accessible = await resolveTransactionAccess(req, res, transaction, { allowJoinPreview: true });
+  if (!accessible) return;
+  res.json({ transaction: enrichTransactionPresence(accessible) });
 });
 
 app.post("/api/transactions", requireAuth, async (req, res) => {
@@ -629,6 +708,11 @@ app.post("/api/transactions", requireAuth, async (req, res) => {
   }
 
   const feeSettings = await getAdminFeeSettings();
+  const normalizedWarranty = normalizeWarrantyInput(warranty);
+  if (!normalizedWarranty) {
+    res.status(400).json({ message: "Masa garansi tidak valid. Pilih 3, 7, 14, 30 hari, atau tulis 'Tanpa garansi'." });
+    return;
+  }
   const code = generateTransactionCode();
   const shareLink = `${getRequestBaseUrl(req)}/?trx=${encodeURIComponent(code)}`;
   const transaction = await createTransaction({
@@ -636,7 +720,7 @@ app.post("/api/transactions", requireAuth, async (req, res) => {
     title: String(title).trim(),
     price: Number(price),
     type: String(type).trim(),
-    warranty: String(warranty || "").trim(),
+    warranty: normalizedWarranty.label,
     sellerPayoutAccount: String(sellerPayoutAccount || "").trim(),
     sellerBankName: String(sellerBankName || "").trim(),
     sellerBankNumber: String(sellerBankNumber || "").trim(),
@@ -721,6 +805,8 @@ app.post("/api/transactions/:code/join", requireAuth, async (req, res) => {
 
 app.post("/api/transactions/:code/messages", requireAuth, async (req, res) => {
   const code = String(req.params.code || "").toUpperCase();
+  const current = await getTransactionByCode(code);
+  if (!assertTransactionParticipant(req, res, current)) return;
   const text = String(req.body.text || "").trim();
   if (!text) {
     res.status(400).json({ message: "Pesan tidak boleh kosong." });
@@ -738,6 +824,8 @@ app.post("/api/transactions/:code/messages", requireAuth, async (req, res) => {
 
 app.post("/api/transactions/:code/uploads", requireAuth, upload.array("proofFiles", 5), async (req, res) => {
   const code = String(req.params.code || "").toUpperCase();
+  const current = await getTransactionByCode(code);
+  if (!assertTransactionParticipant(req, res, current)) return;
   const files = req.files || [];
   if (!files.length) {
     res.status(400).json({ message: "File upload wajib diisi." });
@@ -789,12 +877,17 @@ app.delete("/api/transactions/:code", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/transactions/:code/status", requireAuth, async (req, res) => {
+app.post("/api/transactions/:code/status", requireAdmin, async (req, res) => {
   const code = String(req.params.code || "").toUpperCase();
   const paymentStatus = String(req.body.paymentStatus || "").trim();
   const systemMessage = String(req.body.systemMessage || "").trim();
   if (!paymentStatus) {
     res.status(400).json({ message: "Status wajib diisi." });
+    return;
+  }
+  const current = await getTransactionByCode(code);
+  if (!current) {
+    res.status(404).json({ message: "Transaksi tidak ditemukan." });
     return;
   }
   const updated = await updateTransactionStatus(code, paymentStatus, systemMessage);
@@ -923,7 +1016,7 @@ app.get("/security-guide", async (_req, res) => {
   res.type("html").send(renderSimpleContentPage("Panduan Pengamanan Akun", "Panduan pengamanan akun / rekber gold", String(settings.accountSecurityGuide || "").trim()));
 });
 
-app.post("/api/admin/settings/notification-sounds", requireAdmin, upload.fields([
+app.post("/api/admin/settings/notification-sounds", requireAdmin, audioUpload.fields([
   { name: "userNotificationSound", maxCount: 1 },
   { name: "adminNotificationSound", maxCount: 1 },
 ]), async (req, res) => {
@@ -1366,6 +1459,12 @@ app.get("/auth/:provider/callback", async (req, res) => {
     const profile = await provider.profile({ tokens });
 
     if (savedAuth.mode === "link") {
+      const existingLinkedUser = await getUserByProviderSocial(profile.provider, profile.socialId);
+      if (existingLinkedUser && existingLinkedUser.id !== savedAuth.targetUserId) {
+        clearAuthSession(req);
+        res.redirect(buildAuthRedirectUrl(savedAuth.returnTo, providerName, "failed", "Akun sosial ini sudah terhubung ke pengguna lain."));
+        return;
+      }
       await linkProviderToUser(savedAuth.targetUserId, profile.provider, profile.socialId, profile.username, profile.email || "");
       const refreshed = await getUserById(savedAuth.targetUserId);
       req.session.user = await withAdminFlag(refreshed);
@@ -1419,6 +1518,19 @@ if (useNextFrontend) {
 }
 
 app.use(express.static(webRoot));
+
+app.use((error, req, res, next) => {
+  if (!error) {
+    next();
+    return;
+  }
+  if (error instanceof multer.MulterError || String(error.message || "").toLowerCase().includes("tipe file")) {
+    res.status(400).json({ message: error.message || "Upload gagal." });
+    return;
+  }
+  next(error);
+});
+
 app.get("*", (_req, res) => res.sendFile(path.join(webRoot, "index.html")));
 
 async function startServer() {
@@ -1664,8 +1776,94 @@ function buildAuthRedirectUrl(returnTo, providerName, result, message = "") {
 
 function generateTransactionCode() {
   const year = new Date().getFullYear();
-  const randomPart = crypto.randomInt(100000, 999999);
-  return `RW-${year}-${String(randomPart).padStart(6, "0")}`;
+  const suffix = crypto.randomBytes(6).toString("base64url").toUpperCase();
+  return `RW-${year}-${suffix}`;
+}
+
+function normalizeWarrantyInput(rawWarranty) {
+  const raw = String(rawWarranty || "").trim().toLowerCase();
+  if (!raw || raw === "tanpa garansi" || raw === "0" || raw === "0 hari") {
+    return { label: "Tanpa garansi", days: 0 };
+  }
+  const matched = raw.match(/(\d+)/);
+  const days = matched ? Number(matched[1] || 0) : NaN;
+  if (!ALLOWED_WARRANTY_DAY_VALUES.has(days)) {
+    return null;
+  }
+  return { label: `${days} hari`, days };
+}
+
+function isTransactionParticipant(transaction, user) {
+  if (!transaction || !user) return false;
+  return transaction.buyer?.id === user.id || transaction.seller?.id === user.id;
+}
+
+function canPreviewTransactionForJoin(transaction) {
+  if (!transaction) return false;
+  if (transaction.paymentStatus === "Transaksi dibatalkan" || transaction.paymentStatus === "Selesai") return false;
+  return !transaction.buyer || !transaction.seller;
+}
+
+function buildJoinPreviewTransaction(transaction) {
+  return {
+    ...transaction,
+    sellerBankName: "",
+    sellerBankNumber: "",
+    sellerBankHolder: "",
+    sellerPayoutAccount: "",
+    adminPayoutAccount: "",
+    messages: [],
+    uploads: [],
+    buyer: transaction.buyer
+      ? {
+        id: transaction.buyer.id,
+        displayName: transaction.buyer.displayName,
+        username: transaction.buyer.username,
+        avatar: transaction.buyer.avatar,
+        verificationStatus: transaction.buyer.verificationStatus,
+        verified: transaction.buyer.verified,
+      }
+      : null,
+    seller: transaction.seller
+      ? {
+        id: transaction.seller.id,
+        displayName: transaction.seller.displayName,
+        username: transaction.seller.username,
+        avatar: transaction.seller.avatar,
+        verificationStatus: transaction.seller.verificationStatus,
+        verified: transaction.seller.verified,
+      }
+      : null,
+  };
+}
+
+function assertTransactionParticipant(req, res, transaction) {
+  if (!transaction) {
+    res.status(404).json({ message: "Transaksi tidak ditemukan." });
+    return false;
+  }
+  const user = req.session.user;
+  if (user.isAdmin || isTransactionParticipant(transaction, user)) {
+    return true;
+  }
+  res.status(403).json({ message: "Tidak punya akses ke transaksi ini." });
+  return false;
+}
+
+async function resolveTransactionAccess(req, res, transaction, { allowJoinPreview = false } = {}) {
+  if (!transaction) {
+    res.status(404).json({ message: "Transaksi tidak ditemukan." });
+    return null;
+  }
+  const user = req.session.user;
+  if (user.isAdmin || isTransactionParticipant(transaction, user)) {
+    return transaction;
+  }
+  if (allowJoinPreview && canPreviewTransactionForJoin(transaction)) {
+    return buildJoinPreviewTransaction(transaction);
+  }
+  res.status(403).json({ message: "Tidak punya akses ke transaksi ini." });
+  return null;
 }
 
 function randomString(length) {
@@ -1965,22 +2163,24 @@ async function persistUploadFile(file, transactionCode, senderId) {
 }
 
 async function uploadToCloudinary(file, transactionCode, senderId) {
-  const extension = path.extname(file.originalname).replace(/^\./, "").toLowerCase();
+  const mime = String(file.mimetype || "").toLowerCase().split(";")[0].trim();
+  const extension = MIME_TO_EXT[mime]?.replace(/^\./, "") || "bin";
   const safeBase = path.basename(file.originalname, path.extname(file.originalname)).replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 40) || "bukti";
   const publicId = `${cloudinaryFolder}/${transactionCode}/${Date.now()}-${safeBase}`;
+  const resourceType = mime.startsWith("video/") ? "video" : mime.startsWith("image/") ? "image" : "raw";
 
   const result = await new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: undefined,
         public_id: publicId,
-        resource_type: "auto",
+        resource_type: resourceType,
         use_filename: false,
         unique_filename: false,
         overwrite: false,
         access_mode: "public",
         tags: ["rekberwe", transactionCode, String(senderId || "guest")],
-        format: extension || undefined,
+        format: resourceType === "image" ? extension : undefined,
       },
       (error, uploaded) => {
         if (error) {
@@ -2000,8 +2200,9 @@ async function uploadToCloudinary(file, transactionCode, senderId) {
 }
 
 function storeFileLocally(file) {
-  const ext = path.extname(file.originalname);
-  const safeBase = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 40) || "bukti";
+  const mime = String(file.mimetype || "").toLowerCase().split(";")[0].trim();
+  const ext = MIME_TO_EXT[mime] || ".bin";
+  const safeBase = path.basename(file.originalname, path.extname(file.originalname)).replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 40) || "bukti";
   const storedName = `${Date.now()}-${safeBase}${ext}`;
   const target = path.join(uploadsDir, storedName);
   fs.writeFileSync(target, file.buffer);
