@@ -1,6 +1,7 @@
 "use client";
 
 import { getInitials, formatTime } from "@/lib/format";
+import { VerificationBadge } from "@/components/chat/VerificationBadge";
 
 export const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-shield.png?v=6";
 
@@ -8,28 +9,37 @@ type AvatarProps = {
   name: string;
   avatarUrl?: string;
   size?: number;
+  onClick?: () => void;
 };
 
-export function Avatar({ name, avatarUrl, size = 28 }: AvatarProps) {
+export function Avatar({ name, avatarUrl, size = 28, onClick }: AvatarProps) {
   const style = { width: size, height: size };
-  if (avatarUrl) {
-    const isBrandMark = avatarUrl.includes("rekberwe-logo-shield") || avatarUrl.includes("rekberwe-logo-mark");
-    return (
-      <img
-        src={avatarUrl}
-        alt={name}
-        style={{ ...style, ...(isBrandMark ? { objectPosition: "center 24%" } : {}) }}
-        className="shrink-0 rounded-full object-cover ring-1 ring-border"
-      />
-    );
-  }
-  return (
+  const image = avatarUrl ? (
+    <img
+      src={avatarUrl}
+      alt={name}
+      style={{ ...style, ...(avatarUrl.includes("rekberwe-logo") ? { objectPosition: "center" } : {}) }}
+      className="shrink-0 rounded-full object-cover ring-1 ring-border"
+    />
+  ) : (
     <span
       style={style}
       className="inline-flex shrink-0 items-center justify-center rounded-full bg-accent-blue/20 text-xs font-semibold text-accent-blue ring-1 ring-border"
     >
       {getInitials(name)}
     </span>
+  );
+
+  if (!onClick) return image;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="shrink-0 rounded-full border-0 bg-transparent p-0"
+      aria-label={`Lihat profil ${name}`}
+    >
+      {image}
+    </button>
   );
 }
 
@@ -41,6 +51,8 @@ type ChatBubbleProps = {
   isMine: boolean;
   isAdmin: boolean;
   avatarUrl?: string;
+  senderVerified?: boolean;
+  onAvatarClick?: () => void;
 };
 
 export function ChatBubble({
@@ -51,6 +63,8 @@ export function ChatBubble({
   isMine,
   isAdmin,
   avatarUrl,
+  senderVerified = false,
+  onAvatarClick,
 }: ChatBubbleProps) {
   const align = isMine && !isAdmin ? "justify-end" : "justify-start";
   const bubbleClass = isAdmin
@@ -61,10 +75,15 @@ export function ChatBubble({
 
   return (
     <div className={`flex ${align} gap-2 px-3 py-1`}>
-      {!isMine || isAdmin ? <Avatar name={sender} avatarUrl={avatarUrl} /> : null}
+      {!isMine || isAdmin ? (
+        <Avatar name={sender} avatarUrl={avatarUrl} onClick={onAvatarClick} />
+      ) : null}
       <div className={`max-w-bubble rounded-xl px-3 py-2 ${bubbleClass}`}>
         <div className="mb-1 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-semibold">{sender}</span>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold">
+            {sender}
+            {!isAdmin ? <VerificationBadge verified={senderVerified} /> : null}
+          </span>
           {isAdmin ? (
             <span className="rounded-full bg-accent-purple/20 px-2 py-0.5 text-[10px] font-bold uppercase text-accent-purple">
               Admin
@@ -78,7 +97,9 @@ export function ChatBubble({
         <MessageText text={text} />
         <p className="mt-1 text-right text-[10px] text-white/40">{formatTime(time)}</p>
       </div>
-      {isMine && !isAdmin ? <Avatar name={sender} avatarUrl={avatarUrl} /> : null}
+      {isMine && !isAdmin ? (
+        <Avatar name={sender} avatarUrl={avatarUrl} onClick={onAvatarClick} />
+      ) : null}
     </div>
   );
 }
@@ -166,6 +187,8 @@ export function UploadBubble({
   isMine,
   isAdmin,
   avatarUrl,
+  senderVerified = false,
+  onAvatarClick,
 }: {
   sender: string;
   senderTitle: string;
@@ -175,14 +198,22 @@ export function UploadBubble({
   isMine: boolean;
   isAdmin: boolean;
   avatarUrl?: string;
+  senderVerified?: boolean;
+  onAvatarClick?: () => void;
 }) {
   const isImage = isImageFile(fileName, fileUrl);
 
   return (
     <div className={`flex ${isMine && !isAdmin ? "justify-end" : "justify-start"} gap-2 px-3 py-1`}>
-      {!isMine || isAdmin ? <Avatar name={sender} avatarUrl={avatarUrl} /> : null}
+      {!isMine || isAdmin ? (
+        <Avatar name={sender} avatarUrl={avatarUrl} onClick={onAvatarClick} />
+      ) : null}
       <div className="max-w-bubble overflow-hidden rounded-xl border border-border bg-card px-3 py-2">
-        <p className="text-xs font-semibold">{sender} · {senderTitle}</p>
+        <p className="inline-flex items-center gap-1 text-xs font-semibold">
+          {sender}
+          {!isAdmin ? <VerificationBadge verified={senderVerified} /> : null}
+          <span className="text-white/45">· {senderTitle}</span>
+        </p>
         {isImage ? (
           <a href={fileUrl} target="_blank" rel="noreferrer" className="mt-2 block">
             <img
@@ -205,7 +236,9 @@ export function UploadBubble({
         )}
         <p className="mt-1 text-right text-[10px] text-white/40">{formatTime(time)}</p>
       </div>
-      {isMine && !isAdmin ? <Avatar name={sender} avatarUrl={avatarUrl} /> : null}
+      {isMine && !isAdmin ? (
+        <Avatar name={sender} avatarUrl={avatarUrl} onClick={onAvatarClick} />
+      ) : null}
     </div>
   );
 }

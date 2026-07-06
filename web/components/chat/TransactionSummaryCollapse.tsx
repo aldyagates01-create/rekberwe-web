@@ -1,8 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { formatCurrency, getInitials } from "@/lib/format";
+import { isUserVerified } from "@/lib/profile";
 import { getShortStatus, getTransactionProgress } from "@/lib/transaction";
 import type { Transaction, User } from "@/lib/types";
+import { VerificationBadge } from "@/components/chat/VerificationBadge";
 
 const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-shield.png?v=6";
 
@@ -17,6 +20,7 @@ export function TransactionSummaryCollapse({
   expanded: _expanded,
   onToggle: _onToggle,
 }: TransactionSummaryCollapseProps) {
+  const router = useRouter();
   const progress = getTransactionProgress(transaction);
   const shortStatus = getShortStatus(transaction);
   const steps = [
@@ -43,9 +47,21 @@ export function TransactionSummaryCollapse({
         </div>
 
         <div className="grid grid-cols-3 divide-x divide-border border-b border-border px-1.5 py-1.5">
-          <Participant label="Pembeli" user={transaction.buyer} fallbackName="Menunggu Pembeli" accent="blue" />
+          <Participant
+            label="Pembeli"
+            user={transaction.buyer}
+            fallbackName="Menunggu Pembeli"
+            accent="blue"
+            onOpenProfile={transaction.buyer ? () => router.push(`/transaksi/${encodeURIComponent(transaction.code)}/profil/buyer`) : undefined}
+          />
           <Participant label="Admin Rekber" fallbackName="Qhead Admin" badge="ADMIN" accent="gold" />
-          <Participant label="Penjual" user={transaction.seller} fallbackName="Menunggu Penjual" accent="green" />
+          <Participant
+            label="Penjual"
+            user={transaction.seller}
+            fallbackName="Menunggu Penjual"
+            accent="green"
+            onOpenProfile={transaction.seller ? () => router.push(`/transaksi/${encodeURIComponent(transaction.code)}/profil/seller`) : undefined}
+          />
         </div>
 
         <div className="grid grid-cols-4 gap-1 px-2 py-1.5">
@@ -87,12 +103,14 @@ function Participant({
   fallbackName,
   badge,
   accent,
+  onOpenProfile,
 }: {
   label: string;
   user?: User | null;
   fallbackName: string;
   badge?: string;
   accent: "blue" | "gold" | "green";
+  onOpenProfile?: () => void;
 }) {
   const name = user?.displayName || fallbackName;
   const accentClass = {
@@ -100,20 +118,43 @@ function Participant({
     gold: "bg-warning/15 text-warning",
     green: "bg-success/15 text-success",
   }[accent];
+  const avatarNode = badge ? (
+    <img src={ADMIN_AVATAR_URL} alt={name} className="h-full w-full object-contain p-0.5" />
+  ) : user?.avatar ? (
+    <img src={user.avatar} alt={name} className="h-full w-full object-cover" />
+  ) : (
+    getInitials(name)
+  );
 
   return (
     <div className="flex min-w-0 flex-col items-center px-1 text-center">
-      <div className={`mb-0.5 inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-full text-[9px] font-bold ${accentClass}`}>
-        {badge ? (
-          <img src={ADMIN_AVATAR_URL} alt={name} className="h-full w-full object-contain p-0.5" />
-        ) : user?.avatar ? (
-          <img src={user.avatar} alt={name} className="h-full w-full object-cover" />
-        ) : (
-          getInitials(name)
-        )}
-      </div>
+      {onOpenProfile ? (
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className={`mb-0.5 inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-full text-[9px] font-bold ${accentClass}`}
+          aria-label={`Lihat profil ${name}`}
+        >
+          {avatarNode}
+        </button>
+      ) : (
+        <div className={`mb-0.5 inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-full text-[9px] font-bold ${accentClass}`}>
+          {avatarNode}
+        </div>
+      )}
       <span className="text-[8px] text-white/40">{label}</span>
-      <strong className="max-w-full truncate text-[9px] text-white">{name}</strong>
+      <strong
+        className="inline-flex max-w-full items-center justify-center gap-0.5 truncate text-[9px] text-white"
+        onClick={onOpenProfile}
+        onKeyDown={(event) => {
+          if (onOpenProfile && (event.key === "Enter" || event.key === " ")) onOpenProfile();
+        }}
+        role={onOpenProfile ? "button" : undefined}
+        tabIndex={onOpenProfile ? 0 : undefined}
+      >
+        <span className="truncate">{name}</span>
+        {!badge && user ? <VerificationBadge verified={isUserVerified(user)} /> : null}
+      </strong>
       {badge ? (
         <span className="mt-0.5 rounded-full bg-accent-purple/15 px-1.5 py-0.5 text-[8px] font-bold text-accent-purple">
           {badge}

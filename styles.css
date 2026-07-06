@@ -143,20 +143,10 @@ a {
 
 .brand-byline {
   color: #ffffff;
-  font-size: clamp(0.68rem, 1.3vw, 0.8rem);
-  font-weight: 600;
+  font-size: clamp(0.58rem, 1vw, 0.68rem);
+  font-weight: 500;
   line-height: 1.2;
-  opacity: 0.94;
-}
-
-.brand-tagline {
-  color: #ffffff;
-  font-size: clamp(0.6rem, 1.1vw, 0.72rem);
-  font-weight: 700;
-  line-height: 1.2;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  opacity: 0.9;
+  opacity: 0.88;
 }
 
 .brand-logo-icon,
@@ -877,15 +867,28 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 8px;
-  width: 20px;
-  height: 20px;
+  margin-left: 6px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
-  background: rgba(28, 125, 87, 0.12);
-  color: var(--success);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 800;
   vertical-align: middle;
+}
+
+.verified-inline-badge.is-verified {
+  background: rgba(28, 125, 87, 0.16);
+  color: var(--success);
+}
+
+.verified-inline-badge.is-unverified {
+  background: rgba(194, 65, 12, 0.16);
+  color: var(--danger);
+}
+
+.participant-avatar-shell[data-profile-trigger],
+.participant-copy strong[data-profile-trigger] {
+  cursor: pointer;
 }
 
 .transactions-shell {
@@ -3809,17 +3812,11 @@ textarea::placeholder {
 }
 
 .workspace-sidebar-brand-featured .workspace-sidebar-brand-copy .brand-byline {
-  font-size: 0.78rem;
-  color: #ffffff;
-  opacity: 0.92;
-  text-transform: none;
-  letter-spacing: 0.02em;
-}
-
-.workspace-sidebar-brand-featured .workspace-sidebar-brand-copy .brand-tagline {
   font-size: 0.68rem;
   color: #ffffff;
-  opacity: 0.88;
+  opacity: 0.86;
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
 .workspace-sidebar-logo {
@@ -9271,11 +9268,6 @@ select:disabled,
   }
 
   .brand-byline {
-    font-size: 0.68rem;
-  }
-
-  .brand-tagline {
-    font-size: 0.58rem;
-    letter-spacing: 0.1em;
+    font-size: 0.62rem;
   }
 }

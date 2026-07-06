@@ -106,6 +106,19 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     [transaction],
   );
 
+  const openParticipantProfile = useCallback(
+    (senderTitle: string) => {
+      if (senderTitle === "Pembeli") {
+        router.push(`/transaksi/${encodeURIComponent(code)}/profil/buyer`);
+        return;
+      }
+      if (senderTitle === "Penjual") {
+        router.push(`/transaksi/${encodeURIComponent(code)}/profil/seller`);
+      }
+    },
+    [code, router],
+  );
+
   const refresh = useCallback(async () => {
     const payload = await getTransaction(code);
     setTransaction(payload);
@@ -423,6 +436,8 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
                 isMine={isMine}
                 isAdmin={isAdmin}
                 avatarUrl={getAvatarUrl(item.senderUserId, item.senderTitle)}
+                senderVerified={item.senderVerified}
+                onAvatarClick={!isAdmin ? () => openParticipantProfile(item.senderTitle) : undefined}
               />
             );
           }
@@ -453,6 +468,8 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
               isMine={isMine}
               isAdmin={isAdmin}
               avatarUrl={getAvatarUrl(item.senderUserId, item.senderTitle)}
+              senderVerified={item.senderVerified}
+              onAvatarClick={!isAdmin ? () => openParticipantProfile(item.senderTitle) : undefined}
             />
           );
         })}

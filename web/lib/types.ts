@@ -9,6 +9,10 @@ export type User = {
   verificationStatus?: string;
   provider?: string;
   socialId?: string;
+  linkedProviders?: Array<{ provider: string }>;
+  ktpPhotoUrl?: string;
+  ktpVideoUrl?: string;
+  locationVerified?: boolean;
   presence?: PresenceInfo;
 };
 

@@ -2180,7 +2180,13 @@ function handleProfileTriggerClick(event) {
 }
 
 function openUserProfileModal(role) {
-  const profile = buildTransactionProfileDetails(role, state.activeTransaction);
+  const transaction = state.activeTransaction;
+  if (!transaction) return;
+  if (isMobileViewport()) {
+    window.location.href = `/transaksi/${encodeURIComponent(transaction.code)}/profil/${role}`;
+    return;
+  }
+  const profile = buildTransactionProfileDetails(role, transaction);
   if (!profile || !elements.userProfileModal) return;
   elements.userProfileModalAvatar.innerHTML = renderProfileAvatar(profile);
   elements.userProfileModalRole.textContent = profile.title;
@@ -2689,8 +2695,12 @@ function renderRoom(transaction) {
   elements.roomPageSubtitle.innerHTML = `${escapeHtml(transaction.code)} | ${escapeHtml(capitalize(transaction.type))} | ${formatCurrencyHtml(transaction.price)}`;
   elements.roomCode.textContent = transaction.code;
   elements.roomPaymentStatus.textContent = transaction.paymentStatus;
-  elements.roomBuyer.textContent = transaction.buyer ? transaction.buyer.displayName : "Menunggu pembeli";
-  elements.roomSeller.textContent = transaction.seller ? transaction.seller.displayName : "Menunggu penjual";
+  elements.roomBuyer.innerHTML = transaction.buyer
+    ? renderParticipantNameWithBadge(transaction.buyer)
+    : "Menunggu pembeli";
+  elements.roomSeller.innerHTML = transaction.seller
+    ? renderParticipantNameWithBadge(transaction.seller)
+    : "Menunggu penjual";
   if (elements.mobileChatHeaderTitle) elements.mobileChatHeaderTitle.textContent = transaction.title || transaction.code;
   if (elements.mobileChatHeaderBadge) elements.mobileChatHeaderBadge.textContent = transaction.paymentStatus || "-";
   if (elements.mobileRoomStatusBadge) elements.mobileRoomStatusBadge.textContent = transaction.paymentStatus || "-";
@@ -2733,7 +2743,17 @@ function renderParticipantAvatarMini(name, avatarUrl) {
   if (avatarUrl) {
     return `<img src="${escapeAttribute(avatarUrl)}" alt="${escapeAttribute(name || "Profil")}" />`;
   }
-  return `<span>${escapeHtml(String(name || "R").trim().charAt(0).toUpperCase() || "R")}</span>`;
+  const initial = escapeHtml(String(name || "R").trim().charAt(0).toUpperCase() || "R");
+  return `<span>${initial}</span>`;
+}
+
+function isUserVerified(user) {
+  return user?.verificationStatus === "verified" || Boolean(user?.verified);
+}
+
+function renderParticipantNameWithBadge(user) {
+  const verified = isUserVerified(user);
+  return `${escapeHtml(user.displayName || "Pengguna")} <span class="verified-inline-badge ${verified ? "is-verified" : "is-unverified"}" aria-label="${verified ? "Terverifikasi" : "Belum terverifikasi"}">${verified ? "✓" : "✕"}</span>`;
 }
 
 function renderRoomProgress(transaction) {
