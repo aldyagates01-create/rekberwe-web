@@ -98,26 +98,30 @@
         </div>
         <div class="support-admin-layout">
           <div class="admin-list" id="admin-support-list"></div>
-          <div class="support-admin-room">
-            <div class="support-admin-room-head" id="admin-support-room-head">
+          <section class="chat-room-card room-chat-main support-chat-main support-admin-room">
+            <div class="panel-top telegram-chat-head support-admin-room-head" id="admin-support-room-head">
               <div>
                 <p class="eyebrow">Live chat aktif</p>
-                <h4 id="admin-support-room-title">Pilih live chat</h4>
-                <p class="mini-note" id="admin-support-room-subtitle">Klik percakapan di panel kiri untuk mulai membalas.</p>
+                <h5 id="admin-support-room-title">Pilih live chat</h5>
+                <span class="mini-label" id="admin-support-room-subtitle">Klik percakapan di panel kiri untuk mulai membalas.</span>
               </div>
               <span class="admin-tag" id="admin-support-room-status">open</span>
             </div>
-            <div class="support-widget-messages support-admin-messages" id="admin-support-messages"></div>
-            <form class="support-widget-form" id="admin-support-form">
+            <div class="chat-room-alert">
+              <span class="chat-room-alert-icon">i</span>
+              <p>Balas pesan pengguna dengan jelas. Riwayat live chat tersimpan untuk kebutuhan dukungan akun dan transaksi.</p>
+            </div>
+            <div class="chat-box admin-chat-scroll-area support-admin-messages" id="admin-support-messages"></div>
+            <form class="chat-form" id="admin-support-form">
               <label class="chat-file-picker">
                 <input type="file" id="admin-support-upload" multiple />
                 <span class="attach-icon" aria-hidden="true">+</span>
                 <span class="sr-only">Lampirkan file live chat admin</span>
               </label>
-              <input type="text" id="admin-support-input" placeholder="Balas live chat pengguna..." />
-              <button type="submit" class="primary-btn">Kirim</button>
+              <input type="text" id="admin-support-input" placeholder="Kirim pesan sebagai RekberWE.id / Admin..." />
+              <button type="submit" class="primary-btn chat-send-btn" aria-label="Kirim live chat">➤</button>
             </form>
-          </div>
+          </section>
         </div>
       </section>
 

@@ -459,8 +459,10 @@ img.brand-logo-mark {
 }
 
 .primary-btn {
-  background: linear-gradient(135deg, #1f6fb6 0%, #e0b232 100%);
+  background: linear-gradient(135deg, #446dff 0%, #7a61ff 100%);
   color: white;
+  border: 1px solid rgba(167, 190, 229, 0.12);
+  box-shadow: 0 12px 28px rgba(68, 109, 255, 0.22);
 }
 
 .danger-btn {
@@ -991,8 +993,8 @@ select {
   margin: 0 24px;
   padding: 18px;
   border-radius: 18px;
-  background: rgba(194, 106, 45, 0.08);
-  border: 1px solid rgba(194, 106, 45, 0.14);
+  background: linear-gradient(180deg, rgba(16, 27, 45, 0.98), rgba(12, 21, 35, 0.98));
+  border: 1px solid rgba(143, 164, 205, 0.12);
 }
 
 .join-role-box-modal {
@@ -3291,10 +3293,24 @@ body {
 .admin-primary-btn,
 button.primary-btn,
 a.primary-btn {
-  background: linear-gradient(135deg, var(--brand-blue), var(--brand-gold));
+  background: linear-gradient(135deg, var(--brand-blue), #7a61ff);
   color: #ffffff;
-  border: none;
+  border: 1px solid rgba(167, 190, 229, 0.12);
   box-shadow: 0 12px 28px rgba(68, 109, 255, 0.25);
+}
+
+.primary-btn:hover:not(:disabled),
+button.primary-btn:hover:not(:disabled),
+a.primary-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5a78ff, #8a70ff);
+  box-shadow: 0 14px 32px rgba(68, 109, 255, 0.32);
+}
+
+.primary-btn:disabled,
+button.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .ghost-btn,
@@ -8788,5 +8804,229 @@ body.is-member-view .topbar {
 @media (max-width: 768px) {
   .workspace-desktop-only {
     display: none !important;
+  }
+}
+
+/* Themed action buttons: profil, verifikasi, role join, pengaturan admin */
+.profile-form .primary-btn,
+.profile-verification-panel .primary-btn,
+#profile-settings-form .primary-btn,
+#profile-verification-form .primary-btn,
+.admin-settings-form .primary-btn,
+.settings-save-actions .primary-btn,
+#open-profile-tab,
+#approve-location-consent-modal {
+  background: linear-gradient(135deg, #446dff 0%, #7a61ff 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(167, 190, 229, 0.14) !important;
+  box-shadow: 0 12px 28px rgba(68, 109, 255, 0.26) !important;
+}
+
+.profile-form .primary-btn:hover:not(:disabled),
+.profile-verification-panel .primary-btn:hover:not(:disabled),
+.admin-settings-form .primary-btn:hover:not(:disabled),
+.settings-save-actions .primary-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5a78ff 0%, #8a70ff 100%) !important;
+  box-shadow: 0 14px 32px rgba(68, 109, 255, 0.34) !important;
+}
+
+.join-role-box .action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.join-role-btn {
+  min-height: 48px;
+  border-radius: 14px;
+  font-weight: 700;
+}
+
+.join-role-btn.ghost-btn:not(:disabled) {
+  background: rgba(68, 109, 255, 0.14) !important;
+  border: 1px solid rgba(102, 116, 255, 0.38) !important;
+  color: #e8efff !important;
+  box-shadow: none !important;
+}
+
+.join-role-btn.ghost-btn:not(:disabled):hover {
+  background: rgba(68, 109, 255, 0.22) !important;
+  border-color: rgba(122, 97, 255, 0.5) !important;
+  color: #ffffff !important;
+}
+
+.join-role-btn.primary-btn:not(:disabled) {
+  background: linear-gradient(135deg, #446dff 0%, #7a61ff 100%) !important;
+  border: 1px solid rgba(167, 190, 229, 0.14) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 28px rgba(68, 109, 255, 0.28) !important;
+}
+
+.join-role-btn.primary-btn:not(:disabled):hover {
+  background: linear-gradient(135deg, #5a78ff 0%, #8a70ff 100%) !important;
+  box-shadow: 0 14px 32px rgba(68, 109, 255, 0.34) !important;
+}
+
+.join-role-btn:disabled {
+  opacity: 0.38 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+.join-role-box .mini-note {
+  color: var(--muted);
+}
+
+/* Admin live chat: match transaction chat room UI */
+.support-admin-layout {
+  align-items: stretch;
+}
+
+.support-chat-main.support-admin-room {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: clamp(540px, calc(100vh - 280px), 820px);
+  max-height: calc(100vh - 200px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.support-chat-main .support-admin-room-head {
+  position: static;
+  padding: 18px 20px 0;
+  background: transparent;
+  border-bottom: none;
+}
+
+.support-chat-main .support-admin-room-head h5 {
+  margin: 4px 0 6px;
+  color: #f4f8ff;
+  font-size: 1rem;
+}
+
+.support-chat-main .chat-room-alert {
+  margin: 12px 20px 0;
+}
+
+.support-chat-main .chat-box,
+.support-chat-main #admin-support-messages {
+  margin: 12px 20px 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 10px 14px 8px;
+  border-radius: 16px;
+  background: rgba(4, 9, 18, 0.42);
+  border: 1px solid rgba(143, 164, 205, 0.1);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 116, 255, 0.55) rgba(255, 255, 255, 0.04);
+}
+
+.support-chat-main #admin-support-form {
+  margin: 12px 20px 20px;
+}
+
+.support-chat-main .chat-message {
+  width: 100% !important;
+  max-width: 100% !important;
+  justify-self: auto !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.support-chat-main .chat-message-body {
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.support-chat-main .chat-message.chat-admin .chat-message-body,
+.support-chat-main .chat-message.chat-other .chat-message-body {
+  justify-content: flex-start;
+}
+
+.support-chat-main .chat-message-copy {
+  max-width: min(100%, 520px);
+}
+
+.support-chat-main .chat-message.chat-admin .chat-message-copy {
+  background: linear-gradient(135deg, rgba(34, 39, 63, 0.98), rgba(23, 28, 51, 0.98)) !important;
+  border: 1px solid rgba(114, 97, 255, 0.22) !important;
+}
+
+.support-chat-main .chat-message.chat-other .chat-message-copy {
+  background: rgba(255, 255, 255, 0.045) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.support-chat-main .chat-avatar-btn {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(143, 164, 205, 0.14);
+  background: linear-gradient(135deg, rgba(66, 104, 255, 0.25), rgba(255, 255, 255, 0.05));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  pointer-events: none;
+}
+
+.support-chat-main .chat-avatar-btn img,
+.support-chat-main .chat-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.support-chat-main .support-attachment {
+  margin-top: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  display: block;
+}
+
+.support-chat-main .support-attachment img {
+  display: block;
+  max-width: 100%;
+  border-radius: 12px;
+}
+
+.support-chat-main .upload-empty-state {
+  margin: auto;
+  text-align: center;
+  color: #8ea2c3;
+}
+
+@media (min-width: 769px) {
+  .support-chat-main {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .support-chat-main .telegram-chat-head,
+  .support-chat-main .chat-room-alert,
+  .support-chat-main #admin-support-form {
+    flex-shrink: 0 !important;
+  }
+}
+
+@media (max-width: 1100px) {
+  .support-admin-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .support-chat-main.support-admin-room {
+    min-height: 520px;
+    max-height: none;
   }
 }

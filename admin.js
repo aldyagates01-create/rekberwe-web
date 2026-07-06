@@ -2132,29 +2132,49 @@ function renderSupportThreads() {
   }
   markAdminSupportThreadSeen(active);
   elements.adminSupportMessages.innerHTML = active.messages.length
-    ? active.messages.map(renderSupportAdminMessage).join("")
+    ? active.messages.map((message) => renderSupportAdminMessage(message, active.user)).join("")
     : "<div class=\"upload-empty-state\">Belum ada pesan live chat.</div>";
   elements.adminSupportMessages.scrollTop = elements.adminSupportMessages.scrollHeight;
   updateAdminNotificationBadges();
 }
 
-function renderSupportAdminMessage(message) {
-  const roleClass = message.senderRole === "admin" ? "chat-role-admin" : "chat-role-buyer";
-  const messageClass = message.senderRole === "admin" ? "chat-own" : "chat-other";
+function renderSupportAdminMessage(message, threadUser = null) {
+  const isAdmin = message.senderRole === "admin";
+  const roleClass = isAdmin ? "chat-role-admin" : "chat-role-buyer";
+  const messageClass = isAdmin ? "chat-admin" : "chat-other";
+  const profile = isAdmin
+    ? normalizeAdminProfileDetails({
+      displayName: message.sender || "RekberWE.id",
+      avatar: "/assets/rekberwe-logo-mark.jpg?v=5",
+      verificationStatus: "verified",
+      verified: true,
+    }, "Admin")
+    : normalizeAdminProfileDetails({
+      ...(threadUser || {}),
+      displayName: message.sender || threadUser?.displayName || "Pengguna",
+      avatar: threadUser?.avatar || "",
+      verificationStatus: threadUser?.verificationStatus,
+      verified: threadUser?.verified,
+    }, "Pengguna");
+
   return `
-    <div class="chat-message ${roleClass} ${messageClass}">
+    <div class="chat-message ${messageClass} ${roleClass}">
       <div class="chat-message-body">
+        <div class="chat-avatar-btn" aria-hidden="true">
+          ${renderAdminProfileAvatar(profile)}
+        </div>
         <div class="chat-message-copy">
           <div class="chat-header">
             <div class="chat-author">
               <strong>${escapeHtml(message.sender)}</strong>
               <div class="chat-badges">
-                <span class="chat-badge chat-badge-role">${escapeHtml(message.senderRole === "admin" ? "Admin" : "Pengguna")}</span>
+                <span class="chat-badge chat-badge-role">${escapeHtml(isAdmin ? "Admin" : "Pengguna")}</span>
+                ${!isAdmin ? `<span class="chat-badge ${profile.verified ? "chat-badge-verified" : "chat-badge-unverified"}">${profile.verified ? "Verified ✓" : "Unverified ✕"}</span>` : ""}
               </div>
             </div>
             <span>${formatTime(new Date(message.time))}</span>
           </div>
-          ${message.text ? `<p>${escapeHtml(message.text)}</p>` : ""}
+          ${message.text ? `<p>${formatMessageText(message.text)}</p>` : ""}
           ${renderSupportAttachment(message)}
         </div>
       </div>
