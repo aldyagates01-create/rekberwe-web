@@ -146,7 +146,7 @@ export async function sendWhatsappOtp(userId, rawPhone) {
   const lastSentAt = new Date().toISOString();
   sendCount += 1;
 
-  await sendFonnteWhatsApp(normalized, buildOtpWhatsAppMessage(otp));
+  await updateUserPhoneNumberDraft(userId, normalized);
 
   const record = await upsertOtpVerification({
     userId,
@@ -158,7 +158,8 @@ export async function sendWhatsappOtp(userId, rawPhone) {
     lockedUntil: phoneChanged ? "" : lockedUntil,
   });
 
-  await updateUserPhoneNumberDraft(userId, normalized);
+  await sendFonnteWhatsApp(normalized, buildOtpWhatsAppMessage(otp));
+
   await logOtpVerificationAction(userId, normalized, "send", `send_count=${sendCount}`);
 
   const refreshedUser = await getUserById(userId);

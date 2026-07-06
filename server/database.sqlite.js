@@ -1504,6 +1504,5 @@ export function updateUserPhoneNumberDraft(userId, phoneNumber) {
         updated_at = ?
     WHERE id = ?
   `).run(phoneNumber, now, userId);
-  clearOtpVerification(userId);
   return getUserById(userId);
 }

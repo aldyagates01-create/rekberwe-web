@@ -1750,6 +1750,5 @@ export async function updateUserPhoneNumberDraft(userId, phoneNumber) {
   await ensureReady();
   const now = new Date().toISOString();
   await query("UPDATE users SET phone_number = $2, updated_at = $3 WHERE id = $1", [userId, phoneNumber, now]);
-  await clearOtpVerification(userId);
   return getUserById(userId);
 }
