@@ -4136,6 +4136,70 @@ textarea.field-invalid {
   margin-top: 6px;
 }
 
+@media (min-width: 769px) {
+  #workspace-transaction-form.workspace-transaction-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 18px;
+    align-items: start;
+  }
+
+  #workspace-transaction-form.workspace-transaction-form-grid .form-span-full {
+    grid-column: 1 / -1;
+  }
+
+  #workspace-transaction-form.workspace-transaction-form-grid .submit-btn {
+    justify-self: start;
+    min-width: min(100%, 320px);
+  }
+
+  #workspace-inline-transaction-panel .section-head h3 {
+    font-size: 1.45rem;
+  }
+
+  .workspace-transaction-note {
+    margin-top: 14px;
+  }
+}
+
+.inline-link-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #8eb4ff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.verification-page-shell {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.verification-page-body {
+  display: grid;
+  gap: 16px;
+}
+
+#workspace-verification-view .profile-verification-panel {
+  margin-top: 0;
+  padding: 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(17, 28, 45, 0.72), rgba(12, 20, 34, 0.92));
+  border: 1px solid rgba(82, 110, 255, 0.14);
+}
+
+.profile-layout-single {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.mobile-quick-action-icon.icon-teal {
+  background: linear-gradient(135deg, #2dd4bf 0%, #0ea5e9 100%);
+}
+
 .brand-home-trigger {
   cursor: pointer;
 }

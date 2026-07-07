@@ -99,7 +99,7 @@ const elements = {
   mobileDashboardLearnMore: document.getElementById("mobile-dashboard-learn-more"),
   mobileDashboardSeeAll: document.getElementById("mobile-dashboard-see-all"),
   mobileQuickCreate: document.getElementById("mobile-quick-create"),
-  mobileQuickTransactions: document.getElementById("mobile-quick-transactions"),
+  mobileQuickVerification: document.getElementById("mobile-quick-verification"),
   mobileQuickGuide: document.getElementById("mobile-quick-guide"),
   desktopQuickGuide: document.getElementById("desktop-quick-guide"),
   mobileQuickSecurity: document.getElementById("mobile-quick-security"),
@@ -191,9 +191,11 @@ const elements = {
   transactionsIntroSection: document.getElementById("transactions-intro-section"),
   workspaceDashboardView: document.getElementById("workspace-dashboard-view"),
   workspaceProfileView: document.getElementById("workspace-profile-view"),
+  workspaceVerificationView: document.getElementById("workspace-verification-view"),
   workspaceNotificationsView: document.getElementById("workspace-notifications-view"),
   workspaceMobileTransactionsView: document.getElementById("workspace-mobile-transactions-view"),
   profileCardWorkspace: document.getElementById("profile-card-workspace"),
+  profileVerificationPageWorkspace: document.getElementById("profile-verification-page-workspace"),
   profileVerificationAsideWorkspace: document.getElementById("profile-verification-aside-workspace"),
   workspaceCreateTransactionButton: document.getElementById("workspace-create-transaction-button"),
   workspaceOpenTransactionsButton: document.getElementById("workspace-open-transactions-button"),
@@ -258,6 +260,7 @@ const elements = {
   sidebarTransactionsButton: document.getElementById("sidebar-transactions-button"),
   sidebarProfileButton: document.getElementById("sidebar-profile-button"),
   sidebarNotificationsButton: document.getElementById("sidebar-notifications-button"),
+  sidebarVerificationButton: document.getElementById("sidebar-verification-button"),
   sidebarSecurityGuideButton: document.getElementById("sidebar-security-guide-button"),
   sidebarCreateTransaction: document.getElementById("sidebar-create-transaction"),
   sidebarLiveChatButton: document.getElementById("sidebar-live-chat-button"),
@@ -1288,6 +1291,7 @@ function bindForms() {
   });
   elements.sidebarProfileButton?.addEventListener("click", () => openWorkspaceSection("profile"));
   elements.sidebarNotificationsButton?.addEventListener("click", () => openWorkspaceSection("notifications"));
+  elements.sidebarVerificationButton?.addEventListener("click", () => openWorkspaceSection("verification"));
   elements.sidebarCreateTransaction?.addEventListener("click", () => {
     openWorkspaceSection("dashboard");
   });
@@ -1309,10 +1313,7 @@ function bindForms() {
   elements.mobileQuickCreate?.addEventListener("click", () => {
     openMobileCreateTransaction();
   });
-  elements.mobileQuickTransactions?.addEventListener("click", () => {
-    state.transactionScreen = "list";
-    openWorkspaceSection("transactions");
-  });
+  elements.mobileQuickVerification?.addEventListener("click", () => openWorkspaceSection("verification"));
   elements.mobileDashboardSeeAll?.addEventListener("click", () => {
     state.transactionScreen = "list";
     openWorkspaceSection("transactions");
@@ -1413,8 +1414,9 @@ function bindForms() {
   elements.cancelTransaction?.addEventListener("click", () => handleTransactionAction("cancel_transaction"));
   elements.lookupProfile?.addEventListener("click", handleProfileLookup);
   elements.lookupProfileWorkspace?.addEventListener("click", handleProfileLookup);
-  elements.openProfileTab.addEventListener("click", () => {
-    openWorkspaceSection("profile");
+  document.getElementById("workspace-open-verification-link")?.addEventListener("click", () => openWorkspaceSection("verification"));
+  elements.openProfileTab?.addEventListener("click", () => {
+    openWorkspaceSection("verification");
     closeVerificationModal();
   });
   bindWhatsappOtpModalControls();
@@ -1554,8 +1556,8 @@ async function handleCreateTransaction(event) {
   const role = String(formData.get("role") || "").trim();
 
   if (role === "seller" && state.currentUser.verificationStatus !== "verified") {
-    openVerificationModal("Untuk membuat transaksi sebagai penjual, Anda wajib verifikasi KTP dulu di tab Profil.");
-    showResult(form, "Penjual wajib verifikasi KTP dulu di tab Profil.", true);
+    openVerificationModal("Untuk membuat transaksi sebagai penjual, Anda wajib verifikasi KTP dulu di menu Verifikasi.");
+    showResult(form, "Penjual wajib verifikasi KTP dulu di menu Verifikasi.", true);
     return;
   }
 
@@ -2389,6 +2391,7 @@ function updateWorkspaceMenuState() {
     [elements.sidebarTransactionsButton, state.workspaceSection === "transactions"],
     [elements.sidebarProfileButton, state.workspaceSection === "profile"],
     [elements.sidebarNotificationsButton, state.workspaceSection === "notifications"],
+    [elements.sidebarVerificationButton, state.workspaceSection === "verification"],
     [elements.mobileNavDashboard, state.workspaceSection === "dashboard"],
     [elements.mobileNavTransactions, state.workspaceSection === "transactions"],
     [elements.mobileNavAccount, state.workspaceSection === "profile"],
@@ -2619,12 +2622,16 @@ function renderProfile() {
     elements.profileCardWorkspace.innerHTML = profileMarkup;
   }
   captureProfileVerificationDraft();
-  if (elements.profileVerificationAsideWorkspace) {
+  const verificationHost = elements.profileVerificationPageWorkspace || elements.profileVerificationAsideWorkspace;
+  if (verificationHost) {
     if (!isProfileVerificationFormFocused()) {
-      elements.profileVerificationAsideWorkspace.innerHTML = verificationMarkup;
+      verificationHost.innerHTML = verificationMarkup;
       restoreProfileVerificationDraft();
       bindProfileVerificationDraftTracking();
     }
+  }
+  if (elements.profileVerificationAsideWorkspace && elements.profileVerificationPageWorkspace) {
+    elements.profileVerificationAsideWorkspace.innerHTML = "";
   }
 
   bindLinkProviderButtons();
@@ -3227,7 +3234,7 @@ function enforceTransactionVerificationState(showPopup = false) {
       field.disabled = blocked;
     });
     if (blocked && showPopup) {
-      openVerificationModal("Role penjual membutuhkan verifikasi KTP dulu. Silakan lengkapi di tab Profil.");
+      openVerificationModal("Role penjual membutuhkan verifikasi KTP dulu. Silakan lengkapi di menu Verifikasi.");
     }
   });
 }
@@ -4348,6 +4355,7 @@ function renderTransactionScreen() {
   const showTransactionsSection = section === "transactions";
   const showDashboard = section === "dashboard";
   const showProfile = section === "profile";
+  const showVerification = section === "verification";
   const showNotifications = section === "notifications";
   const showRoom = inWorkspace && showTransactionsSection && state.transactionScreen === "room" && Boolean(state.activeTransaction);
   const showTransactionEmpty = inWorkspace && showTransactionsSection && !showRoom;
@@ -4359,6 +4367,7 @@ function renderTransactionScreen() {
   elements.workspaceDashboardView?.classList.toggle("hidden", !showDashboard);
   elements.workspaceDashboardView?.classList.toggle("mobile-create-open", Boolean(showDashboard && state.mobileCreateOpen));
   elements.workspaceProfileView?.classList.toggle("hidden", !showProfile);
+  elements.workspaceVerificationView?.classList.toggle("hidden", !showVerification);
   elements.workspaceNotificationsView?.classList.toggle("hidden", !showNotifications);
   elements.workspaceMobileTransactionsView?.classList.toggle("hidden", !showMobileTransactionsView);
   elements.transactionRoom.classList.toggle("hidden", !showRoom);
@@ -4371,7 +4380,10 @@ function renderTransactionScreen() {
     elements.roomPageSubtitle.textContent = "Gunakan menu kiri untuk membuat transaksi, membuka ruang chat, dan mengelola akun Anda.";
   } else if (showProfile) {
     elements.roomPageTitle.textContent = "Akun Saya";
-    elements.roomPageSubtitle.textContent = "Kelola profil, verifikasi, dan social media tanpa meninggalkan workspace.";
+    elements.roomPageSubtitle.textContent = "Kelola profil dan social media tanpa meninggalkan workspace.";
+  } else if (showVerification) {
+    elements.roomPageTitle.textContent = "Verifikasi";
+    elements.roomPageSubtitle.textContent = "Lengkapi verifikasi identitas penjual dan WhatsApp OTP di halaman ini.";
   } else if (showNotifications) {
     elements.roomPageTitle.textContent = "Notifikasi";
     elements.roomPageSubtitle.textContent = "Semua pemberitahuan transaksi dan live chat tampil di sini.";
