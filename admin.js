@@ -28,6 +28,12 @@ let adminSupportPresenceTickTimer = null;
 let adminRoomPresenceTickTimer = null;
 let settingsFormDirty = false;
 
+const adminAppConfig = {
+  authCallbackParam: "authResult",
+};
+
+let providerConfig = null;
+
 const elements = {
   adminUserCard: document.getElementById("admin-user-card"),
   adminStatus: document.getElementById("admin-status"),
@@ -149,6 +155,14 @@ const elements = {
   adminUserProfileModalName: document.getElementById("admin-user-profile-modal-name"),
   adminUserProfileModalBadge: document.getElementById("admin-user-profile-modal-badge"),
   adminUserProfileModalGrid: document.getElementById("admin-user-profile-modal-grid"),
+  adminLoginGate: document.getElementById("admin-login-gate"),
+  adminLoginGateText: document.getElementById("admin-login-gate-text"),
+  adminHeaderLogin: document.getElementById("admin-header-login"),
+  adminOpenLoginBtn: document.getElementById("admin-open-login-btn"),
+  adminSwitchAccountBtn: document.getElementById("admin-switch-account-btn"),
+  adminLoginModal: document.getElementById("admin-login-modal"),
+  closeAdminLoginModal: document.getElementById("close-admin-login-modal"),
+  adminProviderLoginButtons: Array.from(document.querySelectorAll("#admin-login-modal [data-provider]")),
 };
 
 let adminNoteResolver = null;
@@ -190,6 +204,20 @@ function bindAdminUserMenuDelegation() {
 bootstrap().catch((error) => {
   console.error(error);
   showStatus(error.message || "Gagal membuka dashboard admin.", true);
+});
+
+elements.adminHeaderLogin?.addEventListener("click", openAdminLoginModal);
+elements.adminOpenLoginBtn?.addEventListener("click", openAdminLoginModal);
+elements.closeAdminLoginModal?.addEventListener("click", closeAdminLoginModal);
+elements.adminSwitchAccountBtn?.addEventListener("click", async () => {
+  await fetchJson("/api/logout", { method: "POST" });
+  window.location.href = "/admin";
+});
+elements.adminProviderLoginButtons.forEach((button) => {
+  button.addEventListener("click", () => startAdminProviderLogin(button.dataset.provider));
+});
+elements.adminLoginModal?.addEventListener("click", (event) => {
+  if (event.target === elements.adminLoginModal) closeAdminLoginModal();
 });
 
 window.addEventListener("pointerdown", unlockAdminNotificationAudio, { once: true });
@@ -270,13 +298,121 @@ document.addEventListener("click", async (event) => {
   showStatus("Data rekening penjual berhasil dicopy.");
 });
 
-async function bootstrap() {
-  const session = await fetchJson("/api/session");
-  if (!session.user || !session.user.isAdmin) {
-    showStatus("Akses admin diperlukan. Login dengan akun admin terlebih dahulu.", true);
-    elements.adminUserCard.innerHTML = "<strong>Akun ini belum memiliki akses admin.</strong>";
+function normalizeAdminProviderName(value) {
+  const raw = String(value || "").toLowerCase();
+  if (raw === "telegram") return "Telegram";
+  if (raw === "google" || raw === "gmail") return "Google";
+  if (raw === "facebook") return "Facebook";
+  if (raw === "discord") return "Discord";
+  return "";
+}
+
+function applyAdminProviderAvailability() {
+  if (!providerConfig?.providers) return;
+  const providerMap = new Map(providerConfig.providers.map((item) => [item.name, item]));
+  elements.adminProviderLoginButtons.forEach((button) => {
+    const provider = providerMap.get(normalizeAdminProviderName(button.dataset.provider));
+    if (normalizeAdminProviderName(button.dataset.provider) === "Facebook") {
+      button.title = "Login Facebook saat ini sedang pengembangan. Silakan gunakan social media lain.";
+      return;
+    }
+    if (!provider || provider.enabled) return;
+    button.disabled = true;
+    button.title = `Provider ${button.dataset.provider} belum diaktifkan di backend.`;
+  });
+}
+
+function openAdminLoginModal() {
+  elements.adminLoginModal?.classList.remove("hidden");
+}
+
+function closeAdminLoginModal() {
+  elements.adminLoginModal?.classList.add("hidden");
+}
+
+function startAdminProviderLogin(providerName) {
+  const normalized = normalizeAdminProviderName(providerName);
+  if (!normalized) return;
+  if (normalized === "Facebook") {
+    closeAdminLoginModal();
+    showStatus("Login Facebook saat ini sedang pengembangan. Silakan login melalui Google, Discord, atau Telegram.", true);
     return;
   }
+  closeAdminLoginModal();
+  showStatus(`Mengarahkan ke login ${normalized}...`);
+  const params = new URLSearchParams();
+  params.set("returnTo", "/admin");
+  window.location.href = `/auth/${normalized.toLowerCase()}?${params.toString()}`;
+}
+
+function handleAdminAuthCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const authResult = params.get(adminAppConfig.authCallbackParam);
+  if (!authResult) return;
+
+  const providerName = normalizeAdminProviderName(params.get("provider"));
+  const label = providerName || "provider";
+  if (authResult === "success") {
+    window.RekberAnalytics?.track?.("login_success");
+    showStatus(`Login ${label} berhasil. Memuat dashboard admin...`);
+  } else {
+    const message = params.get("message");
+    window.RekberAnalytics?.track?.("login_failed");
+    showStatus(`Login ${label} gagal${message ? `: ${message}` : "."}`, true);
+  }
+
+  params.delete(adminAppConfig.authCallbackParam);
+  params.delete("provider");
+  params.delete("message");
+  const cleanQuery = params.toString();
+  history.replaceState({}, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
+}
+
+function showAdminLoginGate(message, options = {}) {
+  document.body.classList.add("admin-locked");
+  elements.adminLoginGate?.classList.remove("hidden");
+  elements.adminHeaderLogin?.classList.remove("hidden");
+  if (elements.adminLoginGateText && message) {
+    elements.adminLoginGateText.textContent = message;
+  }
+  elements.adminSwitchAccountBtn?.classList.toggle("hidden", !options.showSwitchAccount);
+  if (elements.adminUserCard) {
+    elements.adminUserCard.innerHTML = "<p class=\"mini-label\">Belum login sebagai admin</p>";
+  }
+  showStatus(message || "Login admin diperlukan.", true);
+}
+
+function hideAdminLoginGate() {
+  document.body.classList.remove("admin-locked");
+  elements.adminLoginGate?.classList.add("hidden");
+  elements.adminHeaderLogin?.classList.add("hidden");
+  closeAdminLoginModal();
+}
+
+async function bootstrap() {
+  handleAdminAuthCallback();
+  try {
+    providerConfig = await fetchJson("/api/config");
+    applyAdminProviderAvailability();
+  } catch (error) {
+    console.warn("Gagal memuat konfigurasi provider login admin:", error);
+  }
+
+  const session = await fetchJson("/api/session");
+  if (!session.user) {
+    showAdminLoginGate("Silakan login dengan akun admin untuk membuka dashboard RekberWE.id.");
+    return;
+  }
+
+  if (!session.user.isAdmin) {
+    showAdminLoginGate(
+      `Akun ${session.user.displayName || "ini"} belum memiliki akses admin. Login dengan akun admin yang terdaftar, atau hubungi pemilik sistem.`,
+      { showSwitchAccount: true },
+    );
+    return;
+  }
+
+  hideAdminLoginGate();
 
   state.currentUser = session.user;
   ensureAdminNotificationState();
