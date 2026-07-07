@@ -6,6 +6,7 @@ import {
   getSupportThreadForGuest,
   getSupportThreadForUser,
   getTransactionByCode,
+  usersShareAnyTransaction,
 } from "./database.js";
 
 function extractUploadFilename(value) {
@@ -37,7 +38,14 @@ export async function canAccessLocalUpload(req, filename) {
   const context = await getLocalUploadAccessContext(uploadPath);
   if (!context) return false;
 
-  if (context.ownerUserIds.includes(user.id)) return true;
+  if (context.ktpOwnerUserIds.includes(user.id)) return true;
+  if (context.avatarOwnerUserIds.includes(user.id)) return true;
+
+  for (const ownerId of context.avatarOwnerUserIds) {
+    if (ownerId !== user.id && await usersShareAnyTransaction(user.id, ownerId)) {
+      return true;
+    }
+  }
 
   for (const code of context.transactionCodes) {
     const transaction = await getTransactionByCode(code);

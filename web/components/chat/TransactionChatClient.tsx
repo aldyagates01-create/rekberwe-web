@@ -9,12 +9,16 @@ import { QuickActionChips } from "@/components/chat/QuickActionChips";
 import { TransactionSummaryCollapse } from "@/components/chat/TransactionSummaryCollapse";
 import {
   buildTimeline,
+  canJoinTransaction,
+  getJoinRole,
+  getJoinRoleLabel,
   getSession,
   getSystemMessageIcon,
   getTransaction,
   getTransactionActions,
   getUserRole,
   isSystemMessage,
+  joinTransaction,
   runAction,
   sendMessage,
   sendPresenceAway,
@@ -61,6 +65,13 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     () => (transaction ? getUserRole(transaction, user?.id) : null),
     [transaction, user?.id],
   );
+
+  const joinRole = useMemo(
+    () => (transaction ? getJoinRole(transaction) : "buyer"),
+    [transaction],
+  );
+
+  const showJoinPanel = Boolean(transaction && user && !role && canJoinTransaction(transaction, user.id));
 
   const actionButtons = useMemo(
     () => (transaction ? getTransactionActions(transaction, role) : []),
@@ -381,6 +392,20 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     }
   }
 
+  async function handleJoinTransaction() {
+    if (!transaction || sending) return;
+    setSending(true);
+    setError("");
+    try {
+      const payload = await joinTransaction(code, joinRole);
+      setTransaction(payload.transaction);
+    } catch (joinError) {
+      setError(joinError instanceof Error ? joinError.message : "Gagal bergabung ke transaksi.");
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-bg text-sm text-white/60">
@@ -559,20 +584,48 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
         </p>
       ) : null}
 
+      {error ? (
+        <p className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-xs text-red-200">
+          {error}
+        </p>
+      ) : null}
+
       <QuickActionChips
         actions={actionButtons}
         onAction={handleTransactionAction}
-        disabled={sending}
+        disabled={sending || showJoinPanel}
       />
 
-      <ChatInput
-        value={message}
-        onChange={setMessage}
-        onSend={handleSend}
-        onAttach={() => fileInputRef.current?.click()}
-        disabled={!user}
-        sending={sending}
-      />
+      {showJoinPanel ? (
+        <div className="shrink-0 border-t border-white/10 bg-[#0d1524] px-4 py-4">
+          <p className="mb-3 text-sm text-white/80">
+            Anda belum masuk ke transaksi ini. Untuk link ini Anda hanya bisa bergabung sebagai{" "}
+            <strong>{getJoinRoleLabel(joinRole)}</strong>.
+          </p>
+          {joinRole === "seller" && user?.verificationStatus !== "verified" ? (
+            <p className="mb-3 text-xs text-amber-300">
+              Sebagai penjual, Anda wajib verifikasi KTP dan WhatsApp di menu Verifikasi terlebih dahulu.
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleJoinTransaction}
+            disabled={sending || (joinRole === "seller" && user?.verificationStatus !== "verified")}
+            className="h-11 w-full rounded-xl bg-accent-blue text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {sending ? "Memproses..." : `Masuk sebagai ${getJoinRoleLabel(joinRole)}`}
+          </button>
+        </div>
+      ) : (
+        <ChatInput
+          value={message}
+          onChange={setMessage}
+          onSend={handleSend}
+          onAttach={() => fileInputRef.current?.click()}
+          disabled={!user || !role}
+          sending={sending}
+        />
+      )}
 
       <input
         ref={fileInputRef}

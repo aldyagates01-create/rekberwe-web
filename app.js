@@ -312,7 +312,11 @@ window.addEventListener("touchstart", unlockUserNotificationAudio, { once: true,
 
 bootstrap().catch((error) => {
   console.error(error);
-  setAuthStatus("Website belum bisa memuat data login. Silakan coba refresh halaman.", true);
+  if (state.currentUser?.banned) {
+    setAuthStatus(state.currentUser.bannedReason || "Akun Anda sedang diblokir admin.", true);
+  } else {
+    setAuthStatus("Website belum bisa memuat data login. Silakan coba refresh halaman.", true);
+  }
   renderAll();
 });
 
@@ -771,12 +775,12 @@ function bindWhatsappOtpModalControls() {
 }
 
 function bindWhatsappOtpDelegation() {
-  if (elements.profileVerificationAsideWorkspace?.dataset.otpBound === "true") return;
-  if (!elements.profileVerificationAsideWorkspace) return;
-  elements.profileVerificationAsideWorkspace.dataset.otpBound = "true";
-  elements.profileVerificationAsideWorkspace.addEventListener("click", (event) => {
+  if (document.body.dataset.otpDelegationBound === "true") return;
+  document.body.dataset.otpDelegationBound = "true";
+  document.body.addEventListener("click", (event) => {
     const trigger = event.target.closest("[data-open-whatsapp-otp]");
     if (!trigger || trigger.disabled) return;
+    if (!trigger.closest("#profile-verification-form")) return;
     event.preventDefault();
     openWhatsappOtpModal();
   });
@@ -852,6 +856,9 @@ function toggleChatFormBusy(isBusy) {
 async function hydrateCurrentSession() {
   const session = await fetchJson("/api/session");
   state.currentUser = session.user;
+  if (state.currentUser?.banned) {
+    setAuthStatus(state.currentUser.bannedReason || "Akun Anda sedang diblokir admin.", true);
+  }
   if (state.currentUser && !state.currentMemberView) {
     try {
       const shouldOpenDashboard = sessionStorage.getItem("rekberwe-open-dashboard");
@@ -869,6 +876,10 @@ async function hydrateCurrentSession() {
 
 async function refreshTransactions() {
   if (!state.currentUser) {
+    state.transactions = [];
+    return;
+  }
+  if (state.currentUser.banned) {
     state.transactions = [];
     return;
   }
@@ -1820,6 +1831,7 @@ async function handleJoinTransaction() {
   }
 
   if (!state.currentUser) {
+    rememberPendingTransactionRoute(code);
     openLoginModal();
     return;
   }
@@ -2913,14 +2925,15 @@ function buildUserProfileModalGrid(profile, transactions) {
   if (profile.role === "admin") {
     return `${stats}<div class="profile-stat-card" style="grid-column: 1 / -1;"><span>Kontak customer care</span><strong>Gmail: ${escapeHtml(profile.email || "-")}</strong><strong>Telegram: ${escapeHtml(profile.telegramContact || "-")}</strong></div>`;
   }
+  const isVerifiedSeller = profile.verificationStatus === "verified" || Boolean(profile.verified);
   const connectedProviders = new Set([profile.provider, ...(profile.linkedProviders || []).map((item) => item.provider)].filter(Boolean));
   const statuses = [
     buildProfileStatusRow("facebook", "Facebook", connectedProviders.has("Facebook")),
     buildProfileStatusRow("discord", "Discord", connectedProviders.has("Discord")),
     buildProfileStatusRow("telegram", "Telegram", connectedProviders.has("Telegram")),
-    buildProfileStatusRow("location", "Lokasi terverifikasi", Boolean(profile.locationVerified)),
-    buildProfileStatusRow("ktp", "Foto KTP", Boolean(profile.ktpPhotoUrl)),
-    buildProfileStatusRow("video", "Video selfie KTP", Boolean(profile.ktpVideoUrl)),
+    buildProfileStatusRow("location", "Lokasi terverifikasi", isVerifiedSeller),
+    buildProfileStatusRow("ktp", "Foto KTP", isVerifiedSeller),
+    buildProfileStatusRow("video", "Video selfie KTP", isVerifiedSeller),
   ].join("");
   return `${stats}<div class="profile-stat-card" style="grid-column: 1 / -1;"><span>Status data terhubung</span><div class="profile-status-list">${statuses}</div></div>`;
 }
@@ -4140,7 +4153,7 @@ async function handleSupportRoute() {
     openLoginModal();
     return;
   }
-  openWorkspaceSection("home");
+  openWorkspaceSection("dashboard");
   if (elements.supportWidgetPanel?.classList.contains("hidden")) {
     toggleSupportWidget();
   }
@@ -4165,7 +4178,9 @@ async function handleInitialRoute() {
   }
   openWorkspaceSection("transactions");
   state.transactionScreen = "room";
-  elements.joinCode.value = code.toUpperCase();
+  const normalizedCode = code.toUpperCase();
+  if (elements.joinCode) elements.joinCode.value = normalizedCode;
+  if (elements.mobileJoinCode) elements.mobileJoinCode.value = normalizedCode;
   await handleJoinTransaction();
 }
 

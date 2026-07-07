@@ -1785,8 +1785,9 @@ export async function updateUserPhoneNumberDraft(userId, phoneNumber) {
 export async function getLocalUploadAccessContext(uploadPath) {
   if (!postgresEnabled) return sqliteDb.getLocalUploadAccessContext(uploadPath);
   await ensureReady();
-  const ownerRows = await queryRows(
-    "SELECT id FROM users WHERE avatar = $1 OR ktp_photo_url = $1 OR ktp_video_url = $1",
+  const avatarRows = await queryRows("SELECT id FROM users WHERE avatar = $1", [uploadPath]);
+  const ktpRows = await queryRows(
+    "SELECT id FROM users WHERE ktp_photo_url = $1 OR ktp_video_url = $1",
     [uploadPath],
   );
   const transactionRows = await queryRows(
@@ -1797,9 +1798,31 @@ export async function getLocalUploadAccessContext(uploadPath) {
     "SELECT DISTINCT thread_id FROM support_messages WHERE attachment_url = $1",
     [uploadPath],
   );
+  const ownerUserIds = [...new Set([
+    ...avatarRows.map((row) => row.id),
+    ...ktpRows.map((row) => row.id),
+  ])];
   return {
-    ownerUserIds: ownerRows.map((row) => row.id),
+    ownerUserIds,
+    avatarOwnerUserIds: avatarRows.map((row) => row.id),
+    ktpOwnerUserIds: ktpRows.map((row) => row.id),
     transactionCodes: transactionRows.map((row) => row.code),
     supportThreadIds: supportRows.map((row) => row.thread_id),
   };
+}
+
+export async function usersShareAnyTransaction(userIdA, userIdB) {
+  if (!postgresEnabled) return sqliteDb.usersShareAnyTransaction(userIdA, userIdB);
+  if (!userIdA || !userIdB || userIdA === userIdB) return false;
+  await ensureReady();
+  const rows = await queryRows(
+    `
+      SELECT 1 AS ok FROM transactions
+      WHERE (buyer_user_id = $1 AND seller_user_id = $2)
+         OR (buyer_user_id = $2 AND seller_user_id = $1)
+      LIMIT 1
+    `,
+    [userIdA, userIdB],
+  );
+  return rows.length > 0;
 }

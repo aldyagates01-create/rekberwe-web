@@ -63,6 +63,7 @@ export type Transaction = {
   buyerConfirmedReceived: boolean;
   sellerPayoutSent: boolean;
   createdAt: string;
+  createdByRole?: "buyer" | "seller";
   adminPayoutAccount?: string;
   sellerBankName?: string;
   sellerBankNumber?: string;

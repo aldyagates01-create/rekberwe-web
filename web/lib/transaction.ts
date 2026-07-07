@@ -38,6 +38,24 @@ export function getUserRole(transaction: Transaction, userId?: string | null) {
   return null;
 }
 
+export function canJoinTransaction(transaction: Transaction, userId?: string | null) {
+  if (!userId) return false;
+  if (transaction.paymentStatus === "Transaksi dibatalkan" || transaction.paymentStatus === "Selesai") {
+    return false;
+  }
+  if (transaction.buyer?.id === userId || transaction.seller?.id === userId) return false;
+  if (transaction.buyer && transaction.seller) return false;
+  return true;
+}
+
+export function getJoinRole(transaction: Transaction): "buyer" | "seller" {
+  return transaction.createdByRole === "buyer" ? "seller" : "buyer";
+}
+
+export function getJoinRoleLabel(role: "buyer" | "seller") {
+  return role === "buyer" ? "Pembeli" : "Penjual";
+}
+
 export function isSystemMessage(item: TransactionMessage) {
   const sender = String(item.sender || "").toLowerCase();
   return sender === "system";
@@ -152,6 +170,13 @@ export async function getSession() {
 export async function getTransaction(code: string) {
   const payload = await fetchJson<{ transaction: Transaction }>(`/api/transactions/${encodeURIComponent(code)}`);
   return payload.transaction;
+}
+
+export async function joinTransaction(code: string, role: "buyer" | "seller") {
+  return fetchJson<{ transaction: Transaction }>(`/api/transactions/${encodeURIComponent(code)}/join`, {
+    method: "POST",
+    body: JSON.stringify({ role }),
+  });
 }
 
 export async function sendMessage(code: string, text: string) {

@@ -1531,19 +1531,38 @@ export function updateUserPhoneNumberDraft(userId, phoneNumber) {
 }
 
 export function getLocalUploadAccessContext(uploadPath) {
-  const ownerRows = db.prepare(`
-    SELECT id FROM users
-    WHERE avatar = ? OR ktp_photo_url = ? OR ktp_video_url = ?
-  `).all(uploadPath, uploadPath, uploadPath);
+  const avatarOwners = db.prepare(`
+    SELECT id FROM users WHERE avatar = ?
+  `).all(uploadPath);
+  const ktpOwners = db.prepare(`
+    SELECT id FROM users WHERE ktp_photo_url = ? OR ktp_video_url = ?
+  `).all(uploadPath, uploadPath);
   const transactionRows = db.prepare(`
     SELECT DISTINCT transaction_code AS code FROM transaction_uploads WHERE file_url = ?
   `).all(uploadPath);
   const supportRows = db.prepare(`
     SELECT DISTINCT thread_id FROM support_messages WHERE attachment_url = ?
   `).all(uploadPath);
+  const ownerUserIds = [...new Set([
+    ...avatarOwners.map((row) => row.id),
+    ...ktpOwners.map((row) => row.id),
+  ])];
   return {
-    ownerUserIds: ownerRows.map((row) => row.id),
+    ownerUserIds,
+    avatarOwnerUserIds: avatarOwners.map((row) => row.id),
+    ktpOwnerUserIds: ktpOwners.map((row) => row.id),
     transactionCodes: transactionRows.map((row) => row.code),
     supportThreadIds: supportRows.map((row) => row.thread_id),
   };
+}
+
+export function usersShareAnyTransaction(userIdA, userIdB) {
+  if (!userIdA || !userIdB || userIdA === userIdB) return false;
+  const row = db.prepare(`
+    SELECT 1 AS ok FROM transactions
+    WHERE (buyer_user_id = ? AND seller_user_id = ?)
+       OR (buyer_user_id = ? AND seller_user_id = ?)
+    LIMIT 1
+  `).get(userIdA, userIdB, userIdB, userIdA);
+  return Boolean(row);
 }
