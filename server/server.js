@@ -56,10 +56,12 @@ import {
 import {
   dispatchEmail,
   sendAdminVerifiedEmail,
+  sendBuyerFundsSecuredEmail,
   sendDisputeOpenedEmail,
   sendFundsReleasedEmail,
-  sendFundsSecuredEmail,
+  sendItemDeliveredEmail,
   sendRegistrationSuccessEmail,
+  sendSellerFundsReceivedEmail,
   sendTestEmail,
   sendTransactionCreatedEmail,
 } from "../lib/email/sendEmail.ts";
@@ -101,6 +103,28 @@ function getRequestBaseUrl(req) {
   if (!host) return appBaseUrl;
   return `${protocol}://${host}`.replace(/\/$/, "");
 }
+
+async function getEmailReadyUser(userOrId) {
+  if (!userOrId) return null;
+  if (typeof userOrId === "string") return getUserById(userOrId);
+  if (userOrId.id) {
+    const fresh = await getUserById(userOrId.id);
+    return fresh || userOrId;
+  }
+  return userOrId;
+}
+
+async function getEmailReadyTransaction(transaction) {
+  if (!transaction) return { transaction: null, buyer: null, seller: null };
+  const buyer = transaction.buyer?.id ? await getUserById(transaction.buyer.id) : transaction.buyer;
+  const seller = transaction.seller?.id ? await getUserById(transaction.seller.id) : transaction.seller;
+  return {
+    transaction,
+    buyer: buyer || transaction.buyer || null,
+    seller: seller || transaction.seller || null,
+  };
+}
+
 const cloudinaryEnabled = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
   process.env.CLOUDINARY_API_KEY &&
@@ -855,12 +879,16 @@ app.post("/api/transactions", requireAuth, async (req, res) => {
 
   await broadcastEvent("transaction_updated", transaction.code, { transaction });
 
-  dispatchEmail(() => sendTransactionCreatedEmail(
-    transaction,
-    transaction.buyer,
-    transaction.seller,
-    getRequestBaseUrl(req),
-  ));
+  dispatchEmail(async () => {
+    const { buyer, seller } = await getEmailReadyTransaction(transaction);
+    const creator = await getEmailReadyUser(req.session.user);
+    await sendTransactionCreatedEmail(
+      transaction,
+      buyer || (role === "buyer" ? creator : null),
+      seller || (role === "seller" ? creator : null),
+      getRequestBaseUrl(req),
+    );
+  });
 
   res.status(201).json({ transaction });
 });
@@ -926,6 +954,16 @@ app.post("/api/transactions/:code/join", requireAuth, async (req, res) => {
 
   const updated = await joinTransaction(code, req.session.user.id, role);
   await broadcastEvent("transaction_updated", code, { transaction: updated });
+  dispatchEmail(async () => {
+    const { buyer, seller } = await getEmailReadyTransaction(updated);
+    const joiner = await getEmailReadyUser(req.session.user);
+    await sendTransactionCreatedEmail(
+      updated,
+      buyer || (role === "buyer" ? joiner : null),
+      seller || (role === "seller" ? joiner : null),
+      getRequestBaseUrl(req),
+    );
+  });
   res.json({ transaction: updated });
 });
 
@@ -1108,13 +1146,21 @@ app.post("/api/transactions/:code/actions", requireAuth, async (req, res) => {
     ...buildStatusPushExtras(updated, `Update transaksi — ${getTransactionDisplayTitle(updated)}`, updated.paymentStatus),
   });
   if (action === "open_dispute") {
-    dispatchEmail(() => sendDisputeOpenedEmail(
-      updated,
-      updated.buyer,
-      updated.seller,
-      null,
-      getRequestBaseUrl(req),
-    ));
+    dispatchEmail(async () => {
+      const { buyer, seller, transaction } = await getEmailReadyTransaction(updated);
+      await sendDisputeOpenedEmail(
+        transaction,
+        buyer,
+        seller,
+        null,
+        getRequestBaseUrl(req),
+      );
+    });
+  } else if (action === "account_delivered") {
+    dispatchEmail(async () => {
+      const { buyer, transaction } = await getEmailReadyTransaction(updated);
+      await sendItemDeliveredEmail(transaction, buyer, getRequestBaseUrl(req));
+    });
   }
   res.json({ transaction: updated });
 });
@@ -1317,7 +1363,10 @@ app.post("/api/admin/users/:id/verification", requireAdmin, async (req, res) => 
     pushTrigger: "verification_reviewed",
   });
   if (action === "approve" && updated.verificationStatus === "verified") {
-    dispatchEmail(() => sendAdminVerifiedEmail(updated, getRequestBaseUrl(req)));
+    dispatchEmail(async () => {
+      const freshUser = await getEmailReadyUser(updated);
+      await sendAdminVerifiedEmail(freshUser || updated, getRequestBaseUrl(req));
+    });
   }
   res.json({ user: updated });
 });
@@ -1505,19 +1554,16 @@ app.post("/api/admin/transactions/:code/actions", requireAdmin, async (req, res)
     ...buildStatusPushExtras(updated, `Update admin — ${getTransactionDisplayTitle(updated)}`, updated.paymentStatus),
   });
   if (action === "funds_received") {
-    dispatchEmail(() => sendFundsSecuredEmail(
-      updated,
-      updated.buyer,
-      updated.seller,
-      getRequestBaseUrl(req),
-    ));
+    dispatchEmail(async () => {
+      const { buyer, seller, transaction } = await getEmailReadyTransaction(updated);
+      await sendBuyerFundsSecuredEmail(transaction, buyer, getRequestBaseUrl(req));
+      await sendSellerFundsReceivedEmail(transaction, seller, getRequestBaseUrl(req));
+    });
   } else if (action === "complete_transaction") {
-    dispatchEmail(() => sendFundsReleasedEmail(
-      updated,
-      updated.buyer,
-      updated.seller,
-      getRequestBaseUrl(req),
-    ));
+    dispatchEmail(async () => {
+      const { buyer, seller, transaction } = await getEmailReadyTransaction(updated);
+      await sendFundsReleasedEmail(transaction, buyer, seller, getRequestBaseUrl(req));
+    });
   }
   res.json({ transaction: updated });
 });

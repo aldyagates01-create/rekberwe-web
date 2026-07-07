@@ -4,7 +4,9 @@ import {
   buildDisputeOpenedEmail,
   buildFundsReleasedEmail,
   buildFundsSecuredEmail,
+  buildItemDeliveredEmail,
   buildRegistrationSuccessEmail,
+  buildSellerFundsReceivedEmail,
   buildTestEmail,
   buildTransactionCreatedEmail,
 } from "./templates.ts";
@@ -12,6 +14,7 @@ import {
 export type EmailUserLike = {
   email?: string | null;
   displayName?: string | null;
+  linkedProviders?: Array<{ email?: string | null; provider?: string | null }> | null;
 };
 
 export type EmailTransactionLike = {
@@ -48,12 +51,20 @@ function formatDateWib(value: string | Date): string {
 }
 
 function resolveRecipient(user?: EmailUserLike | null) {
-  const email = String(user?.email || "").trim();
-  if (!email || !email.includes("@")) return null;
-  return {
-    email,
-    name: String(user?.displayName || "Pengguna").trim() || "Pengguna",
-  };
+  if (!user) return null;
+  const candidates = [
+    user.email,
+    ...(user.linkedProviders || []).map((item) => item?.email),
+  ];
+  for (const raw of candidates) {
+    const email = String(raw || "").trim();
+    if (!email || !email.includes("@")) continue;
+    return {
+      email,
+      name: String(user.displayName || "Pengguna").trim() || "Pengguna",
+    };
+  }
+  return null;
 }
 
 function normalizeBaseUrl(baseUrl?: string) {
@@ -85,6 +96,10 @@ async function sendUniqueEmails(
   event: string,
   buildMessage: (name: string) => { subject: string; html: string },
 ) {
+  if (!recipients.length) {
+    logEmailResult("-", event, "skipped", "no_recipients");
+    return;
+  }
   const seen = new Set<string>();
   for (const recipient of recipients) {
     const email = recipient.email.trim().toLowerCase();
@@ -191,6 +206,42 @@ export async function sendFundsSecuredEmail(
 
   await sendUniqueEmails(recipients, "funds_secured", (name) => (
     buildFundsSecuredEmail(name, payload, buildTransactionUrl(baseUrl || "", payload.code))
+  ));
+}
+
+export async function sendBuyerFundsSecuredEmail(
+  transaction: EmailTransactionLike,
+  buyer?: EmailUserLike | null,
+  baseUrl?: string,
+) {
+  const payload = buildTransactionPayload(transaction);
+  const recipients = [resolveRecipient(buyer ?? transaction.buyer)].filter(Boolean) as Array<{ email: string; name: string }>;
+  await sendUniqueEmails(recipients, "funds_secured_buyer", (name) => (
+    buildFundsSecuredEmail(name, payload, buildTransactionUrl(baseUrl || "", payload.code))
+  ));
+}
+
+export async function sendSellerFundsReceivedEmail(
+  transaction: EmailTransactionLike,
+  seller?: EmailUserLike | null,
+  baseUrl?: string,
+) {
+  const payload = buildTransactionPayload(transaction);
+  const recipients = [resolveRecipient(seller ?? transaction.seller)].filter(Boolean) as Array<{ email: string; name: string }>;
+  await sendUniqueEmails(recipients, "seller_funds_received", (name) => (
+    buildSellerFundsReceivedEmail(name, payload, buildTransactionUrl(baseUrl || "", payload.code))
+  ));
+}
+
+export async function sendItemDeliveredEmail(
+  transaction: EmailTransactionLike,
+  buyer?: EmailUserLike | null,
+  baseUrl?: string,
+) {
+  const payload = buildTransactionPayload(transaction);
+  const recipients = [resolveRecipient(buyer ?? transaction.buyer)].filter(Boolean) as Array<{ email: string; name: string }>;
+  await sendUniqueEmails(recipients, "item_delivered", (name) => (
+    buildItemDeliveredEmail(name, payload, buildTransactionUrl(baseUrl || "", payload.code))
   ));
 }
 

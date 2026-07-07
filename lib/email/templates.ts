@@ -243,6 +243,55 @@ export function buildDisputeOpenedEmail(name: string, transaction: {
   };
 }
 
+export function buildSellerFundsReceivedEmail(name: string, transaction: {
+  code: string;
+  title: string;
+  price: number;
+}, ctaUrl: string) {
+  return {
+    subject: `Dana Transaksi #${transaction.code} Sudah Diterima Admin`,
+    html: wrapEmailHtml({
+      preview: `Dana transaksi #${transaction.code} sudah diterima admin.`,
+      greeting: `Halo ${name},`,
+      paragraphs: [
+        `Dana untuk transaksi #${transaction.code} telah diterima admin RekberWe.id.`,
+        "Silakan lanjutkan proses penyerahan barang, akun, item, atau jasa kepada pembeli sesuai kesepakatan transaksi.",
+        "Setelah data atau item benar-benar diserahkan, klik tombol konfirmasi penyerahan di ruang transaksi.",
+      ],
+      details: [
+        { label: "Judul", value: transaction.title || "-" },
+        { label: "Nilai transaksi", value: formatCurrencyId(transaction.price) },
+        { label: "Status", value: "Dana Diterima Admin" },
+      ],
+      cta: { label: "Buka Transaksi", url: ctaUrl },
+    }),
+  };
+}
+
+export function buildItemDeliveredEmail(name: string, transaction: {
+  code: string;
+  title: string;
+  price: number;
+}, ctaUrl: string) {
+  return {
+    subject: `Item / Akun Transaksi #${transaction.code} Sudah Diserahkan`,
+    html: wrapEmailHtml({
+      preview: `Penjual telah menyerahkan item pada transaksi #${transaction.code}.`,
+      greeting: `Halo ${name},`,
+      paragraphs: [
+        `Penjual telah mengonfirmasi bahwa data akun, item, atau jasa untuk transaksi #${transaction.code} sudah diserahkan.`,
+        "Segera cek dan amankan data atau item Anda. Jika sudah sesuai, lanjutkan proses transaksi melalui ruang chat RekberWe.id.",
+      ],
+      details: [
+        { label: "Judul", value: transaction.title || "-" },
+        { label: "Nilai transaksi", value: formatCurrencyId(transaction.price) },
+        { label: "Status", value: "Akun / Item Diserahkan" },
+      ],
+      cta: { label: "Buka Transaksi", url: ctaUrl },
+    }),
+  };
+}
+
 export function buildTestEmail() {
   return {
     subject: "Test Email RekberWe.id",
