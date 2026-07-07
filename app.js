@@ -2793,7 +2793,7 @@ function buildTransactionProfileDetails(role, transaction) {
     return normalizeProfileDetails({
       id: "admin",
       displayName: "RekberWE.id",
-      avatar: state.providerConfig?.brandLogoUrl || "assets/rekberwe-logo-shield.png?v=6",
+      avatar: state.providerConfig?.brandLogoUrl || "assets/rekberwe-logo-shield.png?v=7",
       verificationStatus: "verified",
       verified: true,
       provider: "Admin",
@@ -3410,7 +3410,7 @@ function buildTransactionStatusTimeline(transaction) {
       detail: completedDone
         ? "Dana sudah diproses ke penjual dan transaksi selesai."
         : "Menunggu admin menyelesaikan transfer dana ke penjual.",
-      time: findTransactionEventTime(transaction, ["transaksi dinyatakan selesai", "transfer ke penjual sudah selesai"]) || "-",
+      time: findTransactionEventTime(transaction, ["Admin sudah meneruskan dana ke penjual", "transaksi dinyatakan selesai", "transfer ke penjual sudah selesai"]) || "-",
       done: completedDone,
     },
   ];

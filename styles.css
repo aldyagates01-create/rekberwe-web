@@ -158,6 +158,7 @@ img.brand-logo-icon {
   object-fit: contain;
   object-position: center;
   display: block;
+  background: transparent;
   filter: drop-shadow(0 8px 22px rgba(46, 125, 255, 0.24));
 }
 

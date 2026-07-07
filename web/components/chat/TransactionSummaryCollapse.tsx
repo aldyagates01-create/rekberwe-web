@@ -7,7 +7,7 @@ import { getShortStatus, getTransactionProgress } from "@/lib/transaction";
 import type { Transaction, User } from "@/lib/types";
 import { VerificationBadge } from "@/components/chat/VerificationBadge";
 
-const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-shield.png?v=6";
+const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-shield.png?v=7";
 
 type TransactionSummaryCollapseProps = {
   transaction: Transaction;

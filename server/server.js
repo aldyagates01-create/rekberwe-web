@@ -362,7 +362,7 @@ app.get("/api/config", async (_req, res) => {
   const feeSettings = await getAdminFeeSettings();
   res.json({
     appBaseUrl,
-    brandLogoUrl: "/assets/rekberwe-logo-shield.png?v=6",
+    brandLogoUrl: "/assets/rekberwe-logo-shield.png?v=7",
     providers: Object.entries(providers).map(([name, provider]) => ({
       name,
       label: provider.label,
@@ -1537,8 +1537,12 @@ app.post("/api/admin/transactions/:code/actions", requireAdmin, async (req, res)
       adminFundsReceived: current.adminFundsReceived ? 1 : 0,
       buyerConfirmedReceived: current.buyerConfirmedReceived ? 1 : 0,
       sellerPayoutSent: 1,
-      systemMessage: "Admin menandai transfer ke penjual sudah selesai dan transaksi dinyatakan selesai.",
+      systemMessage: "Admin sudah meneruskan dana ke penjual. Terimakasih sudah menggunakan jasa RekberWe.id.",
     });
+    updated = await addAdminTransactionMessage(
+      code,
+      "Admin sudah meneruskan dana ke penjual. Terimakasih sudah menggunakan jasa RekberWe.id.",
+    );
   } else if (action === "cancel_transaction") {
     updated = await updateTransactionWorkflow(code, {
       paymentStatus: "Transaksi dibatalkan",

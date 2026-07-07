@@ -3,7 +3,7 @@
 import { getInitials, formatTime } from "@/lib/format";
 import { VerificationBadge } from "@/components/chat/VerificationBadge";
 
-export const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-shield.png?v=6";
+export const ADMIN_AVATAR_URL = "/assets/rekberwe-logo-shield.png?v=7";
 
 type AvatarProps = {
   name: string;

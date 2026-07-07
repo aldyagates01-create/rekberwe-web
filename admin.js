@@ -1466,7 +1466,7 @@ function buildAdminTransactionStatusTimeline(transaction) {
       detail: completedDone
         ? "Dana sudah diproses ke penjual dan transaksi selesai."
         : "Menunggu admin menyelesaikan transfer dana ke penjual.",
-      time: findAdminTransactionEventTime(transaction, ["transaksi dinyatakan selesai", "transfer ke penjual sudah selesai"]) || "-",
+      time: findAdminTransactionEventTime(transaction, ["Admin sudah meneruskan dana ke penjual", "transaksi dinyatakan selesai", "transfer ke penjual sudah selesai"]) || "-",
       done: completedDone,
     },
   ];
@@ -1788,13 +1788,6 @@ async function handleAdminAction(action) {
 
     state.activeTransaction = payload.transaction;
     await refreshDashboardData();
-    if (action === "complete_transaction") {
-      await fetchJson(`/api/admin/transactions/${state.activeTransaction.code}/messages`, {
-        method: "POST",
-        body: JSON.stringify({ text: "Terima kasih sudah bertransaksi menggunakan RekberWE.id. Semoga transaksi Anda aman dan lancar. Sampai jumpa di transaksi berikutnya." }),
-      });
-      await refreshDashboardData();
-    }
     showStatus(
       action === "request_buyer_payment"
         ? "Instruksi transfer ke admin berhasil dikirim."
@@ -1975,7 +1968,7 @@ function buildAdminTransactionProfileDetails(role, transaction) {
     return normalizeAdminProfileDetails({
       id: state.currentUser?.id || "admin",
       displayName: "RekberWE.id",
-      avatar: "/assets/rekberwe-logo-shield.png?v=6",
+      avatar: "/assets/rekberwe-logo-shield.png?v=7",
       verificationStatus: "verified",
       verified: true,
       provider: "Admin",
@@ -2631,7 +2624,7 @@ function renderSupportAdminMessage(message, threadUser = null) {
   const profile = isAdmin
     ? normalizeAdminProfileDetails({
       displayName: message.sender || "RekberWE.id",
-      avatar: "/assets/rekberwe-logo-shield.png?v=6",
+      avatar: "/assets/rekberwe-logo-shield.png?v=7",
       verificationStatus: "verified",
       verified: true,
     }, "Admin")
