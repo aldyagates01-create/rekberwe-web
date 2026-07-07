@@ -18,10 +18,12 @@ const sqliteImportEnabled = String(process.env.MIGRATE_SQLITE_ON_BOOT || "").tri
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), "data"));
 const sqliteImportPath = path.resolve(process.env.SQLITE_IMPORT_PATH || path.join(dataDir, "rekberwe.sqlite"));
 
+const postgresSslRejectUnauthorized = String(process.env.DATABASE_SSL_REJECT_UNAUTHORIZED || "false").trim().toLowerCase() === "true";
+
 const pool = postgresEnabled
   ? new Pool({
     connectionString: databaseUrl,
-    ssl: postgresSsl ? { rejectUnauthorized: false } : false,
+    ssl: postgresSsl ? { rejectUnauthorized: postgresSslRejectUnauthorized } : false,
     max: Number(process.env.DATABASE_POOL_MAX || 10),
   })
   : null;
@@ -1778,4 +1780,26 @@ export async function updateUserPhoneNumberDraft(userId, phoneNumber) {
   const now = new Date().toISOString();
   await query("UPDATE users SET phone_number = $2, updated_at = $3 WHERE id = $1", [userId, phoneNumber, now]);
   return getUserById(userId);
+}
+
+export async function getLocalUploadAccessContext(uploadPath) {
+  if (!postgresEnabled) return sqliteDb.getLocalUploadAccessContext(uploadPath);
+  await ensureReady();
+  const ownerRows = await queryRows(
+    "SELECT id FROM users WHERE avatar = $1 OR ktp_photo_url = $1 OR ktp_video_url = $1",
+    [uploadPath],
+  );
+  const transactionRows = await queryRows(
+    "SELECT DISTINCT transaction_code AS code FROM transaction_uploads WHERE file_url = $1",
+    [uploadPath],
+  );
+  const supportRows = await queryRows(
+    "SELECT DISTINCT thread_id FROM support_messages WHERE attachment_url = $1",
+    [uploadPath],
+  );
+  return {
+    ownerUserIds: ownerRows.map((row) => row.id),
+    transactionCodes: transactionRows.map((row) => row.code),
+    supportThreadIds: supportRows.map((row) => row.thread_id),
+  };
 }

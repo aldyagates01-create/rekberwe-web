@@ -80,6 +80,7 @@ const elements = {
   facebookDirectLogin: document.getElementById("facebook-direct-login"),
   discordDirectLogin: document.getElementById("discord-direct-login"),
   telegramStatus: document.getElementById("telegram-status"),
+  workspaceStatusToast: document.getElementById("workspace-status-toast"),
   currentUserCard: document.getElementById("current-user-card"),
   officeBox: document.getElementById("office-box"),
   officeAddressDisplay: document.getElementById("public-office-address"),
@@ -155,6 +156,8 @@ const elements = {
   chatForm: document.getElementById("chat-form"),
   chatInput: document.getElementById("chat-input"),
   joinCode: document.getElementById("join-code"),
+  mobileJoinCode: document.getElementById("mobile-join-code"),
+  mobileJoinTransaction: document.getElementById("mobile-join-transaction"),
   joinTransaction: document.getElementById("join-transaction"),
   joinRoleBox: document.getElementById("join-role-box"),
   joinRoleModal: document.getElementById("join-role-modal"),
@@ -1387,7 +1390,12 @@ function bindForms() {
       validateWarrantyField(form);
     }, true);
   });
-  elements.joinTransaction.addEventListener("click", handleJoinTransaction);
+  elements.joinTransaction?.addEventListener("click", handleJoinTransaction);
+  elements.mobileJoinTransaction?.addEventListener("click", handleJoinTransaction);
+  elements.mobileJoinCode?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") handleJoinTransaction();
+  });
+  document.getElementById("profile-open-verification-link")?.addEventListener("click", () => openWorkspaceSection("verification"));
   elements.joinAsBuyer.addEventListener("click", () => handleRoleJoin("buyer"));
   elements.joinAsSeller.addEventListener("click", () => handleRoleJoin("seller"));
   elements.backToTransactionList?.addEventListener("click", handleWorkspaceBackNavigation);
@@ -1509,11 +1517,22 @@ function handleProviderAuthCallback() {
 }
 
 function setAuthStatus(message, isError = false) {
-  elements.telegramStatus.textContent = message;
-  elements.telegramStatus.classList.remove("hidden");
-  elements.telegramStatus.style.background = isError ? "rgba(180, 58, 45, 0.1)" : "rgba(28, 125, 87, 0.1)";
-  elements.telegramStatus.style.color = isError ? "#b43a2d" : "#1c7d57";
-  elements.telegramStatus.style.borderColor = isError ? "rgba(180, 58, 45, 0.14)" : "rgba(28, 125, 87, 0.14)";
+  const inWorkspace = Boolean(state.currentUser && document.body.classList.contains("is-member-view"));
+  const target = inWorkspace && elements.workspaceStatusToast
+    ? elements.workspaceStatusToast
+    : elements.telegramStatus;
+  if (!target) return;
+  target.textContent = message;
+  target.classList.remove("hidden");
+  target.style.background = isError ? "rgba(180, 58, 45, 0.1)" : "rgba(28, 125, 87, 0.1)";
+  target.style.color = isError ? "#b43a2d" : "#1c7d57";
+  target.style.borderColor = isError ? "rgba(180, 58, 45, 0.14)" : "rgba(28, 125, 87, 0.14)";
+  if (inWorkspace && elements.workspaceStatusToast) {
+    window.clearTimeout(setAuthStatus.hideTimer);
+    setAuthStatus.hideTimer = window.setTimeout(() => {
+      elements.workspaceStatusToast?.classList.add("hidden");
+    }, 6000);
+  }
 }
 
 async function handleLogout() {
@@ -1568,17 +1587,23 @@ async function handleCreateTransaction(event) {
   if (!warrantyCheck.valid) {
     setWarrantyFieldError(form, warrantyCheck.message);
     showResult(form, warrantyCheck.message, true);
-    form.querySelector('input[name="warranty"]')?.focus();
+    form.querySelector('select[name="warranty"], input[name="warranty"]')?.focus();
     return;
   }
   setWarrantyFieldError(form, "");
+
+  const price = parseCurrencyInput(formData.get("price"));
+  if (!Number.isFinite(price) || price <= 0) {
+    showResult(form, "Harga transaksi harus lebih dari 0.", true);
+    return;
+  }
 
   try {
     const payload = await fetchJson("/api/transactions", {
       method: "POST",
       body: JSON.stringify({
         title: String(formData.get("title") || "").trim(),
-        price: parseCurrencyInput(formData.get("price")),
+        price,
         role,
         type: String(formData.get("type") || "").trim(),
         warranty: warrantyCheck.value,
@@ -1653,7 +1678,7 @@ function validateWarrantyValue(rawValue) {
 }
 
 function setWarrantyFieldError(form, message) {
-  const input = form?.querySelector('input[name="warranty"]');
+  const input = form?.querySelector('select[name="warranty"], input[name="warranty"]');
   const errorEl = form?.querySelector(".warranty-field-error");
   if (!errorEl) return;
   if (!message) {
@@ -1668,7 +1693,7 @@ function setWarrantyFieldError(form, message) {
 }
 
 function validateWarrantyField(form) {
-  const input = form?.querySelector('input[name="warranty"]');
+  const input = form?.querySelector('select[name="warranty"], input[name="warranty"]');
   if (!input) return { valid: true };
   const result = validateWarrantyValue(input.value);
   if (!result.valid) {
@@ -1681,7 +1706,7 @@ function validateWarrantyField(form) {
 
 function handleWarrantyInputFormat(event) {
   const input = event?.target;
-  if (!input || input.name !== "warranty") return;
+  if (!input || input.name !== "warranty" || input.tagName === "SELECT") return;
   const sanitized = sanitizeWarrantyDigits(input.value);
   if (sanitized !== input.value) {
     input.value = sanitized;
@@ -1747,7 +1772,7 @@ function consumePendingTransactionRoute() {
 
 function buildJoinRoleInstruction(allowedRole) {
   if (allowedRole === "seller" && state.currentUser?.verificationStatus !== "verified") {
-    return "Untuk transaksi ini Anda hanya bisa masuk sebagai Penjual. Akun Anda belum terverifikasi, silakan verifikasi dulu di Profil lalu buka kembali link transaksi ini.";
+    return "Untuk transaksi ini Anda hanya bisa masuk sebagai Penjual. Akun Anda belum terverifikasi, silakan verifikasi dulu di menu Verifikasi lalu buka kembali link transaksi ini.";
   }
   return `Untuk transaksi ini Anda hanya bisa masuk sebagai ${allowedRole === "buyer" ? "Pembeli" : "Penjual"}.`;
 }
@@ -1784,14 +1809,22 @@ function getTransactionActionAvailability(transaction, action) {
 }
 
 async function handleJoinTransaction() {
-  const code = String(elements.joinCode.value || "").trim().toUpperCase();
-  if (!code) return;
+  const code = String(
+    elements.joinCode?.value
+    || elements.mobileJoinCode?.value
+    || "",
+  ).trim().toUpperCase();
+  if (!code) {
+    setAuthStatus("Masukkan kode transaksi terlebih dahulu.", true);
+    return;
+  }
 
   if (!state.currentUser) {
     openLoginModal();
     return;
   }
 
+  try {
   const localTransaction = state.transactions.find((item) => item.code === code);
   if (localTransaction) {
     const allowedRoleLocal = localTransaction.createdByRole === "buyer" ? "seller" : "buyer";
@@ -1855,7 +1888,10 @@ async function handleJoinTransaction() {
   openWorkspaceSection("transactions");
   renderAll();
   history.replaceState({}, "", `?trx=${code}`);
-  document.getElementById("ruang-transaksi").scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById("ruang-transaksi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    setAuthStatus(error?.message || "Gagal masuk transaksi.", true);
+  }
 }
 
 async function handleRoleJoin(role) {
@@ -2071,27 +2107,31 @@ async function handleTransactionAction(action) {
   if (!state.activeTransaction) return;
   const confirmation = getTransactionActionConfirmation(action);
   if (confirmation && !await openConfirmModal("Konfirmasi aksi", confirmation)) return;
-  const payload = await fetchJson(`/api/transactions/${state.activeTransaction.code}/actions`, {
-    method: "POST",
-    body: JSON.stringify({ action }),
-  });
-  state.activeTransaction = payload.transaction;
-  await refreshTransactions();
-  await refreshDashboard();
-  renderRoom(state.activeTransaction);
-  renderHero();
-  renderProfile();
-  setAuthStatus(
-    action === "account_delivered"
-      ? "Konfirmasi akun diserahkan berhasil dikirim."
-      : action === "goods_received"
-        ? "Konfirmasi item diterima berhasil dikirim."
-        : action === "open_dispute"
-          ? "Sengketa berhasil diajukan."
-          : action === "cancel_transaction"
-            ? "Permintaan pembatalan transaksi berhasil dikirim."
-            : "Status transaksi berhasil diperbarui.",
-  );
+  try {
+    const payload = await fetchJson(`/api/transactions/${state.activeTransaction.code}/actions`, {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    });
+    state.activeTransaction = payload.transaction;
+    await refreshTransactions();
+    await refreshDashboard();
+    renderRoom(state.activeTransaction);
+    renderHero();
+    renderProfile();
+    setAuthStatus(
+      action === "account_delivered"
+        ? "Konfirmasi akun diserahkan berhasil dikirim."
+        : action === "goods_received"
+          ? "Konfirmasi item diterima berhasil dikirim."
+          : action === "open_dispute"
+            ? "Sengketa berhasil diajukan."
+            : action === "cancel_transaction"
+              ? "Permintaan pembatalan transaksi berhasil dikirim."
+              : "Status transaksi berhasil diperbarui.",
+    );
+  } catch (error) {
+    setAuthStatus(error?.message || "Aksi transaksi gagal.", true);
+  }
 }
 
 function handleProfileLookup() {
@@ -2117,11 +2157,8 @@ function renderLookupCard(person) {
   return `
     <article>
       <strong>${escapeHtml(person.displayName)}</strong>
-      <p>${escapeHtml(person.provider)}: ${escapeHtml(person.socialId)}</p>
-      <p>Nama sesuai KTP: ${escapeHtml(person.legalName || person.displayName)}</p>
       <p>Username: ${escapeHtml(formatHandle(person.username))}</p>
-      <p>Email: ${escapeHtml(person.email || "-")}</p>
-      <p>WhatsApp: ${escapeHtml(person.whatsapp || "-")}</p>
+      <p>Status verifikasi: ${escapeHtml(person.verificationStatus || (person.verified ? "verified" : "unverified"))}</p>
     </article>
   `;
 }
@@ -2411,7 +2448,13 @@ function renderMobileWorkspaceChrome() {
     }
   }
   if (elements.mobileHeaderNotificationsBadge) {
-    elements.mobileHeaderNotificationsBadge.classList.add("hidden");
+    const count = getTotalUserNotificationCount();
+    if (count > 0) {
+      elements.mobileHeaderNotificationsBadge.textContent = String(count > 99 ? "99+" : count);
+      elements.mobileHeaderNotificationsBadge.classList.remove("hidden");
+    } else {
+      elements.mobileHeaderNotificationsBadge.classList.add("hidden");
+    }
   }
 }
 
@@ -3011,13 +3054,11 @@ async function handleProfileVerificationSave(event) {
     window.setTimeout(() => hideVerificationUploadProgress(), 1800);
     const verificationPendingMessage = "Data verifikasi sudah masuk ke admin. Silakan tunggu, admin sedang cek. Biasanya memakan waktu 2-5 menit.";
     setAuthStatus(verificationPendingMessage);
-    window.alert(verificationPendingMessage);
   } catch (error) {
     console.error(error);
     setVerificationUploadProgressState(error.message || "Upload verifikasi gagal.", 100, "error", "Silakan cek file, izin lokasi, lalu coba lagi.");
     window.setTimeout(() => hideVerificationUploadProgress(), 2200);
     setAuthStatus(error.message || "Verifikasi gagal dikirim.", true);
-    window.alert(error.message || "Verifikasi gagal dikirim.");
   } finally {
     if (submitButton) submitButton.disabled = false;
   }
@@ -3181,6 +3222,14 @@ function openWorkspaceSection(section) {
   state.workspaceSection = section;
   renderHomeVisibility();
   renderMemberVisibility();
+  if (section === "verification" || section === "profile") {
+    renderProfile();
+  }
+  if (section === "notifications") {
+    renderNotifications();
+  }
+  renderTransactionScreen();
+  updateWorkspaceMenuState();
   scrollWorkspaceTarget("member-area");
 }
 
@@ -4254,7 +4303,13 @@ function updateUserNotificationBadges() {
   setButtonBadge(elements.mobileNavTransactions, unreadTransactions);
   setButtonBadge(elements.mobileNavSupport, unreadSupport);
   if (elements.mobileHeaderNotificationsBadge) {
-    elements.mobileHeaderNotificationsBadge.classList.add("hidden");
+    const count = getTotalUserNotificationCount();
+    if (count > 0) {
+      elements.mobileHeaderNotificationsBadge.textContent = String(count > 99 ? "99+" : count);
+      elements.mobileHeaderNotificationsBadge.classList.remove("hidden");
+    } else {
+      elements.mobileHeaderNotificationsBadge.classList.add("hidden");
+    }
   }
 }
 

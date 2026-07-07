@@ -4192,6 +4192,39 @@ textarea.field-invalid {
   border: 1px solid rgba(82, 110, 255, 0.14);
 }
 
+.workspace-status-toast {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(28, 125, 87, 0.14);
+  background: rgba(28, 125, 87, 0.1);
+  color: #1c7d57;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.mobile-join-code-card {
+  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(17, 28, 45, 0.72), rgba(12, 20, 34, 0.92));
+  border: 1px solid rgba(82, 110, 255, 0.14);
+}
+
+.mobile-join-code-label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mobile-join-code-label input {
+  width: 100%;
+}
+
+.mobile-join-code-btn {
+  width: 100%;
+}
+
 .profile-layout-single {
   grid-template-columns: minmax(0, 1fr) !important;
 }

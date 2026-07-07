@@ -46,6 +46,13 @@ import {
   updateUserVerificationFiles,
   upsertUser,
 } from "./database.js";
+import { createRateLimiter, getRequestRateLimitKey } from "./rate-limit.js";
+import { canAccessLocalUpload } from "./upload-access.js";
+import {
+  getViewerFromSession,
+  sanitizeTransactionForViewer,
+  sanitizeTransactionsForViewer,
+} from "./user-privacy.js";
 import { dispatchPushForEvent, getVapidPublicKey, initPushService, isPushEnabled } from "./push-service.js";
 import {
   ANALYTICS_EVENT_TYPES,
@@ -147,6 +154,11 @@ const googleJwks = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2
 const uploadStorage = multer.memoryStorage();
 const uploadLimits = { fileSize: 10 * 1024 * 1024, files: 5 };
 const ALLOWED_WARRANTY_DAY_VALUES = new Set([0, 3, 7, 14, 30]);
+const ALLOWED_TRANSACTION_ROLES = new Set(["buyer", "seller"]);
+const ALLOWED_TRANSACTION_TYPES = new Set(["akun", "gold", "power leveling"]);
+const ALLOWED_FEE_PAYERS = new Set(["buyer", "seller", "split"]);
+const MAX_TRANSACTION_TITLE_LENGTH = 200;
+const MAX_TRANSACTION_PRICE = 2_000_000_000;
 const MIME_TO_EXT = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -225,6 +237,27 @@ const PRESENCE_ONLINE_MS = 30000;
 const PRESENCE_SWEEP_MS = 5000;
 const TYPING_ACTIVE_MS = 5000;
 const analyticsRateLimits = new Map();
+
+const otpSendLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  keyFn: (req) => getRequestRateLimitKey(req, "otp-send"),
+});
+const otpVerifyLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyFn: (req) => getRequestRateLimitKey(req, "otp-verify"),
+});
+const publicSupportLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 25,
+  keyFn: (req) => getRequestRateLimitKey(req, "public-support"),
+});
+const uploadPostLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 20,
+  keyFn: (req) => getRequestRateLimitKey(req, "upload-post"),
+});
 
 const providers = {
   Telegram: {
@@ -337,7 +370,18 @@ const providers = {
 };
 
 app.use(express.json());
-app.use("/uploads", express.static(uploadsDir));
+
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "geolocation=(self), camera=(), microphone=()");
+  if (isProduction) {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  next();
+});
+
 const sessionSecret = String(process.env.SESSION_SECRET || "").trim();
 if (!sessionSecret && isProduction) {
   throw new Error("SESSION_SECRET wajib diset di production.");
@@ -357,6 +401,75 @@ app.use(
     },
   }),
 );
+
+app.get("/uploads/:filename", async (req, res) => {
+  try {
+    const filename = path.basename(String(req.params.filename || ""));
+    if (!filename || filename !== req.params.filename) {
+      res.status(400).json({ message: "Nama file tidak valid." });
+      return;
+    }
+    const allowed = await canAccessLocalUpload(req, filename);
+    if (!allowed) {
+      res.status(403).json({ message: "Akses file ditolak." });
+      return;
+    }
+    const target = path.join(uploadsDir, filename);
+    if (!fs.existsSync(target)) {
+      res.status(404).json({ message: "File tidak ditemukan." });
+      return;
+    }
+    res.sendFile(target);
+  } catch (error) {
+    res.status(500).json({ message: "Gagal mengambil file." });
+  }
+});
+
+function respondWithTransaction(res, req, transaction, statusCode = 200) {
+  const viewer = getViewerFromSession(req.session.user);
+  const payload = enrichTransactionPresence(sanitizeTransactionForViewer(transaction, viewer));
+  if (statusCode === 201) {
+    res.status(201).json({ transaction: payload });
+    return;
+  }
+  res.json({ transaction: payload });
+}
+
+function respondWithTransactions(res, req, transactions) {
+  const viewer = getViewerFromSession(req.session.user);
+  res.json({ transactions: sanitizeTransactionsForViewer(transactions, viewer) });
+}
+
+function isValidNik(value) {
+  return /^\d{16}$/.test(String(value || "").replace(/\s/g, ""));
+}
+
+function validateTransactionInput(body) {
+  const title = String(body.title || "").trim();
+  const price = Number(body.price);
+  const role = String(body.role || "").trim();
+  const type = String(body.type || "").trim();
+  const feePayer = String(body.feePayer || "").trim();
+  if (!title || title.length > MAX_TRANSACTION_TITLE_LENGTH) {
+    return { ok: false, message: `Judul transaksi wajib diisi (maks. ${MAX_TRANSACTION_TITLE_LENGTH} karakter).` };
+  }
+  if (!Number.isFinite(price) || price <= 0) {
+    return { ok: false, message: "Harga transaksi harus lebih dari 0." };
+  }
+  if (price > MAX_TRANSACTION_PRICE) {
+    return { ok: false, message: "Harga transaksi melebihi batas maksimum." };
+  }
+  if (!ALLOWED_TRANSACTION_ROLES.has(role)) {
+    return { ok: false, message: "Peran transaksi tidak valid." };
+  }
+  if (!ALLOWED_TRANSACTION_TYPES.has(type)) {
+    return { ok: false, message: "Jenis rekber tidak valid." };
+  }
+  if (!ALLOWED_FEE_PAYERS.has(feePayer)) {
+    return { ok: false, message: "Pilihan pembayar fee tidak valid." };
+  }
+  return { ok: true, title, price, role, type, feePayer };
+}
 
 app.get("/api/config", async (_req, res) => {
   const feeSettings = await getAdminFeeSettings();
@@ -523,8 +636,15 @@ app.post("/api/transactions/:code/typing", requireAuth, async (req, res) => {
 
 app.get("/api/me/dashboard", requireAuth, async (req, res) => {
   const transactions = await getTransactionsForUser(req.session.user.id);
-  const activeTransactions = transactions.filter((item) => item.paymentStatus !== "Selesai");
-  const completedTransactions = transactions.filter((item) => item.paymentStatus === "Selesai");
+  const viewer = getViewerFromSession(req.session.user);
+  const activeTransactions = sanitizeTransactionsForViewer(
+    transactions.filter((item) => item.paymentStatus !== "Selesai"),
+    viewer,
+  );
+  const completedTransactions = sanitizeTransactionsForViewer(
+    transactions.filter((item) => item.paymentStatus === "Selesai"),
+    viewer,
+  );
   const chatHistory = transactions
     .flatMap((item) => item.messages.map((message) => ({
       transactionCode: item.code,
@@ -551,7 +671,7 @@ app.get("/api/support-thread", requireAuth, async (req, res) => {
   res.json({ thread: enrichSupportThread(thread, { forUser: true }) });
 });
 
-app.get("/api/public-support-thread", async (req, res) => {
+app.get("/api/public-support-thread", publicSupportLimiter, async (req, res) => {
   const thread = await getSupportThreadForGuest(getGuestSupportKey(req));
   res.json({ thread: enrichSupportThread(thread, { forUser: true }) });
 });
@@ -565,7 +685,7 @@ app.post("/api/support-thread/typing", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/public-support-thread/typing", async (req, res) => {
+app.post("/api/public-support-thread/typing", publicSupportLimiter, async (req, res) => {
   const guestKey = getGuestSupportKey(req);
   const thread = await getSupportThreadForGuest(guestKey);
   const isTyping = Boolean(req.body.isTyping);
@@ -574,7 +694,7 @@ app.post("/api/public-support-thread/typing", async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/public-support-thread/presence", async (req, res) => {
+app.post("/api/public-support-thread/presence", publicSupportLimiter, async (req, res) => {
   const guestKey = getGuestSupportKey(req);
   const thread = await getSupportThreadForGuest(guestKey);
   const userId = `guest:${guestKey}`;
@@ -599,7 +719,7 @@ app.post("/api/support-thread/messages", requireAuth, async (req, res) => {
   res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
-app.post("/api/public-support-thread/messages", async (req, res) => {
+app.post("/api/public-support-thread/messages", publicSupportLimiter, async (req, res) => {
   const text = String(req.body.text || "").trim();
   if (!text) {
     res.status(400).json({ message: "Pesan live chat tidak boleh kosong." });
@@ -616,7 +736,7 @@ app.post("/api/public-support-thread/messages", async (req, res) => {
   res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
-app.post("/api/support-thread/uploads", requireAuth, upload.array("supportFiles", 5), async (req, res) => {
+app.post("/api/support-thread/uploads", requireAuth, uploadPostLimiter, upload.array("supportFiles", 5), async (req, res) => {
   const files = req.files || [];
   if (!files.length) {
     res.status(400).json({ message: "File live chat wajib diisi." });
@@ -640,7 +760,7 @@ app.post("/api/support-thread/uploads", requireAuth, upload.array("supportFiles"
   res.json({ thread: enrichSupportThread(updated, { forUser: true }) });
 });
 
-app.post("/api/public-support-thread/uploads", upload.array("supportFiles", 5), async (req, res) => {
+app.post("/api/public-support-thread/uploads", publicSupportLimiter, uploadPostLimiter, upload.array("supportFiles", 5), async (req, res) => {
   const files = req.files || [];
   if (!files.length) {
     res.status(400).json({ message: "File live chat wajib diisi." });
@@ -699,7 +819,7 @@ app.post("/api/me/profile/avatar", requireAuth, avatarUpload.single("avatar"), a
   res.json({ user: req.session.user });
 });
 
-app.post("/api/me/verification", requireAuth, verificationUpload.fields([
+app.post("/api/me/verification", requireAuth, uploadPostLimiter, verificationUpload.fields([
   { name: "ktpPhoto", maxCount: 1 },
   { name: "ktpVideo", maxCount: 1 },
 ]), async (req, res) => {
@@ -708,6 +828,10 @@ app.post("/api/me/verification", requireAuth, verificationUpload.fields([
   const whatsapp = String(req.body.whatsapp || "").trim();
   if (!legalName || !ktp || !whatsapp) {
     res.status(400).json({ message: "Nama sesuai KTP, nomor KTP, dan WhatsApp wajib diisi." });
+    return;
+  }
+  if (!isValidNik(ktp)) {
+    res.status(400).json({ message: "Nomor KTP harus 16 digit angka." });
     return;
   }
 
@@ -782,7 +906,7 @@ app.get("/api/me/whatsapp/status", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/me/whatsapp/send-otp", requireAuth, async (req, res) => {
+app.post("/api/me/whatsapp/send-otp", requireAuth, otpSendLimiter, async (req, res) => {
   try {
     const payload = await sendWhatsappOtp(req.session.user.id, req.body.phoneNumber, {
       forceResend: Boolean(req.body.forceResend),
@@ -798,7 +922,7 @@ app.post("/api/me/whatsapp/send-otp", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/me/whatsapp/verify-otp", requireAuth, async (req, res) => {
+app.post("/api/me/whatsapp/verify-otp", requireAuth, otpVerifyLimiter, async (req, res) => {
   try {
     const payload = await verifyWhatsappOtp(req.session.user.id, req.body.otp);
     req.session.user = await withAdminFlag(payload.user);
@@ -822,7 +946,11 @@ app.get("/api/transactions", requireAuth, async (req, res) => {
   const transactions = req.session.user.isAdmin
     ? await getAllTransactions()
     : await getTransactionsForUser(req.session.user.id);
-  res.json({ transactions });
+  if (req.session.user.isAdmin) {
+    res.json({ transactions });
+    return;
+  }
+  respondWithTransactions(res, req, transactions);
 });
 
 app.get("/api/transactions/:code", requireAuth, async (req, res) => {
@@ -830,15 +958,21 @@ app.get("/api/transactions/:code", requireAuth, async (req, res) => {
   const transaction = await getTransactionByCode(code);
   const accessible = await resolveTransactionAccess(req, res, transaction, { allowJoinPreview: true });
   if (!accessible) return;
-  res.json({ transaction: enrichTransactionPresence(accessible) });
+  if (req.session.user.isAdmin) {
+    res.json({ transaction: enrichTransactionPresence(accessible) });
+    return;
+  }
+  respondWithTransaction(res, req, accessible);
 });
 
 app.post("/api/transactions", requireAuth, async (req, res) => {
-  const { title, price, role, type, warranty, feePayer, sellerPayoutAccount, sellerBankName, sellerBankNumber, sellerBankHolder } = req.body;
-  if (!title || !price || !role || !type || !feePayer) {
-    res.status(400).json({ message: "Data transaksi belum lengkap." });
+  const validation = validateTransactionInput(req.body);
+  if (!validation.ok) {
+    res.status(400).json({ message: validation.message });
     return;
   }
+  const { title, price, role, type, feePayer } = validation;
+  const { warranty, sellerPayoutAccount, sellerBankName, sellerBankNumber, sellerBankHolder } = req.body;
 
   if (role === "seller" && req.session.user.verificationStatus !== "verified") {
     res.status(400).json({ message: "Penjual wajib verifikasi KTP dan WhatsApp terlebih dahulu." });
@@ -860,18 +994,18 @@ app.post("/api/transactions", requireAuth, async (req, res) => {
   const shareLink = `${getRequestBaseUrl(req)}/?trx=${encodeURIComponent(code)}`;
   const transaction = await createTransaction({
     code,
-    title: String(title).trim(),
-    price: Number(price),
-    type: String(type).trim(),
+    title,
+    price,
+    type,
     warranty: normalizedWarranty.label,
     sellerPayoutAccount: String(sellerPayoutAccount || "").trim(),
     sellerBankName: String(sellerBankName || "").trim(),
     sellerBankNumber: String(sellerBankNumber || "").trim(),
     sellerBankHolder: String(sellerBankHolder || "").trim(),
-    feePayer: String(feePayer).trim(),
-    feeAmount: calculateTransactionFee(Number(price), String(type).trim(), feeSettings),
+    feePayer,
+    feeAmount: calculateTransactionFee(price, type, feeSettings),
     paymentStatus: "Menunggu pembayaran",
-    createdByRole: String(role).trim(),
+    createdByRole: role,
     buyerUserId: role === "buyer" ? req.session.user.id : null,
     sellerUserId: role === "seller" ? req.session.user.id : null,
     shareLink,
@@ -890,7 +1024,7 @@ app.post("/api/transactions", requireAuth, async (req, res) => {
     );
   });
 
-  res.status(201).json({ transaction });
+  respondWithTransaction(res, req, transaction, 201);
 });
 
 app.post("/api/transactions/:code/seller-bank", requireAuth, async (req, res) => {
@@ -917,7 +1051,7 @@ app.post("/api/transactions/:code/seller-bank", requireAuth, async (req, res) =>
   }
   const updated = await updateSellerPayoutDetails(code, { bankName, bankNumber, bankHolder });
   await broadcastEvent("transaction_updated", code, { transaction: updated });
-  res.json({ transaction: updated });
+  respondWithTransaction(res, req, updated);
 });
 
 app.post("/api/transactions/:code/join", requireAuth, async (req, res) => {
@@ -964,7 +1098,7 @@ app.post("/api/transactions/:code/join", requireAuth, async (req, res) => {
       getRequestBaseUrl(req),
     );
   });
-  res.json({ transaction: updated });
+  respondWithTransaction(res, req, updated);
 });
 
 app.post("/api/transactions/:code/messages", requireAuth, async (req, res) => {
@@ -983,10 +1117,10 @@ app.post("/api/transactions/:code/messages", requireAuth, async (req, res) => {
     pushTrigger: "new_message",
     pushMeta: { message: lastMessage },
   });
-  res.json({ transaction: updated });
+  respondWithTransaction(res, req, updated);
 });
 
-app.post("/api/transactions/:code/uploads", requireAuth, upload.array("proofFiles", 5), async (req, res) => {
+app.post("/api/transactions/:code/uploads", requireAuth, uploadPostLimiter, upload.array("proofFiles", 5), async (req, res) => {
   const code = String(req.params.code || "").toUpperCase();
   const current = await getTransactionByCode(code);
   if (!assertTransactionParticipant(req, res, current)) return;
@@ -1015,7 +1149,7 @@ app.post("/api/transactions/:code/uploads", requireAuth, upload.array("proofFile
       pushTrigger: "new_upload",
       pushMeta: { upload: lastUpload },
     });
-    res.json({ transaction: updated });
+    respondWithTransaction(res, req, updated);
   } catch (error) {
     res.status(500).json({ message: error.message || "Upload file gagal." });
   }
@@ -1162,7 +1296,7 @@ app.post("/api/transactions/:code/actions", requireAuth, async (req, res) => {
       await sendItemDeliveredEmail(transaction, buyer, getRequestBaseUrl(req));
     });
   }
-  res.json({ transaction: updated });
+  respondWithTransaction(res, req, updated);
 });
 
 app.get("/api/admin/transactions", requireAdmin, async (_req, res) => {
@@ -1683,6 +1817,16 @@ app.get("/auth/:provider/callback", async (req, res) => {
     const tokens = await tokenResponse.json();
     if (!tokenResponse.ok) throw new Error(readOAuthError(tokens));
 
+    if (providerName === "Telegram" && savedAuth.nonce && tokens.id_token) {
+      const { payload } = await jwtVerify(tokens.id_token, telegramJwks, {
+        issuer: TELEGRAM_ISSUER,
+        audience: process.env.TELEGRAM_CLIENT_ID,
+      });
+      if (payload.nonce !== savedAuth.nonce) {
+        throw new Error("Nonce OAuth tidak valid.");
+      }
+    }
+
     const profile = await provider.profile({ tokens });
 
     if (savedAuth.mode === "link") {
@@ -1718,6 +1862,9 @@ app.get("/auth/:provider/callback", async (req, res) => {
       whatsapp: "",
     });
 
+    await new Promise((resolve, reject) => {
+      req.session.regenerate((err) => (err ? reject(err) : resolve()));
+    });
     req.session.user = await withAdminFlag(user);
     if (isNewUser) {
       dispatchEmail(() => sendRegistrationSuccessEmail(user, getRequestBaseUrl(req)));
@@ -1757,6 +1904,11 @@ app.use((error, req, res, next) => {
   }
   if (error instanceof multer.MulterError || String(error.message || "").toLowerCase().includes("tipe file")) {
     res.status(400).json({ message: error.message || "Upload gagal." });
+    return;
+  }
+  console.error("Unhandled server error:", error);
+  if (!res.headersSent) {
+    res.status(500).json({ message: "Terjadi kesalahan server." });
     return;
   }
   next(error);
@@ -1806,7 +1958,7 @@ async function requireAuth(req, res, next) {
     return;
   }
   req.session.user = await withAdminFlag(freshUser);
-  if (!req.session.user.isAdmin && req.session.user.banned && req.method !== "GET") {
+  if (!req.session.user.isAdmin && req.session.user.banned) {
     res.status(403).json({ message: req.session.user.bannedReason || "Akun Anda sedang diblokir admin." });
     return;
   }
@@ -2296,10 +2448,6 @@ async function broadcastEvent(type, code, payload = {}) {
   if (!transaction && type === "presence_updated" && payload.presence?.activeTransactionCode) {
     transaction = await getTransactionByCode(payload.presence.activeTransactionCode);
   }
-  const eventPayload = {
-    ...payload,
-    transaction: payload.transaction ? enrichTransactionPresence(payload.transaction) : payload.transaction,
-  };
   for (const client of eventClients) {
     if (type === "support_updated") {
       const supportVisible = client.audience === "admin" || client.userId === payload.userId;
@@ -2324,7 +2472,17 @@ async function broadcastEvent(type, code, payload = {}) {
       const visibleToUser = transaction.buyer?.id === client.userId || transaction.seller?.id === client.userId;
       if (!visibleToUser) continue;
     }
-    client.res.write(`data: ${JSON.stringify({ type, code, ...eventPayload })}\n\n`);
+
+    const clientPayload = { ...payload };
+    if (clientPayload.transaction) {
+      const viewer = client.audience === "admin"
+        ? { id: client.userId, isAdmin: true }
+        : { id: client.userId, isAdmin: false };
+      clientPayload.transaction = enrichTransactionPresence(
+        sanitizeTransactionForViewer(clientPayload.transaction, viewer),
+      );
+    }
+    client.res.write(`data: ${JSON.stringify({ type, code, ...clientPayload })}\n\n`);
   }
 
   const pushPayload = {

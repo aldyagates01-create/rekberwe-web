@@ -38,6 +38,9 @@ export function generateOtpCode() {
 }
 
 export function hashOtpCode(otp, userId) {
-  const pepper = String(process.env.OTP_SECRET || process.env.SESSION_SECRET || "rekberwe-otp-pepper");
+  const pepper = String(process.env.OTP_SECRET || process.env.SESSION_SECRET || "").trim();
+  if (!pepper) {
+    throw new Error("OTP_SECRET atau SESSION_SECRET wajib diset.");
+  }
   return crypto.createHmac("sha256", pepper).update(`${userId}:${otp}`).digest("hex");
 }

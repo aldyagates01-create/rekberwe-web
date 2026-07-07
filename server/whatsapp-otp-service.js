@@ -226,8 +226,19 @@ export async function verifyWhatsappOtp(userId, rawOtp) {
   const expectedHash = hashOtpCode(otp, userId);
   if (expectedHash !== record.otpCodeHash) {
     const updated = await incrementOtpVerificationAttempt(userId);
-    await logOtpVerificationAction(userId, record.phoneNumber, "verify_failed", `attempt=${updated?.attemptCount || 0}`);
-    const remaining = Math.max(0, MAX_VERIFY_ATTEMPTS - Number(updated?.attemptCount || 0));
+    const attemptCount = Number(updated?.attemptCount || 0);
+    if (attemptCount >= MAX_VERIFY_ATTEMPTS) {
+      const lockUntilIso = new Date(nowMs() + LOCK_DURATION_MS).toISOString();
+      await setOtpVerificationLock(userId, lockUntilIso);
+      await logOtpVerificationAction(userId, record.phoneNumber, "lockout", `verify_attempts=${attemptCount}`);
+      const lockedRecord = await getOtpVerificationByUserId(userId);
+      const error = new Error("Percobaan OTP melebihi batas. Verifikasi terkunci 10 menit. Silakan kirim ulang OTP nanti.");
+      error.code = "OTP_LOCKED";
+      error.state = buildOtpState(user, lockedRecord);
+      throw error;
+    }
+    await logOtpVerificationAction(userId, record.phoneNumber, "verify_failed", `attempt=${attemptCount}`);
+    const remaining = Math.max(0, MAX_VERIFY_ATTEMPTS - attemptCount);
     throw new Error(`OTP salah. Gunakan kode dari pesan WhatsApp paling baru. Sisa percobaan: ${remaining}.`);
   }
 

@@ -355,6 +355,8 @@
               </div>
             </div>
 
+            <div class="workspace-status-toast hidden" id="workspace-status-toast" role="status" aria-live="polite"></div>
+
             <div class="workspace-center-view hidden" id="workspace-dashboard-view">
               <section class="mobile-dashboard-shell">
                 <article class="mobile-dashboard-hero-card">
@@ -589,6 +591,7 @@
                 <div class="section-head">
                   <p class="eyebrow">Akun saya</p>
                   <h3>Profil & social media</h3>
+                  <button type="button" class="inline-link-btn" id="profile-open-verification-link">Verifikasi identitas penjual →</button>
                 </div>
                 <div class="profile-layout profile-layout-workspace">
                   <div class="profile-card" id="profile-card-workspace">
@@ -628,6 +631,16 @@
 
             <div class="workspace-center-view hidden" id="workspace-mobile-transactions-view">
               <section class="mobile-transactions-view-shell">
+                <section class="mobile-join-code-card">
+                  <div class="mobile-section-head">
+                    <h4>Masuk dengan kode</h4>
+                  </div>
+                  <label class="mobile-join-code-label">
+                    Kode transaksi
+                    <input type="text" id="mobile-join-code" placeholder="RW-2026-000128" autocomplete="off" />
+                  </label>
+                  <button type="button" class="primary-btn mobile-join-code-btn" id="mobile-join-transaction">Masuk transaksi</button>
+                </section>
                 <section class="mobile-transactions-section-card">
                   <div class="mobile-section-head">
                     <h4>Transaksi aktif</h4>
@@ -644,7 +657,7 @@
             </div>
 
             <div class="room-empty-state" id="transaction-room-empty">
-              <div class="empty-chat-icon">ðŸ’¬</div>
+              <div class="empty-chat-icon" aria-hidden="true">💬</div>
               <h4>Belum ada ruang chat yang dibuka</h4>
               <p>Pilih transaksi aktif atau histori di panel kiri, atau masukkan kode transaksi untuk masuk ke ruang rekber.</p>
             </div>

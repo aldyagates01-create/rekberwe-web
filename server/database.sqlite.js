@@ -1529,3 +1529,21 @@ export function updateUserPhoneNumberDraft(userId, phoneNumber) {
   `).run(phoneNumber, now, userId);
   return getUserById(userId);
 }
+
+export function getLocalUploadAccessContext(uploadPath) {
+  const ownerRows = db.prepare(`
+    SELECT id FROM users
+    WHERE avatar = ? OR ktp_photo_url = ? OR ktp_video_url = ?
+  `).all(uploadPath, uploadPath, uploadPath);
+  const transactionRows = db.prepare(`
+    SELECT DISTINCT transaction_code AS code FROM transaction_uploads WHERE file_url = ?
+  `).all(uploadPath);
+  const supportRows = db.prepare(`
+    SELECT DISTINCT thread_id FROM support_messages WHERE attachment_url = ?
+  `).all(uploadPath);
+  return {
+    ownerUserIds: ownerRows.map((row) => row.id),
+    transactionCodes: transactionRows.map((row) => row.code),
+    supportThreadIds: supportRows.map((row) => row.thread_id),
+  };
+}
