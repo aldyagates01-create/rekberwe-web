@@ -180,6 +180,19 @@
           <h3>Fee, syarat ketentuan, pengamanan akun, dan suara notif</h3>
         </div>
         <form id="admin-fee-form" class="profile-form admin-settings-form">
+          <div class="settings-section-card maintenance-settings-card" id="maintenance-settings-card">
+            <h4>Mode maintenance website</h4>
+            <label class="settings-toggle-row">
+              <input type="checkbox" id="maintenance-mode-enabled" />
+              <span>Aktifkan halaman &quot;Sedang Maintenance&quot;</span>
+            </label>
+            <p class="mini-note" id="maintenance-mode-status">Saat aktif, pengunjung non-admin melihat halaman maintenance. Admin tetap bisa mengakses dashboard dan website.</p>
+            <label>
+              Pesan untuk pengunjung
+              <textarea id="maintenance-mode-message" rows="4" placeholder="Contoh: RekberWE.id sedang dalam pemeliharaan. Silakan kembali 30 menit lagi."></textarea>
+            </label>
+            <button type="button" class="primary-btn" id="save-maintenance-settings-btn">Simpan Mode Maintenance</button>
+          </div>
           <div class="settings-section-card">
             <h4>Pengaturan fee & kontak</h4>
             <label>

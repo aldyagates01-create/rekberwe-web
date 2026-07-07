@@ -1386,7 +1386,17 @@ function defaultFeeSettings() {
       user: { url: "", name: "" },
       admin: { url: "", name: "" },
     },
+    maintenanceMode: false,
+    maintenanceMessage: defaultMaintenanceMessage(),
   };
+}
+
+function defaultMaintenanceMessage() {
+  return [
+    "RekberWE.id sedang dalam pemeliharaan sistem.",
+    "Kami melakukan peningkatan untuk pengalaman transaksi yang lebih aman.",
+    "Silakan kembali beberapa saat lagi.",
+  ].join("\n");
 }
 
 function defaultTermsAndConditions() {
@@ -1442,6 +1452,8 @@ function normalizeFeeSettings(input) {
         name: String(raw.notificationSounds?.admin?.name || "").trim(),
       },
     },
+    maintenanceMode: Boolean(raw.maintenanceMode),
+    maintenanceMessage: String(raw.maintenanceMessage || defaultMaintenanceMessage()).trim() || defaultMaintenanceMessage(),
   };
 }
 

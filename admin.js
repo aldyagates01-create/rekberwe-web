@@ -57,6 +57,11 @@ const elements = {
   adminTransactionList: document.getElementById("admin-transaction-list"),
   adminLogout: document.getElementById("admin-logout"),
   adminFeeForm: document.getElementById("admin-fee-form"),
+  maintenanceSettingsCard: document.getElementById("maintenance-settings-card"),
+  maintenanceModeEnabled: document.getElementById("maintenance-mode-enabled"),
+  maintenanceModeMessage: document.getElementById("maintenance-mode-message"),
+  maintenanceModeStatus: document.getElementById("maintenance-mode-status"),
+  saveMaintenanceSettingsBtn: document.getElementById("save-maintenance-settings-btn"),
   adminPayoutAccount: document.getElementById("admin-payout-account"),
   customerCareTelegram: document.getElementById("customer-care-telegram"),
   customerCareGmail: document.getElementById("customer-care-gmail"),
@@ -229,6 +234,7 @@ elements.adminLogout?.addEventListener("click", async () => {
 });
 
 elements.adminFeeForm.addEventListener("submit", handleSaveFeeSettings);
+elements.saveMaintenanceSettingsBtn?.addEventListener("click", handleSaveMaintenanceSettings);
 bindSettingsFormProtection();
 elements.adminSendTestEmail?.addEventListener("click", handleAdminSendTestEmail);
 elements.adminChatForm.addEventListener("submit", handleAdminSendMessage);
@@ -1415,12 +1421,65 @@ function renderFeeSettings(settings) {
   if (elements.accountSecurityGuide) {
     elements.accountSecurityGuide.value = settings?.accountSecurityGuide || "";
   }
+  if (elements.maintenanceModeEnabled) {
+    elements.maintenanceModeEnabled.checked = Boolean(settings?.maintenanceMode);
+  }
+  if (elements.maintenanceModeMessage) {
+    elements.maintenanceModeMessage.value = settings?.maintenanceMessage || "";
+  }
+  renderMaintenanceSettingsState(settings);
   for (let index = 0; index < 4; index += 1) {
     const tier = tiers[index] || { maxAmount: "", fee: "", feeType: "flat" };
     document.getElementById(`tier-${index + 1}-max`).value = tier.maxAmount ?? "";
     document.getElementById(`tier-${index + 1}-fee`).value = tier.fee ?? "";
   }
   renderFeeSettingsMeta(settings);
+}
+
+function renderMaintenanceSettingsState(settings) {
+  const active = Boolean(settings?.maintenanceMode);
+  elements.maintenanceSettingsCard?.classList.toggle("maintenance-settings-active", active);
+  if (elements.maintenanceModeStatus) {
+    elements.maintenanceModeStatus.textContent = active
+      ? "Mode maintenance AKTIF. Pengunjung non-admin melihat halaman maintenance."
+      : "Mode maintenance nonaktif. Website dapat diakses pengunjung biasa.";
+  }
+}
+
+async function handleSaveMaintenanceSettings() {
+  const maintenanceMode = Boolean(elements.maintenanceModeEnabled?.checked);
+  const maintenanceMessage = String(elements.maintenanceModeMessage?.value || "").trim();
+  if (maintenanceMode) {
+    const confirmed = window.confirm(
+      "Aktifkan mode maintenance?\n\nPengunjung non-admin tidak bisa membuka website sampai mode ini dimatikan.",
+    );
+    if (!confirmed) {
+      if (elements.maintenanceModeEnabled) {
+        elements.maintenanceModeEnabled.checked = false;
+      }
+      return;
+    }
+  }
+
+  const button = elements.saveMaintenanceSettingsBtn;
+  if (button) button.disabled = true;
+  try {
+    const payload = await fetchJson("/api/admin/settings", {
+      method: "POST",
+      body: JSON.stringify({
+        ...(state.settings || {}),
+        maintenanceMode,
+        maintenanceMessage,
+      }),
+    });
+    state.settings = payload.settings;
+    renderMaintenanceSettingsState(state.settings);
+    showStatus(maintenanceMode ? "Mode maintenance diaktifkan." : "Mode maintenance dimatikan.");
+  } catch (error) {
+    showStatus(error.message || "Gagal menyimpan mode maintenance.", true);
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 function renderStorageInfo(storageInfo) {
@@ -1728,6 +1787,8 @@ async function handleSaveFeeSettings(event) {
       accountFeeTiers,
       termsAndConditions: String(elements.termsAndConditions?.value || "").trim(),
       accountSecurityGuide: String(elements.accountSecurityGuide?.value || "").trim(),
+      maintenanceMode: Boolean(elements.maintenanceModeEnabled?.checked),
+      maintenanceMessage: String(elements.maintenanceModeMessage?.value || "").trim(),
     }),
   });
 

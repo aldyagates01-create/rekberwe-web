@@ -405,6 +405,70 @@ app.use(
   }),
 );
 
+const maintenanceCache = {
+  mode: false,
+  message: "",
+  at: 0,
+};
+const MAINTENANCE_CACHE_MS = 3000;
+
+function invalidateMaintenanceCache() {
+  maintenanceCache.at = 0;
+}
+
+async function getMaintenanceState() {
+  const now = Date.now();
+  if (now - maintenanceCache.at < MAINTENANCE_CACHE_MS) {
+    return maintenanceCache;
+  }
+  const settings = await getAdminFeeSettings();
+  maintenanceCache.mode = Boolean(settings.maintenanceMode);
+  maintenanceCache.message = String(settings.maintenanceMessage || "").trim();
+  maintenanceCache.at = now;
+  return maintenanceCache;
+}
+
+function shouldBypassMaintenance(req) {
+  if (req.session?.user?.isAdmin) return true;
+  const requestPath = String(req.path || "");
+  if (requestPath === "/admin" || requestPath === "/maintenance") return true;
+  if (requestPath.startsWith("/auth/")) return true;
+  if (requestPath.startsWith("/api/admin/")) return true;
+  if (requestPath === "/api/session" || requestPath === "/api/logout") return true;
+  if (requestPath.startsWith("/assets/")) return true;
+  if (
+    requestPath === "/styles.css"
+    || requestPath === "/admin.html"
+    || requestPath === "/admin.js"
+    || requestPath === "/analytics-client.js"
+    || requestPath === "/push-client.js"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+app.use(async (req, res, nextMiddleware) => {
+  try {
+    const maintenance = await getMaintenanceState();
+    if (!maintenance.mode || shouldBypassMaintenance(req)) {
+      nextMiddleware();
+      return;
+    }
+    const accept = String(req.headers.accept || "");
+    if (req.path.startsWith("/api/") || req.path.startsWith("/_next/") || accept.includes("application/json")) {
+      res.status(503).json({
+        message: maintenance.message.split(/\r?\n/).find(Boolean) || "Website sedang maintenance.",
+        maintenance: true,
+      });
+      return;
+    }
+    res.status(503).type("html").send(renderMaintenancePage(maintenance.message));
+  } catch (error) {
+    nextMiddleware(error);
+  }
+});
+
 app.get("/uploads/:filename", async (req, res) => {
   try {
     const filename = path.basename(String(req.params.filename || ""));
@@ -1371,6 +1435,7 @@ app.get("/api/admin/settings", requireAdmin, async (_req, res) => {
 
 app.post("/api/admin/settings", requireAdmin, async (req, res) => {
   const settings = await saveAdminFeeSettings(req.body || {});
+  invalidateMaintenanceCache();
   res.json({ settings });
 });
 
@@ -1427,6 +1492,7 @@ app.post("/api/admin/settings/notification-sounds", requireAdmin, audioUpload.fi
     ...current,
     notificationSounds: nextSounds,
   });
+  invalidateMaintenanceCache();
   res.json({ settings });
 });
 
@@ -2837,6 +2903,52 @@ function renderRekberWarrantyPage() {
     <div class="actions">
       <a class="btn btn-primary" href="/">Kembali ke website</a>
       <a class="btn btn-ghost" href="/security-guide">Panduan pengamanan akun</a>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function renderMaintenancePage(bodyText) {
+  const rows = String(bodyText || "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+  return `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RekberWE.id Sedang Maintenance</title>
+  <link rel="icon" type="image/png" href="/assets/rekberwe-favicon.png?v=6" />
+  <style>
+    :root{--blue:#1f6fb6;--gold:#e0b232;--text:#18324f;--muted:#5f7692;}
+    *{box-sizing:border-box}
+    body{font-family:'Plus Jakarta Sans',Arial,sans-serif;background:radial-gradient(circle at top left,rgba(31,111,182,.18),transparent 34%),linear-gradient(180deg,#f8fbff 0%,#eaf3fc 100%);color:var(--text);margin:0;min-height:100vh;display:grid;place-items:center;padding:24px}
+    .card{max-width:560px;width:100%;background:#fff;border-radius:28px;padding:32px 28px;box-shadow:0 18px 54px rgba(22,56,99,.10);border:1px solid rgba(31,111,182,.1);text-align:center}
+    .logo{width:72px;height:72px;margin:0 auto 16px;display:block}
+    .eyebrow{margin:0 0 8px;color:var(--muted);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase}
+    h1{margin:0 0 12px;font-size:clamp(1.6rem,4vw,2.2rem)}
+    p{margin:0 0 18px;color:var(--muted);line-height:1.7}
+    ul{display:grid;gap:10px;line-height:1.6;padding:0;list-style:none;text-align:left;margin:0 0 22px}
+    li{padding:12px 14px;border-radius:16px;background:rgba(31,111,182,.05);border:1px solid rgba(31,111,182,.08)}
+    .actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+    a.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 18px;border-radius:14px;text-decoration:none;font-weight:700}
+    .btn-primary{background:linear-gradient(135deg,var(--blue),var(--gold));color:#fff}
+    .btn-ghost{background:#fff;color:var(--text);border:1px solid rgba(31,111,182,.15)}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="/assets/rekberwe-logo-shield.png?v=7" alt="RekberWE.id" />
+    <p class="eyebrow">Maintenance</p>
+    <h1>Sedang Maintenance</h1>
+    <p>Website sementara tidak dapat diakses untuk peningkatan sistem.</p>
+    <ul>${rows || "<li>RekberWE.id sedang dalam pemeliharaan. Silakan kembali beberapa saat lagi.</li>"}</ul>
+    <div class="actions">
+      <a class="btn btn-primary" href="/admin">Login Admin</a>
     </div>
   </div>
 </body>
