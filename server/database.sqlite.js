@@ -223,6 +223,14 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_otp_verifications_user ON otp_verifications(user_id);
   CREATE INDEX IF NOT EXISTS idx_otp_logs_user ON otp_verification_logs(user_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS pending_seller_joins (
+    user_id TEXT NOT NULL,
+    transaction_code TEXT NOT NULL,
+    admin_notified INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, transaction_code)
+  );
 `);
 
 const statements = {
@@ -1565,4 +1573,59 @@ export function usersShareAnyTransaction(userIdA, userIdB) {
     LIMIT 1
   `).get(userIdA, userIdB, userIdB, userIdA);
   return Boolean(row);
+}
+
+export function upsertPendingSellerJoin(userId, transactionCode) {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO pending_seller_joins (user_id, transaction_code, admin_notified, created_at)
+    VALUES (?, ?, 0, ?)
+    ON CONFLICT(user_id, transaction_code) DO UPDATE SET created_at = excluded.created_at
+  `).run(userId, transactionCode, now);
+  return db.prepare(`
+    SELECT user_id AS userId, transaction_code AS transactionCode, admin_notified AS adminNotified, created_at AS createdAt
+    FROM pending_seller_joins WHERE user_id = ? AND transaction_code = ?
+  `).get(userId, transactionCode);
+}
+
+export function markPendingSellerJoinNotified(userId, transactionCode) {
+  db.prepare(`
+    UPDATE pending_seller_joins SET admin_notified = 1 WHERE user_id = ? AND transaction_code = ?
+  `).run(userId, transactionCode);
+}
+
+export function deletePendingSellerJoin(userId, transactionCode) {
+  db.prepare(`DELETE FROM pending_seller_joins WHERE user_id = ? AND transaction_code = ?`).run(userId, transactionCode);
+}
+
+export function completePendingSellerJoinsForUser(userId) {
+  const rows = db.prepare(`
+    SELECT transaction_code AS transactionCode FROM pending_seller_joins WHERE user_id = ?
+  `).all(userId);
+  const joined = [];
+  const user = getUserById(userId);
+  if (!user || user.verificationStatus !== "verified") return joined;
+
+  for (const row of rows) {
+    const code = row.transactionCode;
+    const transaction = getTransactionByCode(code);
+    if (!transaction) {
+      deletePendingSellerJoin(userId, code);
+      continue;
+    }
+    if (transaction.seller || transaction.createdByRole !== "buyer") {
+      deletePendingSellerJoin(userId, code);
+      continue;
+    }
+    if (transaction.buyer?.id === userId || transaction.seller?.id === userId) {
+      deletePendingSellerJoin(userId, code);
+      continue;
+    }
+    const updated = joinTransaction(code, userId, "seller");
+    if (updated) {
+      joined.push(updated);
+      deletePendingSellerJoin(userId, code);
+    }
+  }
+  return joined;
 }

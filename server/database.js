@@ -922,6 +922,14 @@ async function initializePostgres() {
 
     CREATE INDEX IF NOT EXISTS idx_otp_verifications_user ON otp_verifications(user_id);
     CREATE INDEX IF NOT EXISTS idx_otp_logs_user ON otp_verification_logs(user_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS pending_seller_joins (
+      user_id TEXT NOT NULL,
+      transaction_code TEXT NOT NULL,
+      admin_notified BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY (user_id, transaction_code)
+    );
   `);
 
   if (sqliteImportEnabled) {
@@ -1825,4 +1833,72 @@ export async function usersShareAnyTransaction(userIdA, userIdB) {
     [userIdA, userIdB],
   );
   return rows.length > 0;
+}
+
+export async function upsertPendingSellerJoin(userId, transactionCode) {
+  if (!postgresEnabled) return sqliteDb.upsertPendingSellerJoin(userId, transactionCode);
+  await ensureReady();
+  const now = new Date().toISOString();
+  await query(
+    `
+      INSERT INTO pending_seller_joins (user_id, transaction_code, admin_notified, created_at)
+      VALUES ($1, $2, FALSE, $3)
+      ON CONFLICT (user_id, transaction_code) DO UPDATE SET created_at = EXCLUDED.created_at
+    `,
+    [userId, transactionCode, now],
+  );
+  return queryOne(
+    `
+      SELECT user_id AS "userId", transaction_code AS "transactionCode",
+             admin_notified AS "adminNotified", created_at AS "createdAt"
+      FROM pending_seller_joins WHERE user_id = $1 AND transaction_code = $2
+    `,
+    [userId, transactionCode],
+  );
+}
+
+export async function markPendingSellerJoinNotified(userId, transactionCode) {
+  if (!postgresEnabled) return sqliteDb.markPendingSellerJoinNotified(userId, transactionCode);
+  await ensureReady();
+  await query(
+    "UPDATE pending_seller_joins SET admin_notified = TRUE WHERE user_id = $1 AND transaction_code = $2",
+    [userId, transactionCode],
+  );
+}
+
+export async function deletePendingSellerJoin(userId, transactionCode) {
+  if (!postgresEnabled) return sqliteDb.deletePendingSellerJoin(userId, transactionCode);
+  await ensureReady();
+  await query("DELETE FROM pending_seller_joins WHERE user_id = $1 AND transaction_code = $2", [userId, transactionCode]);
+}
+
+export async function completePendingSellerJoinsForUser(userId) {
+  if (!postgresEnabled) return sqliteDb.completePendingSellerJoinsForUser(userId);
+  await ensureReady();
+  const rows = await queryRows(
+    "SELECT transaction_code AS code FROM pending_seller_joins WHERE user_id = $1",
+    [userId],
+  );
+  const joined = [];
+  const user = await getUserById(userId);
+  if (!user || user.verificationStatus !== "verified") return joined;
+
+  for (const row of rows) {
+    const code = row.code;
+    const transaction = await getTransactionByCode(code);
+    if (!transaction || transaction.seller || transaction.createdByRole !== "buyer") {
+      await deletePendingSellerJoin(userId, code);
+      continue;
+    }
+    if (transaction.buyer?.id === userId || transaction.seller?.id === userId) {
+      await deletePendingSellerJoin(userId, code);
+      continue;
+    }
+    const updated = await joinTransaction(code, userId, "seller");
+    if (updated) {
+      joined.push(updated);
+      await deletePendingSellerJoin(userId, code);
+    }
+  }
+  return joined;
 }

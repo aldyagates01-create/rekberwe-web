@@ -179,6 +179,13 @@ export async function joinTransaction(code: string, role: "buyer" | "seller") {
   });
 }
 
+export async function notifySellerVerificationIntent(code: string) {
+  return fetchJson<{ ok: boolean; adminMessageSent: boolean; verificationStatus: string }>(
+    `/api/transactions/${encodeURIComponent(code)}/seller-verification-intent`,
+    { method: "POST" },
+  );
+}
+
 export async function sendMessage(code: string, text: string) {
   return fetchJson<{ transaction: Transaction }>(`/api/transactions/${encodeURIComponent(code)}/messages`, {
     method: "POST",

@@ -17,6 +17,7 @@ import {
   addTransactionMessage,
   createTransaction,
   deleteTransactionByCode,
+  completePendingSellerJoinsForUser,
   getAdminFeeSettings,
   getAllSupportThreads,
   getAllTransactions,
@@ -36,6 +37,7 @@ import {
   getUserByProviderSocial,
   joinTransaction,
   linkProviderToUser,
+  markPendingSellerJoinNotified,
   recordAnalyticsEvent,
   saveAdminFeeSettings,
   updateTransactionStatus,
@@ -44,6 +46,7 @@ import {
   updateUserProfile,
   updateUserVerification,
   updateUserVerificationFiles,
+  upsertPendingSellerJoin,
   upsertUser,
 } from "./database.js";
 import { createRateLimiter, getRequestRateLimitKey } from "./rate-limit.js";
@@ -1101,6 +1104,56 @@ app.post("/api/transactions/:code/join", requireAuth, async (req, res) => {
   respondWithTransaction(res, req, updated);
 });
 
+app.post("/api/transactions/:code/seller-verification-intent", requireAuth, async (req, res) => {
+  const code = String(req.params.code || "").toUpperCase();
+  const transaction = await getTransactionByCode(code);
+  if (!transaction) {
+    res.status(404).json({ message: "Transaksi tidak ditemukan." });
+    return;
+  }
+
+  const allowedRole = transaction.createdByRole === "buyer" ? "seller" : "buyer";
+  if (allowedRole !== "seller") {
+    res.status(400).json({ message: "Intent verifikasi penjual hanya untuk transaksi yang membutuhkan penjual." });
+    return;
+  }
+
+  if (transaction.seller) {
+    res.status(400).json({ message: "Role penjual sudah terisi." });
+    return;
+  }
+
+  if (transaction.buyer?.id === req.session.user.id || transaction.seller?.id === req.session.user.id) {
+    res.status(400).json({ message: "Anda sudah terdaftar di transaksi ini." });
+    return;
+  }
+
+  if (req.session.user.verificationStatus === "verified") {
+    res.status(400).json({ message: "Akun penjual sudah terverifikasi. Silakan masuk transaksi langsung." });
+    return;
+  }
+
+  const pending = await upsertPendingSellerJoin(req.session.user.id, code);
+  let adminMessageSent = false;
+  if (!pending?.adminNotified) {
+    const sellerName = req.session.user.displayName || req.session.user.legalName || "Penjual";
+    const updated = await addAdminTransactionMessage(
+      code,
+      `${sellerName} telah membuka link transaksi dan sedang melalui proses verifikasi identitas. Mohon menunggu hingga verifikasi selesai ditinjau admin.`,
+    );
+    await markPendingSellerJoinNotified(req.session.user.id, code);
+    adminMessageSent = true;
+    await broadcastEvent("transaction_updated", code, { transaction: updated });
+  }
+
+  res.json({
+    ok: true,
+    adminMessageSent,
+    verificationStatus: req.session.user.verificationStatus,
+    transactionCode: code,
+  });
+});
+
 app.post("/api/transactions/:code/messages", requireAuth, async (req, res) => {
   const code = String(req.params.code || "").toUpperCase();
   const current = await getTransactionByCode(code);
@@ -1491,10 +1544,29 @@ app.post("/api/admin/users/:id/verification", requireAdmin, async (req, res) => 
     return;
   }
 
+  let autoJoinedTransactions = [];
+  if (action === "approve" && updated.verificationStatus === "verified") {
+    autoJoinedTransactions = await completePendingSellerJoinsForUser(userId);
+    for (const transaction of autoJoinedTransactions) {
+      await broadcastEvent("transaction_updated", transaction.code, { transaction });
+      dispatchEmail(async () => {
+        const { buyer, seller } = await getEmailReadyTransaction(transaction);
+        const joiner = await getEmailReadyUser(updated);
+        await sendTransactionCreatedEmail(
+          transaction,
+          buyer,
+          seller || joiner,
+          getRequestBaseUrl(req),
+        );
+      });
+    }
+  }
+
   await broadcastEvent("verification_updated", null, {
     user: updated,
     userId: userId,
     pushTrigger: "verification_reviewed",
+    autoJoinedTransactionCodes: autoJoinedTransactions.map((item) => item.code),
   });
   if (action === "approve" && updated.verificationStatus === "verified") {
     dispatchEmail(async () => {
@@ -1502,7 +1574,10 @@ app.post("/api/admin/users/:id/verification", requireAdmin, async (req, res) => 
       await sendAdminVerifiedEmail(freshUser || updated, getRequestBaseUrl(req));
     });
   }
-  res.json({ user: updated });
+  res.json({
+    user: updated,
+    autoJoinedTransactionCodes: autoJoinedTransactions.map((item) => item.code),
+  });
 });
 
 app.post("/api/admin/users/:id/status", requireAdmin, async (req, res) => {

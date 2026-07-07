@@ -385,6 +385,7 @@ async function bootstrap() {
   startRoomRefresh();
   if (state.currentUser) {
     window.RekberPush?.ensurePushEnabled?.({ audience: "user" }).catch(() => {});
+    await tryCompletePendingSellerJoin();
   }
 }
 
@@ -1781,6 +1782,139 @@ function consumePendingTransactionRoute() {
   }
 }
 
+const PENDING_SELLER_JOIN_KEY = "rekberwe-pending-seller-join";
+
+function rememberPendingSellerJoin(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (!normalized) return;
+  try {
+    sessionStorage.setItem(PENDING_SELLER_JOIN_KEY, normalized);
+  } catch {}
+}
+
+function getPendingSellerJoinCode() {
+  try {
+    return String(sessionStorage.getItem(PENDING_SELLER_JOIN_KEY) || "").trim().toUpperCase();
+  } catch {
+    return "";
+  }
+}
+
+function clearPendingSellerJoin() {
+  try {
+    sessionStorage.removeItem(PENDING_SELLER_JOIN_KEY);
+  } catch {}
+}
+
+function sellerMustVerifyBeforeJoin(allowedRole) {
+  return allowedRole === "seller" && state.currentUser?.verificationStatus !== "verified";
+}
+
+async function notifySellerVerificationIntent(code) {
+  return fetchJson(`/api/transactions/${encodeURIComponent(code)}/seller-verification-intent`, {
+    method: "POST",
+  });
+}
+
+function openSellerVerificationModal(code, message) {
+  const text = document.getElementById("verification-modal-text");
+  const title = elements.verificationModal?.querySelector("h3");
+  if (title) title.textContent = "Verifikasi penjual diperlukan";
+  if (text) {
+    text.textContent = message || `Sebagai penjual untuk transaksi ${code}, Anda wajib verifikasi identitas terlebih dahulu. Setelah admin menyetujui, Anda akan langsung masuk ke ruang chat transaksi.`;
+  }
+  elements.verificationModal?.classList.remove("hidden");
+}
+
+async function beginUnverifiedSellerJoinFlow(transaction) {
+  const code = String(transaction?.code || "").trim().toUpperCase();
+  if (!code) return;
+  rememberPendingSellerJoin(code);
+  rememberPendingTransactionRoute(code);
+  state.pendingJoinTransaction = transaction;
+  closeJoinRoleModal();
+
+  try {
+    await notifySellerVerificationIntent(code);
+  } catch (error) {
+    console.warn("Gagal mengirim notifikasi verifikasi penjual:", error);
+  }
+
+  const status = state.currentUser?.verificationStatus;
+  if (status === "pending") {
+    openSellerVerificationModal(
+      code,
+      `Verifikasi identitas Anda sedang ditinjau admin untuk transaksi ${code}. Pembeli sudah diberi tahu untuk menunggu. Setelah disetujui, Anda akan langsung masuk ke ruang chat.`,
+    );
+    return;
+  }
+
+  if (status === "revision_required") {
+    openSellerVerificationModal(
+      code,
+      `Admin meminta perbaikan verifikasi sebelum Anda bisa masuk sebagai penjual di transaksi ${code}. Silakan perbaiki data verifikasi.`,
+    );
+    openWorkspaceSection("verification");
+    return;
+  }
+
+  openSellerVerificationModal(
+    code,
+    `Sebagai penjual untuk transaksi ${code}, Anda wajib verifikasi KTP dan WhatsApp terlebih dahulu. Pembeli sudah diberi tahu bahwa Anda sedang verifikasi. Setelah admin menyetujui, Anda akan langsung masuk ke ruang chat.`,
+  );
+  openWorkspaceSection("verification");
+}
+
+async function enterTransactionRoom(code, transaction) {
+  const normalized = String(code || "").trim().toUpperCase();
+  closeJoinRoleModal();
+  closeVerificationModal();
+  if (isMobileViewport() && openMobileTransactionChat(normalized)) {
+    return;
+  }
+  state.activeTransaction = transaction;
+  state.transactionScreen = "room";
+  await refreshTransactions();
+  await refreshDashboard();
+  openWorkspaceSection("transactions");
+  renderAll();
+  history.replaceState({}, "", `?trx=${normalized}`);
+  document.getElementById("ruang-transaksi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function tryCompletePendingSellerJoin(preferredCode = "") {
+  const code = String(preferredCode || getPendingSellerJoinCode() || "").trim().toUpperCase();
+  if (!code || !state.currentUser || state.currentUser.verificationStatus !== "verified") {
+    return false;
+  }
+
+  try {
+    let transaction = null;
+    try {
+      const joined = await fetchJson(`/api/transactions/${encodeURIComponent(code)}/join`, {
+        method: "POST",
+        body: JSON.stringify({ role: "seller" }),
+      });
+      transaction = joined.transaction;
+    } catch (joinError) {
+      const current = await fetchJson(`/api/transactions/${encodeURIComponent(code)}`);
+      transaction = current.transaction;
+      if (transaction?.seller?.id !== state.currentUser.id) {
+        throw joinError;
+      }
+    }
+
+    clearPendingSellerJoin();
+    state.pendingJoinTransaction = null;
+    setAuthStatus(`Verifikasi disetujui. Anda sudah masuk ke ruang chat transaksi ${code}.`);
+    await enterTransactionRoom(code, transaction);
+    return true;
+  } catch (error) {
+    console.warn("Gagal menyelesaikan join penjual tertunda:", error);
+    return false;
+  }
+}
+
 function buildJoinRoleInstruction(allowedRole) {
   if (allowedRole === "seller" && state.currentUser?.verificationStatus !== "verified") {
     return "Untuk transaksi ini Anda hanya bisa masuk sebagai Penjual. Akun Anda belum terverifikasi, silakan verifikasi dulu di menu Verifikasi lalu buka kembali link transaksi ini.";
@@ -1832,6 +1966,7 @@ async function handleJoinTransaction() {
 
   if (!state.currentUser) {
     rememberPendingTransactionRoute(code);
+    setAuthStatus("Silakan login terlebih dahulu. Jika Anda penjual, setelah login Anda akan diarahkan ke verifikasi identitas sebelum masuk ruang chat.", true);
     openLoginModal();
     return;
   }
@@ -1862,6 +1997,11 @@ async function handleJoinTransaction() {
       return;
     }
 
+    if (sellerMustVerifyBeforeJoin(allowedRoleLocal)) {
+      await beginUnverifiedSellerJoinFlow(localTransaction);
+      return;
+    }
+
     state.pendingJoinTransaction = localTransaction;
     state.transactionScreen = "room";
     renderTransactionScreen();
@@ -1878,6 +2018,10 @@ async function handleJoinTransaction() {
   const alreadyParticipant = transaction.buyer?.id === state.currentUser.id || transaction.seller?.id === state.currentUser.id;
 
   if (!alreadyParticipant && (!transaction.buyer || !transaction.seller)) {
+    if (sellerMustVerifyBeforeJoin(allowedRole)) {
+      await beginUnverifiedSellerJoinFlow(transaction);
+      return;
+    }
     state.pendingJoinTransaction = transaction;
     state.transactionScreen = "room";
     renderTransactionScreen();
@@ -1909,6 +2053,10 @@ async function handleJoinTransaction() {
 async function handleRoleJoin(role) {
   if (!state.pendingJoinTransaction) return;
   const code = state.pendingJoinTransaction.code;
+  if (role === "seller" && sellerMustVerifyBeforeJoin("seller")) {
+    await beginUnverifiedSellerJoinFlow(state.pendingJoinTransaction);
+    return;
+  }
   try {
     const joined = await fetchJson(`/api/transactions/${code}/join`, {
       method: "POST",
@@ -4172,7 +4320,7 @@ async function handleInitialRoute() {
   if (!code) return;
   if (!state.currentUser) {
     rememberPendingTransactionRoute(code);
-    setAuthStatus("Silakan login / daftar dulu untuk membuka ruang transaksi dari link yang dibagikan.");
+    setAuthStatus("Silakan login / daftar dulu untuk membuka ruang transaksi dari link yang dibagikan. Jika Anda penjual, setelah login Anda akan diarahkan ke verifikasi identitas.", true);
     openLoginModal();
     return;
   }
@@ -4610,7 +4758,11 @@ function setupLiveEvents() {
         renderCurrentUser();
         if (payload.user.verificationStatus === "verified" && previousStatus !== "verified") {
           playUserNotificationSound("transaction");
-          window.alert("Verifikasi Anda sudah disetujui admin. Akun sekarang sudah terverifikasi.");
+          const autoCodes = Array.isArray(payload.autoJoinedTransactionCodes) ? payload.autoJoinedTransactionCodes : [];
+          const joined = await tryCompletePendingSellerJoin(autoCodes[0] || getPendingSellerJoinCode());
+          if (!joined) {
+            setAuthStatus("Verifikasi Anda sudah disetujui admin. Akun penjual sekarang aktif.");
+          }
         }
         if (payload.user.verificationStatus === "revision_required" && previousStatus !== "revision_required") {
           playUserNotificationSound("chat");

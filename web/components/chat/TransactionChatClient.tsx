@@ -19,6 +19,7 @@ import {
   getUserRole,
   isSystemMessage,
   joinTransaction,
+  notifySellerVerificationIntent,
   runAction,
   sendMessage,
   sendPresenceAway,
@@ -72,6 +73,7 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
   );
 
   const showJoinPanel = Boolean(transaction && user && !role && canJoinTransaction(transaction, user.id));
+  const sellerNeedsVerification = showJoinPanel && joinRole === "seller" && user?.verificationStatus !== "verified";
 
   const actionButtons = useMemo(
     () => (transaction ? getTransactionActions(transaction, role) : []),
@@ -105,6 +107,11 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
     () => getCounterpartyPresenceText(transaction, role, Date.now()),
     [transaction, role, presenceTick],
   );
+
+  useEffect(() => {
+    if (!sellerNeedsVerification || !code) return;
+    notifySellerVerificationIntent(code).catch(() => {});
+  }, [sellerNeedsVerification, code]);
 
   const getAvatarUrl = useCallback(
     (senderUserId: string | null, senderTitle: string) => {
@@ -232,6 +239,12 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
         }
         if (payload.type === "typing_updated" && payload.code === code) {
           setTransaction((current) => current ? { ...current, typing: payload.typing || {} } : current);
+        }
+        if (payload.type === "verification_updated" && payload.user?.id === userRef.current?.id) {
+          setUser(payload.user);
+          if (payload.user.verificationStatus === "verified") {
+            await refresh();
+          }
         }
         if (payload.type === "presence_updated") {
           setTransaction((current) => {
@@ -387,6 +400,20 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
       setEditingBank(false);
     } catch (bankError) {
       setError(bankError instanceof Error ? bankError.message : "Gagal mengirim data rekening.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleBeginSellerVerification() {
+    if (!transaction || sending) return;
+    setSending(true);
+    setError("");
+    try {
+      await notifySellerVerificationIntent(code);
+      router.push(`/?trx=${encodeURIComponent(code)}`);
+    } catch (intentError) {
+      setError(intentError instanceof Error ? intentError.message : "Gagal memulai verifikasi penjual.");
     } finally {
       setSending(false);
     }
@@ -602,19 +629,30 @@ export function TransactionChatClient({ code }: TransactionChatClientProps) {
             Anda belum masuk ke transaksi ini. Untuk link ini Anda hanya bisa bergabung sebagai{" "}
             <strong>{getJoinRoleLabel(joinRole)}</strong>.
           </p>
-          {joinRole === "seller" && user?.verificationStatus !== "verified" ? (
-            <p className="mb-3 text-xs text-amber-300">
-              Sebagai penjual, Anda wajib verifikasi KTP dan WhatsApp di menu Verifikasi terlebih dahulu.
-            </p>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleJoinTransaction}
-            disabled={sending || (joinRole === "seller" && user?.verificationStatus !== "verified")}
-            className="h-11 w-full rounded-xl bg-accent-blue text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {sending ? "Memproses..." : `Masuk sebagai ${getJoinRoleLabel(joinRole)}`}
-          </button>
+          {sellerNeedsVerification ? (
+            <>
+              <p className="mb-3 text-xs text-amber-300">
+                Sebagai penjual baru, Anda wajib verifikasi KTP dan WhatsApp terlebih dahulu. Pembeli akan diberi tahu bahwa Anda sedang verifikasi.
+              </p>
+              <button
+                type="button"
+                onClick={handleBeginSellerVerification}
+                disabled={sending}
+                className="h-11 w-full rounded-xl bg-accent-blue text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {sending ? "Memproses..." : "Mulai Verifikasi Penjual"}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleJoinTransaction}
+              disabled={sending}
+              className="h-11 w-full rounded-xl bg-accent-blue text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {sending ? "Memproses..." : `Masuk sebagai ${getJoinRoleLabel(joinRole)}`}
+            </button>
+          )}
         </div>
       ) : (
         <ChatInput
