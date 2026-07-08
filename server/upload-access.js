@@ -6,6 +6,8 @@ import {
   getSupportThreadForGuest,
   getSupportThreadForUser,
   getTransactionByCode,
+  getVoucherOrderByCode,
+  isVoucherProductCatalogImage,
   usersShareAnyTransaction,
 } from "./database.js";
 
@@ -30,11 +32,13 @@ export async function canAccessLocalUpload(req, filename) {
 
   if (await isPublicNotificationSound(safeName)) return true;
 
+  const uploadPath = `/uploads/${safeName}`;
+  if (await isVoucherProductCatalogImage(uploadPath)) return true;
+
   const user = req.session?.user;
   if (!user) return false;
   if (user.isAdmin) return true;
 
-  const uploadPath = `/uploads/${safeName}`;
   const context = await getLocalUploadAccessContext(uploadPath);
   if (!context) return false;
 
@@ -60,6 +64,11 @@ export async function canAccessLocalUpload(req, filename) {
   for (const threadId of context.supportThreadIds) {
     const userThread = await getSupportThreadForUser(user.id);
     if (userThread?.id === threadId) return true;
+  }
+
+  for (const orderCode of context.voucherOrderCodes || []) {
+    const order = await getVoucherOrderByCode(orderCode);
+    if (order && (order.userId === user.id || user.isAdmin)) return true;
   }
 
   const guestKey = req.session?.guestSupportKey;

@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { v2 as cloudinary } from "cloudinary";
+import { buildPrivateCloudinaryRef } from "./upload-url.js";
 import dotenv from "dotenv";
 import express from "express";
 import session from "express-session";
@@ -81,6 +82,9 @@ import {
   sendWhatsappOtp,
   verifyWhatsappOtp,
 } from "./whatsapp-otp-service.js";
+import { registerVoucherRoutes } from "./voucher-routes.js";
+import { voucherOrderForViewer } from "./voucher-utils.js";
+import { resolveVoucherOrderMediaUrls } from "./upload-url.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -205,6 +209,10 @@ const upload = createUploadMiddleware({
     "video/quicktime",
   ],
 });
+const paymentProofUpload = createUploadMiddleware({
+  allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+  maxFiles: 1,
+});
 const avatarUpload = createUploadMiddleware({
   allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
   maxFiles: 1,
@@ -260,6 +268,16 @@ const uploadPostLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 20,
   keyFn: (req) => getRequestRateLimitKey(req, "upload-post"),
+});
+const voucherOrderCreateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 15,
+  keyFn: (req) => getRequestRateLimitKey(req, "voucher-create"),
+});
+const voucherOrderLookupLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 40,
+  keyFn: (req) => getRequestRateLimitKey(req, "voucher-lookup"),
 });
 
 const providers = {
@@ -561,6 +579,7 @@ app.get("/api/config", async (_req, res) => {
     termsAndConditions: String(feeSettings.termsAndConditions || "").trim(),
     accountSecurityGuide: String(feeSettings.accountSecurityGuide || "").trim(),
     notificationSounds: feeSettings.notificationSounds || {},
+    voucherPayment: feeSettings.voucherPayment || {},
   });
 });
 
@@ -2021,6 +2040,7 @@ app.get("/auth/:provider/callback", async (req, res) => {
 app.get("/admin", (_req, res) => res.sendFile(path.join(webRoot, "admin.html")));
 app.get("/privacy", (_req, res) => res.sendFile(path.join(webRoot, "privacy.html")));
 app.get("/data-deletion", (_req, res) => res.sendFile(path.join(webRoot, "data-deletion.html")));
+app.get("/voucher-order/:code", (_req, res) => res.sendFile(path.join(webRoot, "voucher-order.html")));
 
 if (useNextFrontend) {
   app.use((req, res, nextMiddleware) => {
@@ -2053,6 +2073,19 @@ app.use((error, req, res, next) => {
     return;
   }
   next(error);
+});
+
+registerVoucherRoutes(app, {
+  requireAuth,
+  requireAdmin,
+  upload,
+  paymentProofUpload,
+  uploadPostLimiter,
+  voucherOrderCreateLimiter,
+  voucherOrderLookupLimiter,
+  persistUploadFile,
+  broadcastEvent,
+  getRequestBaseUrl,
 });
 
 app.get("*", (_req, res) => res.sendFile(path.join(webRoot, "index.html")));
@@ -2599,6 +2632,10 @@ async function broadcastEvent(type, code, payload = {}) {
     } else if (type === "verification_updated") {
       const verificationVisible = client.audience === "admin" || client.userId === payload.userId;
       if (!verificationVisible) continue;
+    } else if (type === "voucher_order_updated") {
+      const order = payload.order;
+      const voucherVisible = client.audience === "admin" || client.userId === order?.userId;
+      if (!voucherVisible) continue;
     } else if (type === "presence_updated") {
       const visiblePresence = client.audience === "admin"
         || client.userId === payload.userId
@@ -2621,6 +2658,15 @@ async function broadcastEvent(type, code, payload = {}) {
         : { id: client.userId, isAdmin: false };
       clientPayload.transaction = enrichTransactionPresence(
         sanitizeTransactionForViewer(clientPayload.transaction, viewer),
+      );
+    }
+    if (clientPayload.order) {
+      const viewer = client.audience === "admin"
+        ? { id: client.userId, isAdmin: true }
+        : { id: client.userId, isAdmin: false };
+      clientPayload.order = voucherOrderForViewer(
+        resolveVoucherOrderMediaUrls(clientPayload.order),
+        viewer,
       );
     }
     client.res.write(`data: ${JSON.stringify({ type, code, ...clientPayload })}\n\n`);
@@ -2680,19 +2726,20 @@ function cleanupTransactionFiles(transaction) {
   }
 }
 
-async function persistUploadFile(file, transactionCode, senderId) {
+async function persistUploadFile(file, transactionCode, senderId, options = {}) {
   if (!file?.buffer?.length) {
     throw new Error("File upload kosong atau rusak.");
   }
 
+  const sensitive = Boolean(options.sensitive);
   if (cloudinaryEnabled) {
-    return uploadToCloudinary(file, transactionCode, senderId);
+    return uploadToCloudinary(file, transactionCode, senderId, { sensitive });
   }
 
   return storeFileLocally(file);
 }
 
-async function uploadToCloudinary(file, transactionCode, senderId) {
+async function uploadToCloudinary(file, transactionCode, senderId, { sensitive = false } = {}) {
   const mime = String(file.mimetype || "").toLowerCase().split(";")[0].trim();
   const extension = MIME_TO_EXT[mime]?.replace(/^\./, "") || "bin";
   const safeBase = path.basename(file.originalname, path.extname(file.originalname)).replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 40) || "bukti";
@@ -2708,7 +2755,8 @@ async function uploadToCloudinary(file, transactionCode, senderId) {
         use_filename: false,
         unique_filename: false,
         overwrite: false,
-        access_mode: "public",
+        type: sensitive ? "authenticated" : "upload",
+        access_mode: sensitive ? undefined : "public",
         tags: ["rekberwe", transactionCode, String(senderId || "guest")],
         format: resourceType === "image" ? extension : undefined,
       },
@@ -2725,7 +2773,9 @@ async function uploadToCloudinary(file, transactionCode, senderId) {
 
   return {
     storedName: `cloudinary:${result.resource_type}:${result.public_id}`,
-    fileUrl: result.secure_url,
+    fileUrl: sensitive
+      ? buildPrivateCloudinaryRef(result.resource_type, result.public_id)
+      : result.secure_url,
   };
 }
 

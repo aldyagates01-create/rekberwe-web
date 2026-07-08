@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base href="/" />
   <title>RekberWE.id - Rekber Aman</title>
   <link rel="icon" type="image/png" href="assets/rekberwe-favicon.png?v=6" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <div class="bg-orb bg-orb-a"></div>
@@ -42,7 +43,7 @@
           <button type="button" class="primary-btn sidebar-create-btn" id="hero-login-button">Masuk / Daftar</button>
           <div class="workspace-sidebar-menu">
             <p class="workspace-sidebar-label">Menu</p>
-            <button type="button" class="workspace-menu-btn is-active">Dashboard</button>
+            <button type="button" class="workspace-menu-btn is-active" id="home-sidebar-dashboard">Dashboard</button>
             <button type="button" class="workspace-menu-btn" data-scroll-target="cara-kerja">Panduan Transaksi</button>
             <button type="button" class="workspace-menu-btn" onclick="window.location.href='/security-guide'">Panduan Pengamanan</button>
             <button type="button" class="workspace-menu-btn" id="home-live-chat-shortcut">Live Chat Support</button>
@@ -70,7 +71,7 @@
                 lalu masuk ke ruang transaksi untuk chat, kirim bukti, dan menyelesaikan order dengan aman.
               </p>
               <p class="hero-highlight">
-                Tidak perlu isi pendaftaran manual, cukup login atau daftar memakai Telegram, Google, Facebook, atau Discord, lalu akun langsung siap dipakai.
+                Tidak perlu isi pendaftaran manual, cukup login atau daftar memakai Telegram, Google, atau Discord, lalu akun langsung siap dipakai.
               </p>
               <div class="hero-actions">
                 <button class="primary-btn" id="hero-login-button-alt">Mulai Login</button>
@@ -104,7 +105,7 @@
                       <option value="seller">Sebagai Penjual</option>
                     </select>
                   </label>
-                  <label class="hidden" id="seller-payout-account-group">
+                  <label class="hidden seller-payout-account-group" id="seller-payout-account-group">
                     No. rekening penjual
                     <input type="text" name="sellerPayoutAccount" placeholder="Contoh: BCA 1234567890 a.n Nama Penjual" />
                   </label>
@@ -267,7 +268,7 @@
             <div class="workspace-sidebar-menu">
               <p class="workspace-sidebar-label">Menu</p>
               <button type="button" class="workspace-menu-btn" id="sidebar-home-button"><span class="workspace-menu-icon">⌂</span><span>Dashboard</span></button>
-              <button type="button" class="workspace-menu-btn is-active" id="sidebar-transactions-button"><span class="workspace-menu-icon">▣</span><span>Transaksi Saya</span></button>
+              <button type="button" class="workspace-menu-btn is-active" id="sidebar-transactions-button"><span class="workspace-menu-icon">▣</span><span>Riwayat Transaksi</span></button>
               <button type="button" class="workspace-menu-btn" id="sidebar-profile-button"><span class="workspace-menu-icon">◉</span><span>Akun Saya</span></button>
               <button type="button" class="workspace-menu-btn" id="sidebar-notifications-button"><span class="workspace-menu-icon">◎</span><span>Notifikasi</span></button>
               <button type="button" class="workspace-menu-btn" id="sidebar-verification-button"><span class="workspace-menu-icon">✓</span><span>Verifikasi</span></button>
@@ -285,6 +286,13 @@
                 <h3>Transaksi berjalan</h3>
               </div>
               <div class="activity-list telegram-list" id="active-rekber-list"></div>
+            </div>
+            <div class="sidebar-section" id="voucher-orders-sidebar-section">
+              <div class="section-head sidebar-head">
+                <p class="eyebrow">Order voucher</p>
+                <h3>GT / Voucher</h3>
+              </div>
+              <div class="activity-list telegram-list" id="voucher-orders-sidebar-list"></div>
             </div>
             <div class="sidebar-section" id="history-rekber-section">
               <div class="section-head sidebar-head">
@@ -310,10 +318,6 @@
             <div class="section-head room-shell-head">
               <div class="room-page-head room-page-head-premium">
                 <div class="room-page-copy">
-                  <button type="button" class="workspace-back-btn hidden workspace-back-inline" id="back-to-transaction-list">
-                    <span aria-hidden="true">←</span>
-                    <span>Kembali ke daftar transaksi</span>
-                  </button>
                   <p class="eyebrow">Ruang chat transaksi</p>
                   <h3 id="room-page-title">Pilih transaksi</h3>
                   <p class="mini-note" id="room-page-subtitle">Klik judul transaksi di panel kiri untuk membuka ruang chat.</p>
@@ -382,8 +386,8 @@
                       <span class="mobile-quick-action-icon icon-purple" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                       </span>
-                      <strong>Buat Transaksi</strong>
-                      <small>Mulai transaksi baru</small>
+                      <strong>Jasa Rekber</strong>
+                      <small>Escrow aman pembeli &amp; penjual</small>
                     </button>
                     <button type="button" class="mobile-quick-action-btn" id="mobile-quick-verification">
                       <span class="mobile-quick-action-icon icon-teal" aria-hidden="true">
@@ -391,6 +395,11 @@
                       </span>
                       <strong>Verifikasi</strong>
                       <small>Identitas penjual</small>
+                    </button>
+                    <button type="button" class="mobile-quick-action-btn" id="mobile-quick-voucher">
+                      <span class="mobile-quick-action-icon icon-purple" aria-hidden="true">🎮</span>
+                      <strong>Beli voucher/GT</strong>
+                      <small>Gametime &amp; voucher digital</small>
                     </button>
                     <button type="button" class="mobile-quick-action-btn" id="mobile-quick-guide">
                       <span class="mobile-quick-action-icon icon-green" aria-hidden="true">
@@ -444,6 +453,11 @@
               <section class="workspace-dashboard-shell">
                 <div class="workspace-dashboard-main">
                   <section class="workspace-content-card" id="workspace-inline-transaction-panel">
+                    <div class="workspace-service-picker">
+                      <button type="button" class="workspace-service-btn is-active" data-workspace-service="rekber">Rekber</button>
+                      <button type="button" class="workspace-service-btn" data-workspace-service="voucher">Beli Voucher / Gametime</button>
+                    </div>
+                    <div id="workspace-rekber-panel">
                     <div class="section-head">
                       <p class="eyebrow">Buat transaksi</p>
                       <h3>Buat rekber baru langsung dari dashboard</h3>
@@ -536,24 +550,17 @@
                     </section>
                     <p class="mini-note workspace-desktop-only">Catatan: penjual wajib verifikasi di menu Verifikasi sebelum membuat transaksi sebagai penjual.</p>
                     <div class="result-box hidden" id="workspace-transaction-result"></div>
+                    </div>
+                    <div id="workspace-voucher-panel" class="hidden">
+                      <div id="voucher-catalog-view"></div>
+                      <div id="voucher-detail-view" class="hidden"></div>
+                      <div id="voucher-checkout-view" class="hidden"></div>
+                      <div id="voucher-orders-view" class="hidden"></div>
+                      <div id="voucher-chat-view" class="hidden"></div>
+                    </div>
                   </section>
                 </div>
                 <aside class="workspace-dashboard-side">
-                  <section class="workspace-content-card workspace-desktop-quick-actions workspace-desktop-only">
-                    <div class="section-head">
-                      <p class="eyebrow">Aksi cepat</p>
-                      <h3>Shortcuts dashboard</h3>
-                    </div>
-                    <div class="desktop-quick-actions-grid">
-                      <button type="button" class="desktop-quick-action-btn" id="desktop-quick-guide">
-                        <span class="mobile-quick-action-icon icon-green" aria-hidden="true">
-                          <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 4 6.5V11c0 4.2 3.1 7.9 8 9 4.9-1.1 8-4.8 8-9V6.5L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-                        </span>
-                        <strong>Jaminan Rekber</strong>
-                        <small>Tentang perlindungan</small>
-                      </button>
-                    </div>
-                  </section>
                   <section class="workspace-content-card">
                     <div class="section-head">
                       <p class="eyebrow">Daftar fee rekber</p>
@@ -588,6 +595,10 @@
 
             <div class="workspace-center-view hidden" id="workspace-profile-view">
               <section class="workspace-content-card">
+                <div class="mobile-profile-quick-links">
+                  <button type="button" class="ghost-btn mobile-profile-quick-btn" id="mobile-profile-verification-btn">Verifikasi Identitas</button>
+                  <button type="button" class="ghost-btn mobile-profile-quick-btn" id="mobile-profile-guide-btn">Panduan Keamanan</button>
+                </div>
                 <div class="section-head">
                   <p class="eyebrow">Akun saya</p>
                   <h3>Profil & social media</h3>
@@ -596,6 +607,14 @@
                 <div class="profile-layout profile-layout-workspace">
                   <div class="profile-card" id="profile-card-workspace">
                     <p class="mini-label">Memuat profil...</p>
+                  </div>
+                  <div class="check-card profile-lookup-workspace-card">
+                    <label>
+                      Cek profil dari kode transaksi
+                      <input type="text" id="profile-lookup-workspace" placeholder="RW-2026-000128" autocomplete="off" />
+                    </label>
+                    <button type="button" class="ghost-btn" id="lookup-profile-workspace">Tampilkan pembeli & penjual</button>
+                    <div class="lookup-result" id="lookup-result-workspace"></div>
                   </div>
                 </div>
               </section>
@@ -643,23 +662,32 @@
                 </section>
                 <section class="mobile-transactions-section-card">
                   <div class="mobile-section-head">
-                    <h4>Transaksi aktif</h4>
+                    <h4>Transaksi Aktif</h4>
+                    <p class="mini-note">Rekber & voucher yang masih berjalan</p>
                   </div>
-                  <div class="mobile-dashboard-transaction-list" id="mobile-active-rekber-list"></div>
+                  <div class="mobile-dashboard-transaction-list" id="mobile-active-transactions-list"></div>
                 </section>
                 <section class="mobile-transactions-section-card">
                   <div class="mobile-section-head">
-                    <h4>Riwayat transaksi</h4>
+                    <h4>Riwayat Rekber & Voucher</h4>
                   </div>
-                  <div class="mobile-dashboard-transaction-list" id="mobile-history-rekber-list"></div>
+                  <div class="mobile-dashboard-transaction-list" id="mobile-unified-history-list"></div>
                 </section>
               </section>
             </div>
 
+            <div class="history-room-toolbar hidden" id="history-room-toolbar">
+              <button type="button" class="workspace-back-btn" id="back-to-transaction-list">
+                <span aria-hidden="true">←</span>
+                <span>Kembali ke Riwayat Transaksi</span>
+              </button>
+            </div>
+
             <div class="room-empty-state" id="transaction-room-empty">
-              <div class="empty-chat-icon" aria-hidden="true">💬</div>
-              <h4>Belum ada ruang chat yang dibuka</h4>
-              <p>Pilih transaksi aktif atau histori di panel kiri, atau masukkan kode transaksi untuk masuk ke ruang rekber.</p>
+              <p class="transaction-history-intro">Semua riwayat transaksi Rekber dan Voucher ditampilkan di bawah. Klik salah satu untuk masuk ke ruang chat.</p>
+              <div class="transaction-history-layout" id="transaction-history-layout">
+                <div class="activity-list" id="transaction-unified-history-list"></div>
+              </div>
             </div>
 
             <div class="join-role-box hidden" id="join-role-box"></div>
@@ -678,7 +706,7 @@
                   <span class="mobile-chat-header-online" id="mobile-chat-header-online">● Offline</span>
                 </div>
                 <span class="mobile-chat-header-badge" id="mobile-chat-header-badge">Memuat</span>
-                <button type="button" class="mobile-chat-header-menu" aria-label="Menu lainnya">⋮</button>
+                <button type="button" class="mobile-chat-header-menu" id="mobile-chat-header-menu" aria-label="Detail transaksi">⋮</button>
               </div>
 
               <section class="transaction-overview-card">
@@ -862,6 +890,8 @@
               </div>
               <div class="hidden" id="mobile-detail-backdrop"></div>
             </div>
+
+            <div class="room hidden voucher-history-room" id="voucher-history-room"></div>
           </section>
         </section>
       </div>
@@ -959,7 +989,45 @@
     </div>
   </div>
 
-  <div class="modal hidden" id="confirm-modal">
+  <div class="modal hidden" id="mobile-create-choice-modal" role="dialog" aria-modal="true" aria-labelledby="mobile-create-choice-title" aria-hidden="true">
+    <div class="modal-card mobile-create-choice-card">
+      <p class="eyebrow">Buat layanan</p>
+      <h3 id="mobile-create-choice-title">Pilih layanan yang ingin dibuat</h3>
+      <p class="mini-note mobile-create-choice-note">Rekber untuk transaksi escrow, atau beli voucher/gametime langsung dari katalog.</p>
+      <div class="mobile-create-choice-grid">
+        <button type="button" class="mobile-create-choice-btn" id="mobile-create-choice-rekber">
+          <span class="mobile-create-choice-icon icon-purple" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 4 6.5V11c0 4.2 3.1 7.9 8 9 4.9-1.1 8-4.8 8-9V6.5L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          </span>
+          <strong>Jasa Rekber</strong>
+          <small>Buat transaksi escrow aman</small>
+        </button>
+        <button type="button" class="mobile-create-choice-btn" id="mobile-create-choice-voucher">
+          <span class="mobile-create-choice-icon icon-blue" aria-hidden="true">🎮</span>
+          <strong>Beli voucher/GT</strong>
+          <small>Gametime &amp; voucher digital</small>
+        </button>
+      </div>
+      <button type="button" class="ghost-btn mobile-create-choice-cancel" id="mobile-create-choice-cancel">Batal</button>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="prompt-modal" role="dialog" aria-modal="true" aria-labelledby="prompt-modal-title" aria-hidden="true">
+    <div class="modal-card">
+      <p class="eyebrow" id="prompt-modal-eyebrow">Catatan</p>
+      <h3 id="prompt-modal-title">Masukkan informasi</h3>
+      <label class="prompt-modal-field">
+        <span id="prompt-modal-label">Alasan</span>
+        <textarea id="prompt-modal-input" rows="3" placeholder="Tulis alasan di sini..."></textarea>
+      </label>
+      <div class="topbar-actions">
+        <button type="button" class="ghost-btn" id="prompt-modal-cancel">Batal</button>
+        <button type="button" class="primary-btn" id="prompt-modal-approve">Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-hidden="true">
     <div class="modal-card">
       <p class="eyebrow" id="confirm-modal-eyebrow">Konfirmasi</p>
       <h3 id="confirm-modal-title">Lanjutkan aksi?</h3>
@@ -1028,10 +1096,10 @@
       </div>
     </div>
   </div>
-  <div class="modal hidden" id="login-modal">
+  <div class="modal hidden" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title" aria-hidden="true">
     <div class="modal-card">
       <p class="eyebrow">Login sosial cepat</p>
-      <h3>Pilih social media untuk masuk</h3>
+      <h3 id="login-modal-title">Pilih social media untuk masuk</h3>
       <p class="mini-note">Tidak perlu isi formulir manual. Login selesai, akun langsung siap digunakan.</p>
       <div class="quick-provider-grid login-modal-grid">
         <button class="primary-btn social-btn social-btn-telegram" id="telegram-direct-login" data-provider="Telegram">
@@ -1044,7 +1112,7 @@
           <span class="social-logo social-logo-image" aria-hidden="true"><img src="assets/google-g-logo.svg?v=1" alt="" /></span>
           <span>Google / Gmail</span>
         </button>
-        <button class="provider-btn social-btn social-btn-facebook" id="facebook-direct-login" data-provider="Facebook">
+        <button class="provider-btn social-btn social-btn-facebook hidden" id="facebook-direct-login" data-provider="Facebook" hidden disabled aria-hidden="true" tabindex="-1">
           <span class="social-logo social-logo-svg" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 21v-7.6H16l.4-3h-2.9V8.5c0-.9.3-1.5 1.6-1.5h1.5V4.3c-.3 0-1.2-.1-2.4-.1-2.4 0-4 1.4-4 4.1v2.3H8v3h2.2V21z"/></svg>
           </span>
@@ -1062,7 +1130,7 @@
       </div>
     </div>
   </div>
-  <div class="modal hidden" id="user-profile-modal">
+  <div class="modal hidden" id="user-profile-modal" role="dialog" aria-modal="true" aria-labelledby="user-profile-modal-name" aria-hidden="true">
     <div class="modal-card modal-card-wide">
       <div class="user-profile-modal-head">
         <div class="user-profile-modal-avatar" id="user-profile-modal-avatar"></div>
@@ -1078,9 +1146,10 @@
       </div>
     </div>
   </div>
-  <script src="analytics-client.js?v=1"></script>
-  <script src="push-client.js?v=1"></script>
-  <script src="app.js"></script>
+  <script src="/analytics-client.js?v=1"></script>
+  <script src="/push-client.js?v=1"></script>
+  <script src="/voucher-app.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>
 

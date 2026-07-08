@@ -305,3 +305,85 @@ export function buildTestEmail() {
     }),
   };
 }
+
+export function buildVoucherVerificationCodeEmail(name: string, order: {
+  code: string;
+  productName: string;
+  price: number;
+  quantity: number;
+}, ctaUrl: string) {
+  return {
+    subject: `RekberWe.id — Admin meminta kode verifikasi (${order.code})`,
+    html: wrapEmailHtml({
+      preview: `Admin meminta kode verifikasi untuk order ${order.code}.`,
+      greeting: `Halo ${name},`,
+      paragraphs: [
+        `Admin sedang memproses order voucher/gametime Anda (${order.code}).`,
+        "Saat ini admin membutuhkan kode verifikasi yang dikirim ke email akun subscription terkait.",
+        "Silakan cek kotak masuk email akun tersebut, lalu kirimkan kode verifikasi melalui chat order di RekberWe.id.",
+      ],
+      details: [
+        { label: "Order", value: order.code },
+        { label: "Produk", value: order.productName },
+        { label: "Jumlah", value: `${order.quantity} pcs` },
+        { label: "Total", value: formatCurrencyId(order.price) },
+      ],
+      cta: { label: "Buka Chat Order", url: ctaUrl },
+    }),
+  };
+}
+
+export function buildVoucherAccountRevisionEmail(name: string, order: {
+  code: string;
+  productName: string;
+  price: number;
+  quantity: number;
+}, ctaUrl: string) {
+  return {
+    subject: `RekberWe.id — Perbaikan data akun diperlukan (${order.code})`,
+    html: wrapEmailHtml({
+      preview: `Admin meminta perbaikan data akun untuk order ${order.code}.`,
+      greeting: `Halo ${name},`,
+      paragraphs: [
+        `Admin meminta perbaikan data akun subscription untuk order ${order.code}.`,
+        "Silakan buka chat order di RekberWe.id, perbarui email dan password akun pada formulir yang tersedia, lalu kirim ulang data tersebut.",
+        "Setelah data diperbarui, admin akan melanjutkan proses order Anda.",
+      ],
+      details: [
+        { label: "Order", value: order.code },
+        { label: "Produk", value: order.productName },
+        { label: "Jumlah", value: `${order.quantity} pcs` },
+        { label: "Total", value: formatCurrencyId(order.price) },
+      ],
+      cta: { label: "Perbarui Data Akun", url: ctaUrl },
+    }),
+  };
+}
+
+export function buildVoucherOrderCompletedEmail(name: string, order: {
+  code: string;
+  productName: string;
+  price: number;
+  quantity: number;
+}, ctaUrl: string) {
+  return {
+    subject: `RekberWe.id — Order voucher/gametime selesai (${order.code})`,
+    html: wrapEmailHtml({
+      preview: `Order ${order.code} sudah selesai diproses.`,
+      greeting: `Halo ${name},`,
+      paragraphs: [
+        `Order voucher/gametime Anda (${order.code}) sudah selesai diproses oleh admin.`,
+        "Silakan cek akun atau layanan yang Anda pesan. Jika terjadi masalah pada akun, Anda dapat mengajukan sengketa melalui chat order di RekberWe.id.",
+        "Terima kasih telah berbelanja di RekberWe.id.",
+      ],
+      details: [
+        { label: "Order", value: order.code },
+        { label: "Produk", value: order.productName },
+        { label: "Jumlah", value: `${order.quantity} pcs` },
+        { label: "Total", value: formatCurrencyId(order.price) },
+        { label: "Status", value: "Selesai" },
+      ],
+      cta: { label: "Lihat Order", url: ctaUrl },
+    }),
+  };
+}

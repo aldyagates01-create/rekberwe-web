@@ -52,11 +52,23 @@
       </div>
       <div class="admin-nav-list">
         <button type="button" class="admin-nav-btn active-admin-nav" data-admin-page="overview"><span class="workspace-menu-icon">◫</span><span>Ringkasan</span></button>
-        <button type="button" class="admin-nav-btn" data-admin-page="transactions-new"><span class="workspace-menu-icon">▣</span><span>Transaksi Baru Masuk</span></button>
-        <button type="button" class="admin-nav-btn" data-admin-page="transactions-completed"><span class="workspace-menu-icon">✓</span><span>Transaksi Selesai</span></button>
-        <button type="button" class="admin-nav-btn" data-admin-page="transactions-transfer-queue"><span class="workspace-menu-icon">⇄</span><span>Antrian Transfer</span></button>
-        <button type="button" class="admin-nav-btn" data-admin-page="transactions-cancelled"><span class="workspace-menu-icon">×</span><span>Transaksi Dibatalkan</span></button>
-        <button type="button" class="admin-nav-btn" data-admin-page="transactions-dispute"><span class="workspace-menu-icon">!</span><span>Transaksi Sengketa</span></button>
+
+        <div class="admin-nav-divider" aria-hidden="true"></div>
+        <p class="admin-nav-group-label">Rekber</p>
+        <button type="button" class="admin-nav-btn" data-admin-page="transactions-new"><span class="workspace-menu-icon">▣</span><span>Rekber masuk</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="transactions-completed"><span class="workspace-menu-icon">✓</span><span>Selesai Rekber</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="transactions-transfer-queue"><span class="workspace-menu-icon">⇄</span><span>Antrian Transfer Rekber</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="transactions-cancelled"><span class="workspace-menu-icon">×</span><span>Batal Rekber</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="transactions-dispute"><span class="workspace-menu-icon">!</span><span>Sengketa Rekber</span></button>
+
+        <div class="admin-nav-divider" aria-hidden="true"></div>
+        <p class="admin-nav-group-label">GT / Voucher</p>
+        <button type="button" class="admin-nav-btn" data-admin-page="voucher-orders"><span class="workspace-menu-icon">🎮</span><span>Order GT / Voucher</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="voucher-catalog"><span class="workspace-menu-icon">▤</span><span>Katalog Voucher</span></button>
+        <button type="button" class="admin-nav-btn" data-admin-page="voucher-data"><span class="workspace-menu-icon">📊</span><span>Data Voucher / GT</span></button>
+
+        <div class="admin-nav-divider" aria-hidden="true"></div>
+        <p class="admin-nav-group-label">Admin</p>
         <button type="button" class="admin-nav-btn" data-admin-page="support"><span class="workspace-menu-icon">✉</span><span>Live Chat</span></button>
         <button type="button" class="admin-nav-btn" data-admin-page="verification"><span class="workspace-menu-icon">⌁</span><span>Verifikasi Pengguna</span></button>
         <button type="button" class="admin-nav-btn" data-admin-page="users"><span class="workspace-menu-icon">◎</span><span>Semua Pengguna</span></button>
@@ -65,10 +77,26 @@
     </aside>
 
     <section class="admin-content">
+      <div class="admin-notif-floating" id="admin-notif-floating">
+        <button type="button" class="admin-notif-btn" id="admin-notif-btn" aria-expanded="false" aria-controls="admin-notif-panel">
+          <span class="admin-notif-icon" aria-hidden="true">🔔</span>
+          <span class="admin-notif-label">Notifikasi</span>
+          <span class="notif-badge hidden" id="admin-notif-badge">0</span>
+        </button>
+        <div class="admin-notif-panel hidden" id="admin-notif-panel" role="dialog" aria-label="Notifikasi admin">
+          <div class="admin-notif-panel-head">
+            <strong>Notifikasi Admin</strong>
+            <button type="button" class="ghost-btn admin-notif-close" id="admin-notif-close">Tutup</button>
+          </div>
+          <div class="admin-notif-list" id="admin-notif-list"></div>
+        </div>
+      </div>
+
       <section class="card admin-page active-admin-page" data-admin-page-content="overview">
         <div class="section-head">
-          <p class="eyebrow">Dashboard</p>
-          <h3>Ringkasan aktivitas admin</h3>
+          <p class="eyebrow">Ringkasan</p>
+          <h3>Data pengguna & aktivitas umum</h3>
+          <p class="mini-note">Ringkasan pengguna dan analytics pengunjung website.</p>
         </div>
         <div class="admin-summary" id="admin-summary"></div>
         <div class="card admin-analytics-card">
@@ -95,24 +123,6 @@
             <div class="admin-analytics-panel" id="admin-analytics-pages"></div>
           </div>
           <div class="admin-analytics-panel" id="admin-analytics-daily"></div>
-        </div>
-        <div class="card admin-profit-card">
-          <div class="section-head">
-            <p class="eyebrow">Profit transaksi</p>
-            <h3>Pantau fee masuk, hold garansi, dan transaksi batal</h3>
-          </div>
-          <div class="admin-toolbar admin-profit-toolbar">
-            <label>
-              Dari tanggal
-              <input type="date" id="profit-date-from" />
-            </label>
-            <label>
-              Sampai tanggal
-              <input type="date" id="profit-date-to" />
-            </label>
-          </div>
-          <div class="admin-summary" id="admin-profit-summary"></div>
-          <div class="admin-list" id="admin-profit-list"></div>
         </div>
       </section>
 
@@ -174,6 +184,120 @@
         </div>
       </section>
 
+      <section class="card admin-page" data-admin-page-content="voucher-catalog">
+        <div class="section-head">
+          <p class="eyebrow">Katalog</p>
+          <h3>Pengaturan produk voucher / gametime</h3>
+        </div>
+        <div class="admin-workspace voucher-admin-workspace">
+          <div class="admin-list" id="admin-voucher-product-list"></div>
+          <form id="admin-voucher-product-form" class="profile-form settings-section-card">
+            <h4 id="admin-voucher-product-form-title">Tambah produk baru</h4>
+            <label>Nama produk<input type="text" name="name" required /></label>
+            <label>Deskripsi<textarea name="description" rows="3"></textarea></label>
+            <div class="history-split">
+              <label>Nominal harga modal
+                <input type="number" name="costAmount" min="0" step="0.01" value="0" />
+              </label>
+              <label>Mata uang modal
+                <select name="costCurrency" id="admin-voucher-cost-currency">
+                  <option value="IDR">IDR — Rupiah</option>
+                  <option value="USD">USD — Dolar AS</option>
+                </select>
+              </label>
+            </div>
+            <div id="admin-voucher-cost-preview" class="voucher-cost-preview-card">
+              <p class="mini-note">Isi nominal modal dan harga jual untuk melihat konversi IDR dan estimasi profit.</p>
+            </div>
+            <label>Harga jual (user, IDR)<input type="number" name="price" min="1" required /></label>
+            <label>Foto produk (JPG/PNG/WEBP)<input type="file" name="image" accept="image/jpeg,image/png,image/webp" /></label>
+            <label>Ready mode
+              <select name="readyMode">
+                <option value="24h">Ready 24 Jam</option>
+                <option value="schedule">Ready sesuai jadwal</option>
+              </select>
+            </label>
+            <div class="history-split">
+              <label>Jam mulai ready<input type="time" name="readyStart" /></label>
+              <label>Jam selesai ready<input type="time" name="readyEnd" /></label>
+            </div>
+            <label>Stok (-1 = unlimited)<input type="number" name="stock" value="-1" /></label>
+            <label>Urutan tampil<input type="number" name="sortOrder" value="0" /></label>
+            <label class="settings-toggle-row"><input type="checkbox" name="requiresAccountLogin" /><span>Membutuhkan email & password akun subscription</span></label>
+            <label class="settings-toggle-row"><input type="checkbox" name="isActive" checked /><span>Produk aktif</span></label>
+            <div class="topbar-actions">
+              <button type="button" class="ghost-btn" id="admin-voucher-product-reset">Reset form</button>
+              <button type="submit" class="primary-btn">Simpan produk</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="card admin-page" data-admin-page-content="voucher-orders">
+        <div class="section-head">
+          <p class="eyebrow">Order voucher</p>
+          <h3>Order GT / Voucher</h3>
+        </div>
+        <details class="voucher-manual-order-card settings-section-card" open>
+          <summary>Input manual order</summary>
+          <form id="admin-voucher-manual-form" class="profile-form voucher-manual-order-form">
+            <label>Username Telegram pembeli
+              <input type="text" name="buyerTelegram" placeholder="@username" autocomplete="off" required />
+            </label>
+            <label>Email akun
+              <input type="email" name="accountEmail" placeholder="email@contoh.com" autocomplete="off" required />
+            </label>
+            <label>Password akun
+              <input type="text" name="accountPassword" placeholder="Password akun subscription" autocomplete="off" required />
+            </label>
+            <label>Pilih voucher / gametime
+              <select name="productId" id="admin-voucher-manual-product" required>
+                <option value="">Pilih produk dari katalog...</option>
+              </select>
+            </label>
+            <label>Upload bukti transfer
+              <input type="file" name="paymentProof" accept="image/jpeg,image/png,image/webp,application/pdf" />
+            </label>
+            <div class="voucher-manual-preview" id="admin-voucher-manual-preview">
+              <p class="mini-note">Pilih produk untuk melihat estimasi harga jual, modal, dan profit.</p>
+            </div>
+            <button type="submit" class="primary-btn">Simpan order manual</button>
+          </form>
+        </details>
+        <div class="admin-workspace voucher-admin-workspace">
+          <div class="admin-list" id="admin-voucher-order-list"></div>
+          <div class="voucher-order-room-panel" id="admin-voucher-order-room"></div>
+        </div>
+      </section>
+
+      <section class="card admin-page" data-admin-page-content="voucher-data">
+        <div class="section-head">
+          <p class="eyebrow">Laporan penjualan</p>
+          <h3>Data Voucher / Gametime</h3>
+          <p class="mini-note">Hitung order voucher selesai dalam rentang tanggal. Profit = harga jual - harga modal.</p>
+        </div>
+        <div class="voucher-manual-orders-panel settings-section-card">
+          <div class="section-head compact">
+            <h4>Order manual aktif</h4>
+            <p class="mini-note">Order input manual yang belum selesai. Klik Proses, salin data ke pembeli, lalu Selesai agar masuk laporan.</p>
+          </div>
+          <div class="admin-list" id="voucher-manual-orders-list"></div>
+        </div>
+        <div class="admin-toolbar admin-profit-toolbar">
+          <label>
+            Dari tanggal
+            <input type="date" id="voucher-report-date-from" />
+          </label>
+          <label>
+            Sampai tanggal
+            <input type="date" id="voucher-report-date-to" />
+          </label>
+          <button type="button" class="primary-btn" id="voucher-report-load-btn">Tampilkan data</button>
+        </div>
+        <div class="admin-summary" id="voucher-report-summary"></div>
+        <div class="admin-list" id="voucher-report-list"></div>
+      </section>
+
       <section class="card admin-page" data-admin-page-content="settings">
         <div class="section-head">
           <p class="eyebrow">Pengaturan website</p>
@@ -192,6 +316,14 @@
               <textarea id="maintenance-mode-message" rows="4" placeholder="Contoh: RekberWE.id sedang dalam pemeliharaan. Silakan kembali 30 menit lagi."></textarea>
             </label>
             <button type="button" class="primary-btn" id="save-maintenance-settings-btn">Simpan Mode Maintenance</button>
+          </div>
+          <div class="settings-section-card">
+            <h4>Rekening pembayaran voucher / gametime</h4>
+            <label>Nama bank<input type="text" id="voucher-payment-bank-name" placeholder="BCA" /></label>
+            <label>Nomor rekening<input type="text" id="voucher-payment-bank-number" placeholder="1234567890" /></label>
+            <label>Nama pemilik rekening<input type="text" id="voucher-payment-bank-holder" placeholder="Qhead Gold" /></label>
+            <label>URL QRIS (opsional)<input type="url" id="voucher-payment-qris-url" placeholder="https://..." /></label>
+            <label>Instruksi pembayaran<textarea id="voucher-payment-instructions" rows="4"></textarea></label>
           </div>
           <div class="settings-section-card">
             <h4>Pengaturan fee & kontak</h4>
@@ -299,8 +431,8 @@
       <section class="admin-page admin-transactions-page" data-admin-page-content="transactions">
         <div class="workspace-page-head">
           <div>
-            <p class="eyebrow" id="admin-page-eyebrow">Transaksi</p>
-            <h3 id="admin-page-title">Transaksi Baru Masuk</h3>
+            <p class="eyebrow" id="admin-page-eyebrow">Rekber</p>
+            <h3 id="admin-page-title">Rekber masuk</h3>
           </div>
         </div>
 
@@ -498,9 +630,9 @@
       <section class="admin-page admin-transfer-queue-page" data-admin-page-content="transfer-queue">
         <div class="workspace-page-head">
           <div>
-            <p class="eyebrow">Transfer ke penjual</p>
+            <p class="eyebrow">Antrian Transfer Rekber</p>
             <h3>Antrian transfer admin</h3>
-            <p class="mini-note">Halaman ini khusus untuk memantau antrian pencairan dana tanpa gangguan ruang chat transaksi.</p>
+            <p class="mini-note">Halaman ini khusus untuk memantau antrian pencairan dana Rekber tanpa gangguan ruang chat transaksi.</p>
           </div>
         </div>
 
@@ -657,6 +789,7 @@
   </div>
   <script src="analytics-client.js?v=1"></script>
   <script src="push-client.js?v=1"></script>
+  <script src="voucher-admin.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

@@ -13,6 +13,8 @@ const adminNotificationState = {
   initialized: false,
   knownTransactionCodes: [],
   seenMessagesByCode: {},
+  knownVoucherOrderCodes: [],
+  seenVoucherMessagesByCode: {},
   audioUnlocked: false,
   lastSoundAt: 0,
 };
@@ -56,6 +58,11 @@ const elements = {
   adminVerificationSearch: document.getElementById("admin-verification-search"),
   adminTransactionList: document.getElementById("admin-transaction-list"),
   adminLogout: document.getElementById("admin-logout"),
+  voucherPaymentBankName: document.getElementById("voucher-payment-bank-name"),
+  voucherPaymentBankNumber: document.getElementById("voucher-payment-bank-number"),
+  voucherPaymentBankHolder: document.getElementById("voucher-payment-bank-holder"),
+  voucherPaymentQrisUrl: document.getElementById("voucher-payment-qris-url"),
+  voucherPaymentInstructions: document.getElementById("voucher-payment-instructions"),
   adminFeeForm: document.getElementById("admin-fee-form"),
   maintenanceSettingsCard: document.getElementById("maintenance-settings-card"),
   maintenanceModeEnabled: document.getElementById("maintenance-mode-enabled"),
@@ -168,6 +175,12 @@ const elements = {
   adminLoginModal: document.getElementById("admin-login-modal"),
   closeAdminLoginModal: document.getElementById("close-admin-login-modal"),
   adminProviderLoginButtons: Array.from(document.querySelectorAll("#admin-login-modal [data-provider]")),
+  adminNotifBtn: document.getElementById("admin-notif-btn"),
+  adminNotifBadge: document.getElementById("admin-notif-badge"),
+  adminNotifPanel: document.getElementById("admin-notif-panel"),
+  adminNotifList: document.getElementById("admin-notif-list"),
+  adminNotifClose: document.getElementById("admin-notif-close"),
+  adminNotifFloating: document.getElementById("admin-notif-floating"),
 };
 
 let adminNoteResolver = null;
@@ -287,13 +300,21 @@ elements.adminUserSearch?.addEventListener("input", () => {
 elements.adminVerificationSearch?.addEventListener("input", () => {
   renderVerificationQueue(state.users);
 });
-elements.profitDateFrom?.addEventListener("input", () => renderSummary(state.users, state.transactions));
-elements.profitDateTo?.addEventListener("input", () => renderSummary(state.users, state.transactions));
 elements.analyticsDateFrom?.addEventListener("input", () => loadAdminAnalytics());
 elements.analyticsDateTo?.addEventListener("input", () => loadAdminAnalytics());
 elements.analyticsRefreshBtn?.addEventListener("click", () => loadAdminAnalytics());
 elements.adminNavButtons.forEach((button) => {
   button.addEventListener("click", () => openAdminPage(button.dataset.adminPage));
+});
+elements.adminNotifBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleAdminNotificationPanel();
+});
+elements.adminNotifClose?.addEventListener("click", () => closeAdminNotificationPanel());
+document.addEventListener("click", (event) => {
+  if (!elements.adminNotifFloating?.contains(event.target)) {
+    closeAdminNotificationPanel();
+  }
 });
 document.addEventListener("click", async (event) => {
   const copyButton = event.target.closest("[data-copy-transfer-account]");
@@ -376,6 +397,7 @@ function handleAdminAuthCallback() {
 
 function showAdminLoginGate(message, options = {}) {
   document.body.classList.add("admin-locked");
+  closeAdminNotificationPanel();
   elements.adminLoginGate?.classList.remove("hidden");
   elements.adminHeaderLogin?.classList.remove("hidden");
   if (elements.adminLoginGateText && message) {
@@ -427,6 +449,9 @@ async function bootstrap() {
   setupAdminLiveEvents();
   await refreshDashboardData();
   openAdminPage("overview");
+  window.RekberAdminVoucher?.init();
+  await window.RekberAdminVoucher?.refresh?.().catch(() => {});
+  ensureAdminVoucherNotificationState();
   startAdminRoomRefresh();
   if (adminPresenceTickTimer) window.clearInterval(adminPresenceTickTimer);
   adminPresenceTickTimer = window.setInterval(() => {
@@ -454,7 +479,7 @@ async function refreshDashboardData() {
     state.activeTransaction = state.transactions.find((item) => item.code === state.activeTransaction.code) || null;
   }
 
-  renderSummary(state.users, state.transactions);
+  renderSummary(state.users);
   await loadAdminAnalytics();
   renderUsers(state.users);
   renderVerificationQueue(state.users);
@@ -469,6 +494,9 @@ async function refreshDashboardData() {
     renderTransactionsPage();
     renderActiveTransaction();
   }
+  if (state.currentPage === "voucher-catalog" || state.currentPage === "voucher-orders") {
+    await window.RekberAdminVoucher?.refresh?.();
+  }
   renderSupportThreads();
   updateAdminNotificationBadges();
 }
@@ -482,6 +510,8 @@ function ensureAdminNotificationState() {
     adminNotificationState.initialized = false;
     adminNotificationState.knownTransactionCodes = [];
     adminNotificationState.seenMessagesByCode = {};
+    adminNotificationState.knownVoucherOrderCodes = [];
+    adminNotificationState.seenVoucherMessagesByCode = {};
     return;
   }
   const storageKey = getAdminNotificationStorageKey();
@@ -491,9 +521,13 @@ function ensureAdminNotificationState() {
       const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
       adminNotificationState.knownTransactionCodes = Array.isArray(saved.knownTransactionCodes) ? saved.knownTransactionCodes : [];
       adminNotificationState.seenMessagesByCode = saved.seenMessagesByCode || {};
+      adminNotificationState.knownVoucherOrderCodes = Array.isArray(saved.knownVoucherOrderCodes) ? saved.knownVoucherOrderCodes : [];
+      adminNotificationState.seenVoucherMessagesByCode = saved.seenVoucherMessagesByCode || {};
     } catch {
       adminNotificationState.knownTransactionCodes = [];
       adminNotificationState.seenMessagesByCode = {};
+      adminNotificationState.knownVoucherOrderCodes = [];
+      adminNotificationState.seenVoucherMessagesByCode = {};
     }
     if (!adminNotificationState.knownTransactionCodes.length && state.transactions.length) {
       adminNotificationState.knownTransactionCodes = state.transactions.map((transaction) => transaction.code);
@@ -509,6 +543,8 @@ function saveAdminNotificationState() {
   localStorage.setItem(storageKey, JSON.stringify({
     knownTransactionCodes: adminNotificationState.knownTransactionCodes,
     seenMessagesByCode: adminNotificationState.seenMessagesByCode,
+    knownVoucherOrderCodes: adminNotificationState.knownVoucherOrderCodes,
+    seenVoucherMessagesByCode: adminNotificationState.seenVoucherMessagesByCode,
   }));
 }
 
@@ -522,6 +558,219 @@ function markTransactionsAsKnown(codes) {
   });
   if (changed) saveAdminNotificationState();
 }
+
+function getAdminVoucherOrders() {
+  return window.RekberAdminVoucher?.getOrders?.() || [];
+}
+
+function ensureAdminVoucherNotificationState() {
+  ensureAdminNotificationState();
+  if (!adminNotificationState.knownVoucherOrderCodes.length) {
+    const orders = getAdminVoucherOrders();
+    if (orders.length) {
+      adminNotificationState.knownVoucherOrderCodes = orders.map((order) => order.orderCode);
+      saveAdminNotificationState();
+    }
+  }
+}
+
+function markVoucherOrdersAsKnown(codes) {
+  let changed = false;
+  codes.forEach((code) => {
+    const normalized = String(code || "").trim().toUpperCase();
+    if (!normalized) return;
+    if (!adminNotificationState.knownVoucherOrderCodes.includes(normalized)) {
+      adminNotificationState.knownVoucherOrderCodes.push(normalized);
+      changed = true;
+    }
+  });
+  if (changed) saveAdminNotificationState();
+}
+
+function getAdminVoucherLatestMessageTime(order) {
+  const lastMessage = order?.messages?.[order.messages.length - 1];
+  return lastMessage?.time || order?.updatedAt || "";
+}
+
+function markAdminVoucherOrderSeen(order) {
+  if (!order?.orderCode) return;
+  markVoucherOrdersAsKnown([order.orderCode]);
+  const latestMessageTime = getAdminVoucherLatestMessageTime(order);
+  if (!latestMessageTime) return;
+  adminNotificationState.seenVoucherMessagesByCode[order.orderCode] = latestMessageTime;
+  saveAdminNotificationState();
+  updateAdminNotificationBadges();
+}
+
+function getAdminVoucherUnreadCount(order) {
+  if (!order?.messages?.length) return 0;
+  const seenAt = adminNotificationState.seenVoucherMessagesByCode[order.orderCode];
+  const seenTime = seenAt ? new Date(seenAt).getTime() : 0;
+  return order.messages.filter((message) => {
+    const messageTime = new Date(message.time).getTime();
+    return message.senderRole !== "admin" && messageTime > seenTime;
+  }).length;
+}
+
+function isAdminVoucherOrderNew(order) {
+  if (!order?.orderCode) return false;
+  if (["cancelled", "completed"].includes(order.status)) return false;
+  return !adminNotificationState.knownVoucherOrderCodes.includes(order.orderCode);
+}
+
+function getAdminVoucherNotificationCount() {
+  return getAdminVoucherOrders().filter((order) => {
+    if (["cancelled", "completed"].includes(order.status)) {
+      return getAdminVoucherUnreadCount(order) > 0;
+    }
+    return isAdminVoucherOrderNew(order) || getAdminVoucherUnreadCount(order) > 0;
+  }).length;
+}
+
+function buildAdminNotifications() {
+  const items = [];
+  getAdminVoucherOrders().forEach((order) => {
+    const isNew = isAdminVoucherOrderNew(order);
+    const unread = getAdminVoucherUnreadCount(order);
+    if (isNew) {
+      items.push({
+        type: "voucher",
+        code: order.orderCode,
+        title: "Order GT / Voucher baru",
+        text: `${order.product?.name || order.orderCode} • ${order.user?.displayName || "-"}`,
+        time: order.createdAt,
+      });
+    } else if (unread > 0) {
+      items.push({
+        type: "voucher",
+        code: order.orderCode,
+        title: "Pesan baru order GT",
+        text: `${unread} pesan belum dibaca • ${order.product?.name || order.orderCode}`,
+        time: getAdminVoucherLatestMessageTime(order),
+      });
+    }
+  });
+  state.transactions.forEach((transaction) => {
+    const isActiveFlow = transaction.paymentStatus !== "Selesai" && transaction.paymentStatus !== "Transaksi dibatalkan" && !transaction.hasDispute;
+    if (!isActiveFlow) return;
+    const isUnknown = !adminNotificationState.knownTransactionCodes.includes(transaction.code);
+    const unread = getAdminUnreadCount(transaction);
+    if (isUnknown) {
+      items.push({
+        type: "transaction",
+        code: transaction.code,
+        title: "Order Rekber baru",
+        text: `${transaction.code} • ${transaction.title || "Transaksi baru"}`,
+        time: transaction.createdAt,
+      });
+    } else if (unread > 0) {
+      items.push({
+        type: "transaction",
+        code: transaction.code,
+        title: "Pesan baru Rekber",
+        text: `${unread} pesan belum dibaca • ${transaction.code}`,
+        time: getAdminLatestMessageTime(transaction),
+      });
+    }
+  });
+  (state.supportThreads || []).forEach((thread) => {
+    const unread = getAdminSupportUnreadCount(thread);
+    if (!unread) return;
+    const lastMessage = thread.messages?.[thread.messages.length - 1];
+    items.push({
+      type: "support",
+      id: thread.id,
+      title: "Live chat masuk",
+      text: `${unread} pesan belum dibaca • ${thread.user?.displayName || "Guest"}`,
+      time: lastMessage?.time || thread.updatedAt || thread.updated_at,
+    });
+  });
+  return items.sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
+}
+
+function getAdminDashboardNotificationCount() {
+  return buildAdminNotifications().length;
+}
+
+function setAdminNotifBadge(count) {
+  if (!elements.adminNotifBadge) return;
+  elements.adminNotifBadge.classList.toggle("hidden", !count);
+  elements.adminNotifBadge.textContent = String(count > 99 ? "99+" : count);
+}
+
+function renderAdminNotificationPanel() {
+  if (!elements.adminNotifList) return;
+  const items = buildAdminNotifications();
+  setAdminNotifBadge(items.length);
+  elements.adminNotifList.innerHTML = items.length
+    ? items.map((item) => `
+      <button type="button" class="notification-card is-unread admin-notif-item" data-admin-notif-type="${escapeAttribute(item.type)}" data-admin-notif-code="${escapeAttribute(item.code || "")}" data-admin-notif-id="${escapeAttribute(String(item.id || ""))}">
+        <div class="notification-card-top">
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(item.time ? formatDateTime(new Date(item.time)) : "")}</span>
+        </div>
+        <p>${escapeHtml(item.text)}</p>
+      </button>
+    `).join("")
+    : `
+      <article class="notification-card">
+        <strong>Belum ada notifikasi</strong>
+        <p>Notifikasi order GT, Rekber, dan live chat akan tampil di sini.</p>
+      </article>
+    `;
+  elements.adminNotifList.querySelectorAll("[data-admin-notif-type]").forEach((button) => {
+    button.addEventListener("click", () => handleAdminNotificationClick(button));
+  });
+}
+
+function toggleAdminNotificationPanel() {
+  if (!elements.adminNotifPanel || !elements.adminNotifBtn) return;
+  const willOpen = elements.adminNotifPanel.classList.contains("hidden");
+  elements.adminNotifPanel.classList.toggle("hidden", !willOpen);
+  elements.adminNotifBtn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  if (willOpen) renderAdminNotificationPanel();
+}
+
+function closeAdminNotificationPanel() {
+  elements.adminNotifPanel?.classList.add("hidden");
+  elements.adminNotifBtn?.setAttribute("aria-expanded", "false");
+}
+
+async function handleAdminNotificationClick(button) {
+  const type = button.dataset.adminNotifType;
+  const code = button.dataset.adminNotifCode;
+  const threadId = Number(button.dataset.adminNotifId || 0);
+  closeAdminNotificationPanel();
+  if (type === "voucher" && code) {
+    openAdminPage("voucher-orders");
+    await window.RekberAdminVoucher?.refresh?.();
+    await window.RekberAdminVoucher?.openOrder?.(code);
+    return;
+  }
+  if (type === "transaction" && code) {
+    openAdminPage("transactions-new");
+    const found = state.transactions.find((item) => item.code === code);
+    if (found) {
+      state.activeTransaction = found;
+      markAdminTransactionSeen(found);
+      updateActiveAdminTransactionCard();
+      renderActiveTransaction();
+    }
+    updateAdminNotificationBadges();
+    return;
+  }
+  if (type === "support" && threadId) {
+    openAdminPage("support");
+    state.activeSupportThreadId = threadId;
+    renderSupportThreads();
+    updateAdminNotificationBadges();
+  }
+}
+
+window.getAdminVoucherUnreadCount = getAdminVoucherUnreadCount;
+window.isAdminVoucherOrderNew = isAdminVoucherOrderNew;
+window.markAdminVoucherOrderSeen = markAdminVoucherOrderSeen;
+window.updateAdminNotificationBadges = updateAdminNotificationBadges;
 
 function getAdminLatestMessageTime(transaction) {
   const lastMessage = transaction?.messages?.[transaction.messages.length - 1];
@@ -787,6 +1036,10 @@ function openAdminPage(page) {
     section.classList.toggle("active-admin-page", section.dataset.adminPageContent === pageKey);
   });
 
+  if (page === "overview") {
+    loadAdminAnalytics();
+  }
+
   if (page.startsWith("transactions-")) {
     if (page === "transactions-new") {
       markTransactionsAsKnown(state.transactions.filter(getTransactionPageMeta().filter).map((transaction) => transaction.code));
@@ -808,45 +1061,60 @@ function openAdminPage(page) {
     renderSupportThreads();
     fetchJson("/api/presence/heartbeat", { method: "POST", body: JSON.stringify(getAdminHeartbeatBody()) }).catch(() => {});
   }
+
+  if (page === "voucher-catalog" || page === "voucher-orders") {
+    window.RekberAdminVoucher?.refresh?.().catch(() => {});
+  }
+
+  if (page === "voucher-orders") {
+    markVoucherOrdersAsKnown(getAdminVoucherOrders().map((order) => order.orderCode));
+    getAdminVoucherOrders().forEach((order) => markAdminVoucherOrderSeen(order));
+    updateAdminNotificationBadges();
+  }
+
+  if (page === "voucher-data") {
+    window.RekberAdminVoucher?.refresh?.().catch(() => {});
+    window.RekberAdminVoucher?.refreshReport?.().catch(() => {});
+  }
 }
 
 function getTransactionPageMeta() {
   if (state.currentPage === "transactions-completed") {
     return {
-      title: "Transaksi Selesai",
-      eyebrow: "Transaksi selesai",
-      empty: "Belum ada transaksi selesai.",
+      title: "Selesai Rekber",
+      eyebrow: "Rekber selesai",
+      empty: "Belum ada transaksi Rekber selesai.",
       filter: (transaction) => transaction.paymentStatus === "Selesai",
     };
   }
   if (state.currentPage === "transactions-cancelled") {
     return {
-      title: "Transaksi Dibatalkan",
-      eyebrow: "Transaksi dibatalkan",
-      empty: "Belum ada transaksi dibatalkan.",
+      title: "Batal Rekber",
+      eyebrow: "Rekber dibatalkan",
+      empty: "Belum ada transaksi Rekber dibatalkan.",
       filter: (transaction) => transaction.paymentStatus === "Transaksi dibatalkan",
     };
   }
   if (state.currentPage === "transactions-transfer-queue") {
     return {
-      title: "Antrian Transfer",
-      eyebrow: "Transfer ke penjual",
-      empty: "Belum ada transaksi dalam antrian transfer atau masa garansi.",
+      title: "Antrian Transfer Rekber",
+      eyebrow: "Transfer Rekber",
+      empty: "Belum ada transaksi Rekber dalam antrian transfer atau masa garansi.",
       filter: isInTransferQueue,
     };
   }
   if (state.currentPage === "transactions-dispute") {
     return {
-      title: "Transaksi Sengketa",
-      eyebrow: "Transaksi sengketa",
-      empty: "Belum ada transaksi sengketa.",
+      title: "Sengketa Rekber",
+      eyebrow: "Rekber sengketa",
+      empty: "Belum ada transaksi Rekber sengketa.",
       filter: (transaction) => transaction.hasDispute,
     };
   }
   return {
-    title: "Transaksi Baru Masuk",
-    eyebrow: "Transaksi baru",
-    empty: "Belum ada transaksi baru masuk.",
+    title: "Rekber masuk",
+    eyebrow: "Rekber baru",
+    empty: "Belum ada transaksi Rekber baru masuk.",
     filter: (transaction) => transaction.paymentStatus !== "Selesai" && transaction.paymentStatus !== "Transaksi dibatalkan" && !transaction.hasDispute,
   };
 }
@@ -878,21 +1146,19 @@ function renderAdminUser(user) {
   });
 }
 
-function renderSummary(users, transactions) {
+function renderSummary(users) {
   const interestedUsers = users.filter((user) => user.interestedInRekber).length;
-  const disputes = transactions.filter((transaction) => transaction.hasDispute).length;
-  const completed = transactions.filter((transaction) => transaction.paymentStatus === "Selesai").length;
   const waitingVerification = users.filter((user) => user.needsVerificationReview).length;
+  const verifiedUsers = users.filter((user) => user.verified || user.verificationStatus === "verified").length;
+  const bannedUsers = users.filter((user) => user.banned).length;
 
   elements.adminSummary.innerHTML = `
     <article><p class="mini-label">Total pengguna</p><strong>${users.length}</strong></article>
     <article><p class="mini-label">Pengguna tertarik rekber</p><strong>${interestedUsers}</strong></article>
-    <article><p class="mini-label">Total transaksi</p><strong>${transactions.length}</strong></article>
-    <article><p class="mini-label">Sengketa aktif</p><strong>${disputes}</strong></article>
+    <article><p class="mini-label">Pengguna terverifikasi</p><strong>${verifiedUsers}</strong></article>
     <article><p class="mini-label">Menunggu verifikasi</p><strong>${waitingVerification}</strong></article>
-    <article><p class="mini-label">Transaksi selesai</p><strong>${completed}</strong></article>
+    <article><p class="mini-label">Pengguna diblokir</p><strong>${bannedUsers}</strong></article>
   `;
-  renderProfitSummary(transactions);
 }
 
 function ensureAnalyticsDateDefaults() {
@@ -1428,6 +1694,7 @@ function renderFeeSettings(settings) {
     elements.maintenanceModeMessage.value = settings?.maintenanceMessage || "";
   }
   renderMaintenanceSettingsState(settings);
+  window.RekberAdminVoucher?.renderPaymentSettings?.(settings);
   for (let index = 0; index < 4; index += 1) {
     const tier = tiers[index] || { maxAmount: "", fee: "", feeType: "flat" };
     document.getElementById(`tier-${index + 1}-max`).value = tier.maxAmount ?? "";
@@ -1789,6 +2056,13 @@ async function handleSaveFeeSettings(event) {
       accountSecurityGuide: String(elements.accountSecurityGuide?.value || "").trim(),
       maintenanceMode: Boolean(elements.maintenanceModeEnabled?.checked),
       maintenanceMessage: String(elements.maintenanceModeMessage?.value || "").trim(),
+      voucherPayment: {
+        bankName: String(elements.voucherPaymentBankName?.value || "").trim(),
+        bankNumber: String(elements.voucherPaymentBankNumber?.value || "").trim(),
+        bankHolder: String(elements.voucherPaymentBankHolder?.value || "").trim(),
+        qrisUrl: String(elements.voucherPaymentQrisUrl?.value || "").trim(),
+        instructions: String(elements.voucherPaymentInstructions?.value || "").trim(),
+      },
     }),
   });
 
@@ -3096,6 +3370,28 @@ function setupAdminLiveEvents() {
         if (state.currentPage === "support") renderAdminSupportPresence();
       }
 
+      if (payload.type === "voucher_order_updated") {
+        const previousOrders = getAdminVoucherOrders();
+        const orderCode = String(payload.order?.orderCode || payload.orderCode || payload.code || "").toUpperCase();
+        const previous = previousOrders.find((item) => item.orderCode === orderCode);
+        if (!payload.deleted && payload.order) {
+          if (!previous) {
+            shouldPlayTransactionSound = true;
+          } else {
+            const previousMessageCount = previous.messages?.length || 0;
+            const nextMessageCount = payload.order.messages?.length || 0;
+            const lastMessage = payload.order.messages?.[nextMessageCount - 1];
+            if (nextMessageCount > previousMessageCount && lastMessage?.senderRole !== "admin") {
+              shouldPlayChatSound = true;
+            }
+            if (previous.status !== payload.order.status && payload.order.status === "awaiting_confirmation") {
+              shouldPlayTransactionSound = true;
+            }
+          }
+        }
+        await window.RekberAdminVoucher?.handleLiveEvent?.(payload);
+      }
+
       if (payload.type === "transaction_updated" && payload.transaction) {
         if (!previousTransaction) {
           shouldPlayTransactionSound = true;
@@ -3183,12 +3479,18 @@ function updateAdminNotificationBadges() {
   const disputeButton = elements.adminNavButtons.find((button) => button.dataset.adminPage === "transactions-dispute");
   const supportButton = elements.adminNavButtons.find((button) => button.dataset.adminPage === "support");
   const verificationButton = elements.adminNavButtons.find((button) => button.dataset.adminPage === "verification");
+  const voucherOrdersButton = elements.adminNavButtons.find((button) => button.dataset.adminPage === "voucher-orders");
   setAdminButtonBadge(newTransactionsButton, getAdminNewTransactionCount());
   setAdminButtonBadge(transferQueueButton, getAdminTransferQueueCount());
   setAdminButtonBadge(cancelledButton, getAdminCancelledCount());
   setAdminButtonBadge(disputeButton, getAdminDisputeCount());
   setAdminButtonBadge(supportButton, (state.supportThreads || []).reduce((total, thread) => total + getAdminSupportUnreadCount(thread), 0));
   setAdminButtonBadge(verificationButton, (state.users || []).filter((user) => user.needsVerificationReview).length);
+  setAdminButtonBadge(voucherOrdersButton, getAdminVoucherNotificationCount());
+  setAdminNotifBadge(getAdminDashboardNotificationCount());
+  if (elements.adminNotifPanel && !elements.adminNotifPanel.classList.contains("hidden")) {
+    renderAdminNotificationPanel();
+  }
 }
 
 

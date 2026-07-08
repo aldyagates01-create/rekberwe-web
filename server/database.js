@@ -7,6 +7,14 @@ import pg from "pg";
 
 import * as sqliteDb from "./database.sqlite.js";
 import { phoneToLocalWhatsapp } from "./phone-utils.js";
+import {
+  DEFAULT_VOUCHER_PRODUCT_IMAGE,
+  generateVoucherOrderCode,
+  getProductReadyState,
+  normalizeVoucherPaymentSettings,
+} from "./voucher-utils.js";
+import { createVoucherPgApi } from "./voucher-pg.js";
+import { migratePlaintextVoucherCredentials } from "./voucher-credentials-crypto.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -895,6 +903,20 @@ async function initializePostgres() {
     ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS attachment_name TEXT DEFAULT '';
     ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS attachment_url TEXT DEFAULT '';
     ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS attachment_type TEXT DEFAULT '';
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS requires_account_login BOOLEAN DEFAULT FALSE;
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0;
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_currency TEXT DEFAULT 'IDR';
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_amount_original DOUBLE PRECISION DEFAULT 0;
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_fx_rate DOUBLE PRECISION DEFAULT 1;
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_fx_fetched_at TEXT DEFAULT '';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_email TEXT DEFAULT '';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_password TEXT DEFAULT '';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0;
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1;
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_accounts TEXT DEFAULT '[]';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_revision_requested BOOLEAN DEFAULT FALSE;
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS order_source TEXT DEFAULT 'platform';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS buyer_telegram TEXT DEFAULT '';
   `);
 
   await query(`
@@ -930,10 +952,83 @@ async function initializePostgres() {
       created_at TIMESTAMPTZ NOT NULL,
       PRIMARY KEY (user_id, transaction_code)
     );
+
+    CREATE TABLE IF NOT EXISTS voucher_products (
+      id BIGSERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      price INTEGER NOT NULL,
+      image_url TEXT DEFAULT '',
+      image_name TEXT DEFAULT '',
+      ready_mode TEXT DEFAULT '24h',
+      ready_start TEXT DEFAULT '',
+      ready_end TEXT DEFAULT '',
+      is_active BOOLEAN DEFAULT TRUE,
+      stock INTEGER DEFAULT -1,
+      sort_order INTEGER DEFAULT 0,
+      requires_account_login BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS voucher_orders (
+      id BIGSERIAL PRIMARY KEY,
+      order_code TEXT UNIQUE NOT NULL,
+      product_id BIGINT NOT NULL REFERENCES voucher_products(id),
+      user_id TEXT NOT NULL REFERENCES users(id),
+      price INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      payment_proof_url TEXT DEFAULT '',
+      payment_proof_name TEXT DEFAULT '',
+      account_email TEXT DEFAULT '',
+      account_password TEXT DEFAULT '',
+      dispute_reason TEXT DEFAULT '',
+      cancel_reason TEXT DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS voucher_order_messages (
+      id BIGSERIAL PRIMARY KEY,
+      order_code TEXT NOT NULL,
+      sender_user_id TEXT,
+      sender_name TEXT NOT NULL,
+      sender_role TEXT NOT NULL,
+      message_text TEXT DEFAULT '',
+      attachment_name TEXT DEFAULT '',
+      attachment_url TEXT DEFAULT '',
+      attachment_type TEXT DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_voucher_orders_user ON voucher_orders(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_voucher_orders_status ON voucher_orders(status, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_voucher_order_messages_code ON voucher_order_messages(order_code, id);
   `);
 
   if (sqliteImportEnabled) {
     await migrateFromSqliteIfNeeded();
+  }
+
+  const migratedCredentials = await migratePlaintextVoucherCredentials(
+    async (orderCode, encrypted) => {
+      await query(
+        `
+          UPDATE voucher_orders
+          SET account_email = $2, account_password = $3, account_accounts = $4
+          WHERE order_code = $1
+        `,
+        [orderCode, encrypted.account_email, encrypted.account_password, encrypted.account_accounts],
+      );
+    },
+    async () => queryRows(`
+      SELECT order_code, account_email, account_password, account_accounts
+      FROM voucher_orders
+      WHERE account_email != '' OR account_password != '' OR account_accounts NOT IN ('', '[]')
+    `),
+  );
+  if (migratedCredentials > 0) {
+    console.log(`[voucher-crypto] ${migratedCredentials} order voucher — kredensial dienkripsi.`);
   }
 }
 
@@ -1314,6 +1409,35 @@ async function queryValue(sql, params = []) {
   return row[Object.keys(row)[0]];
 }
 
+async function withTransaction(fn) {
+  const client = await pool.connect();
+  const txQuery = (sql, params = []) => client.query(sql, params);
+  const tx = {
+    query: txQuery,
+    queryRows: async (sql, params = []) => (await txQuery(sql, params)).rows,
+    queryOne: async (sql, params = []) => {
+      const rows = (await txQuery(sql, params)).rows;
+      return rows[0] || null;
+    },
+    queryValue: async (sql, params = []) => {
+      const row = await tx.queryOne(sql, params);
+      if (!row) return null;
+      return row[Object.keys(row)[0]];
+    },
+  };
+  try {
+    await client.query("BEGIN");
+    const result = await fn(tx);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 function toIsoString(value) {
   if (!value) return "";
   return new Date(value).toISOString();
@@ -1388,6 +1512,7 @@ function defaultFeeSettings() {
     },
     maintenanceMode: false,
     maintenanceMessage: defaultMaintenanceMessage(),
+    voucherPayment: normalizeVoucherPaymentSettings(),
   };
 }
 
@@ -1454,6 +1579,7 @@ function normalizeFeeSettings(input) {
     },
     maintenanceMode: Boolean(raw.maintenanceMode),
     maintenanceMessage: String(raw.maintenanceMessage || defaultMaintenanceMessage()).trim() || defaultMaintenanceMessage(),
+    voucherPayment: normalizeVoucherPaymentSettings(raw.voucherPayment),
   };
 }
 
@@ -1818,6 +1944,14 @@ export async function getLocalUploadAccessContext(uploadPath) {
     "SELECT DISTINCT thread_id FROM support_messages WHERE attachment_url = $1",
     [uploadPath],
   );
+  const voucherRows = await queryRows(
+    "SELECT DISTINCT order_code AS code FROM voucher_order_messages WHERE attachment_url = $1",
+    [uploadPath],
+  );
+  const voucherProofRows = await queryRows(
+    "SELECT order_code AS code FROM voucher_orders WHERE payment_proof_url = $1",
+    [uploadPath],
+  );
   const ownerUserIds = [...new Set([
     ...avatarRows.map((row) => row.id),
     ...ktpRows.map((row) => row.id),
@@ -1828,6 +1962,10 @@ export async function getLocalUploadAccessContext(uploadPath) {
     ktpOwnerUserIds: ktpRows.map((row) => row.id),
     transactionCodes: transactionRows.map((row) => row.code),
     supportThreadIds: supportRows.map((row) => row.thread_id),
+    voucherOrderCodes: [...new Set([
+      ...voucherRows.map((row) => row.code),
+      ...voucherProofRows.map((row) => row.code),
+    ])],
   };
 }
 
@@ -1913,4 +2051,135 @@ export async function completePendingSellerJoinsForUser(userId) {
     }
   }
   return joined;
+}
+
+let voucherPgApi = null;
+
+function getVoucherApi() {
+  if (!postgresEnabled) return sqliteDb;
+  if (!voucherPgApi) {
+    voucherPgApi = createVoucherPgApi({
+      query,
+      queryOne,
+      queryRows,
+      queryValue,
+      getUserById,
+      withTransaction,
+    });
+  }
+  return voucherPgApi;
+}
+
+export async function getActiveVoucherProducts() {
+  if (!postgresEnabled) return sqliteDb.getActiveVoucherProducts();
+  await ensureReady();
+  return getVoucherApi().getActiveVoucherProducts();
+}
+
+export async function getAllVoucherProducts() {
+  if (!postgresEnabled) return sqliteDb.getAllVoucherProducts();
+  await ensureReady();
+  return getVoucherApi().getAllVoucherProducts();
+}
+
+export async function getVoucherProductById(productId) {
+  if (!postgresEnabled) return sqliteDb.getVoucherProductById(productId);
+  await ensureReady();
+  return getVoucherApi().getVoucherProductById(productId);
+}
+
+export async function createVoucherProduct(input) {
+  if (!postgresEnabled) return sqliteDb.createVoucherProduct(input);
+  await ensureReady();
+  return getVoucherApi().createVoucherProduct(input);
+}
+
+export async function updateVoucherProduct(productId, input) {
+  if (!postgresEnabled) return sqliteDb.updateVoucherProduct(productId, input);
+  await ensureReady();
+  return getVoucherApi().updateVoucherProduct(productId, input);
+}
+
+export async function deleteVoucherProduct(productId) {
+  if (!postgresEnabled) return sqliteDb.deleteVoucherProduct(productId);
+  await ensureReady();
+  return getVoucherApi().deleteVoucherProduct(productId);
+}
+
+export async function deleteVoucherOrder(orderCode) {
+  if (!postgresEnabled) return sqliteDb.deleteVoucherOrder(orderCode);
+  await ensureReady();
+  return getVoucherApi().deleteVoucherOrder(orderCode);
+}
+
+export async function createVoucherOrder(userId, productId, options = {}) {
+  if (!postgresEnabled) return sqliteDb.createVoucherOrder(userId, productId, options);
+  await ensureReady();
+  return getVoucherApi().createVoucherOrder(userId, productId, options);
+}
+
+export async function createManualVoucherOrder(adminUserId, payload = {}) {
+  if (!postgresEnabled) return sqliteDb.createManualVoucherOrder(adminUserId, payload);
+  await ensureReady();
+  return getVoucherApi().createManualVoucherOrder(adminUserId, payload);
+}
+
+export async function updateVoucherOrderAccounts(orderCode, accounts = []) {
+  if (!postgresEnabled) return sqliteDb.updateVoucherOrderAccounts(orderCode, accounts);
+  await ensureReady();
+  return getVoucherApi().updateVoucherOrderAccounts(orderCode, accounts);
+}
+
+export async function getVoucherOrderByCode(orderCode) {
+  if (!postgresEnabled) return sqliteDb.getVoucherOrderByCode(orderCode);
+  await ensureReady();
+  return getVoucherApi().getVoucherOrderByCode(orderCode);
+}
+
+export async function getVoucherOrdersByUserId(userId) {
+  if (!postgresEnabled) return sqliteDb.getVoucherOrdersByUserId(userId);
+  await ensureReady();
+  return getVoucherApi().getVoucherOrdersByUserId(userId);
+}
+
+export async function getAllVoucherOrders() {
+  if (!postgresEnabled) return sqliteDb.getAllVoucherOrders();
+  await ensureReady();
+  return getVoucherApi().getAllVoucherOrders();
+}
+
+export async function updateVoucherOrderFields(orderCode, fields) {
+  if (!postgresEnabled) return sqliteDb.updateVoucherOrderFields(orderCode, fields);
+  await ensureReady();
+  return getVoucherApi().updateVoucherOrderFields(orderCode, fields);
+}
+
+export async function addVoucherOrderMessage(orderCode, senderUserId, senderName, senderRole, messageText, attachment) {
+  if (!postgresEnabled) {
+    return sqliteDb.addVoucherOrderMessage(orderCode, senderUserId, senderName, senderRole, messageText, attachment);
+  }
+  await ensureReady();
+  return getVoucherApi().addVoucherOrderMessage(orderCode, senderUserId, senderName, senderRole, messageText, attachment);
+}
+
+export async function getVoucherOrderOwnerUserId(orderCode) {
+  if (!postgresEnabled) return sqliteDb.getVoucherOrderOwnerUserId(orderCode);
+  await ensureReady();
+  return getVoucherApi().getVoucherOrderOwnerUserId(orderCode);
+}
+
+export async function getVoucherSalesReport(fromDate, toDate) {
+  if (!postgresEnabled) return sqliteDb.getVoucherSalesReport(fromDate, toDate);
+  await ensureReady();
+  return getVoucherApi().getVoucherSalesReport(fromDate, toDate);
+}
+
+export async function isVoucherProductCatalogImage(uploadPath) {
+  if (!postgresEnabled) return sqliteDb.isVoucherProductCatalogImage(uploadPath);
+  await ensureReady();
+  const row = await queryOne(
+    "SELECT 1 AS ok FROM voucher_products WHERE image_url = $1 AND is_active = TRUE LIMIT 1",
+    [String(uploadPath || "").trim()],
+  );
+  return Boolean(row);
 }

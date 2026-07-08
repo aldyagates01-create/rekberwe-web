@@ -26,6 +26,9 @@ const state = {
   supportThread: null,
   workspaceSection: "dashboard",
   mobileCreateOpen: false,
+  historySelection: { type: "", code: "" },
+  historyChatType: null,
+  historyVoucherOrder: null,
 };
 
 const notificationState = {
@@ -95,14 +98,15 @@ const elements = {
   workspaceTransactionFeePreview: document.getElementById("workspace-transaction-fee-preview"),
   mobileDashboardSummary: document.getElementById("mobile-dashboard-summary"),
   mobileDashboardTransactions: document.getElementById("mobile-dashboard-transactions"),
-  mobileActiveRekberList: document.getElementById("mobile-active-rekber-list"),
-  mobileHistoryRekberList: document.getElementById("mobile-history-rekber-list"),
+  mobileUnifiedHistoryList: document.getElementById("mobile-unified-history-list"),
+  mobileActiveTransactionsList: document.getElementById("mobile-active-transactions-list"),
   mobileDashboardLearnMore: document.getElementById("mobile-dashboard-learn-more"),
   mobileDashboardSeeAll: document.getElementById("mobile-dashboard-see-all"),
   mobileQuickCreate: document.getElementById("mobile-quick-create"),
+  mobileQuickVoucher: document.getElementById("mobile-quick-voucher"),
   mobileQuickVerification: document.getElementById("mobile-quick-verification"),
   mobileQuickGuide: document.getElementById("mobile-quick-guide"),
-  desktopQuickGuide: document.getElementById("desktop-quick-guide"),
+  homeSidebarDashboard: document.getElementById("home-sidebar-dashboard"),
   mobileQuickSecurity: document.getElementById("mobile-quick-security"),
   mobileHeaderNotifications: document.getElementById("mobile-header-notifications"),
   mobileHeaderNotificationsBadge: document.getElementById("mobile-header-notifications-badge"),
@@ -115,6 +119,7 @@ const elements = {
   mobileChatHeaderTitle: document.getElementById("mobile-chat-header-title"),
   mobileChatHeaderOnline: document.getElementById("mobile-chat-header-online"),
   mobileChatHeaderBadge: document.getElementById("mobile-chat-header-badge"),
+  mobileChatHeaderMenu: document.getElementById("mobile-chat-header-menu"),
   mobileRoomStatusBadge: document.getElementById("mobile-room-status-badge"),
   mobileRoomPrice: document.getElementById("mobile-room-price"),
   mobileDetailBackdrop: document.getElementById("mobile-detail-backdrop"),
@@ -171,8 +176,10 @@ const elements = {
   cancelTransaction: document.getElementById("cancel-transaction"),
   profileCard: document.getElementById("profile-card"),
   profileLookup: document.getElementById("profile-lookup"),
+  profileLookupWorkspace: document.getElementById("profile-lookup-workspace"),
   lookupProfile: document.getElementById("lookup-profile"),
   lookupResult: document.getElementById("lookup-result"),
+  lookupResultWorkspace: document.getElementById("lookup-result-workspace"),
   homeArea: document.getElementById("home-area"),
   memberArea: document.getElementById("member-area"),
   activeRekberList: document.getElementById("active-rekber-list"),
@@ -189,6 +196,17 @@ const elements = {
   confirmModalText: document.getElementById("confirm-modal-text"),
   confirmModalApprove: document.getElementById("confirm-modal-approve"),
   confirmModalCancel: document.getElementById("confirm-modal-cancel"),
+  promptModal: document.getElementById("prompt-modal"),
+  promptModalEyebrow: document.getElementById("prompt-modal-eyebrow"),
+  promptModalTitle: document.getElementById("prompt-modal-title"),
+  promptModalLabel: document.getElementById("prompt-modal-label"),
+  promptModalInput: document.getElementById("prompt-modal-input"),
+  promptModalApprove: document.getElementById("prompt-modal-approve"),
+  promptModalCancel: document.getElementById("prompt-modal-cancel"),
+  mobileCreateChoiceModal: document.getElementById("mobile-create-choice-modal"),
+  mobileCreateChoiceRekber: document.getElementById("mobile-create-choice-rekber"),
+  mobileCreateChoiceVoucher: document.getElementById("mobile-create-choice-voucher"),
+  mobileCreateChoiceCancel: document.getElementById("mobile-create-choice-cancel"),
   profilePanel: document.getElementById("profile-panel"),
   transactionsPanel: document.getElementById("transactions-panel"),
   transactionsIntroSection: document.getElementById("transactions-intro-section"),
@@ -203,11 +221,15 @@ const elements = {
   workspaceCreateTransactionButton: document.getElementById("workspace-create-transaction-button"),
   workspaceOpenTransactionsButton: document.getElementById("workspace-open-transactions-button"),
   activeRekberSection: document.getElementById("active-rekber-section"),
+  voucherOrdersSidebarSection: document.getElementById("voucher-orders-sidebar-section"),
   historyRekberSection: document.getElementById("history-rekber-section"),
   backToTransactionList: document.getElementById("back-to-transaction-list"),
+  historyRoomToolbar: document.getElementById("history-room-toolbar"),
   roomPageTitle: document.getElementById("room-page-title"),
   roomPageSubtitle: document.getElementById("room-page-subtitle"),
   transactionRoomEmpty: document.getElementById("transaction-room-empty"),
+  transactionUnifiedHistoryList: document.getElementById("transaction-unified-history-list"),
+  voucherHistoryRoom: document.getElementById("voucher-history-room"),
   publicFeeList: document.getElementById("public-fee-list"),
   workspacePublicFeeList: document.getElementById("workspace-public-fee-list"),
   termsList: document.getElementById("terms-list"),
@@ -290,6 +312,8 @@ let userPresenceTimer = null;
 let presenceTickTimer = null;
 let typingStopTimer = null;
 let confirmModalResolver = null;
+let promptModalResolver = null;
+let activeModalEscapeHandler = null;
 let supportThreadTimer = null;
 let supportTypingStopTimer = null;
 let supportPresenceTickTimer = null;
@@ -323,6 +347,7 @@ bootstrap().catch((error) => {
 async function bootstrap() {
   state.providerConfig = await fetchJson("/api/config");
   initResizableLayouts();
+  initViewportListener();
   handleProviderAuthCallback();
   renderAll();
   updateProviderAvailability();
@@ -348,6 +373,7 @@ async function bootstrap() {
     }
   }
   const hasTransactionRoute = routeParams.has("trx");
+  const hasVoucherRoute = routeParams.has("voucher");
   const hasSupportRoute = routeParams.get("support") === "1";
   if (hasTransactionRoute) {
     try {
@@ -364,7 +390,7 @@ async function bootstrap() {
   }
   const initialResults = await Promise.allSettled(initialJobs);
   const failedInitialJob = initialResults.find((item) => item.status === "rejected");
-  if (failedInitialJob && !hasTransactionRoute) {
+  if (failedInitialJob && !hasTransactionRoute && !hasVoucherRoute) {
     throw failedInitialJob.reason;
   }
   renderAll();
@@ -373,6 +399,13 @@ async function bootstrap() {
       await handleSupportRoute();
     } catch (supportRouteError) {
       console.warn("Gagal membuka live chat dari URL:", supportRouteError);
+    }
+  }
+  if (hasVoucherRoute) {
+    try {
+      await handleVoucherRoute();
+    } catch (voucherRouteError) {
+      console.warn("Gagal membuka order voucher dari URL:", voucherRouteError);
     }
   }
   if (!hasTransactionRoute) {
@@ -385,8 +418,64 @@ async function bootstrap() {
   startRoomRefresh();
   if (state.currentUser) {
     window.RekberPush?.ensurePushEnabled?.({ audience: "user" }).catch(() => {});
+    window.fetchJson = fetchJson;
+    window.setAuthStatus = setAuthStatus;
+    window.openPromptModal = openPromptModal;
+    window.syncHistoryVoucherOrder = (order) => {
+      if (state.historyChatType === "voucher" && state.historyVoucherOrder?.orderCode === order?.orderCode) {
+        state.historyVoucherOrder = order;
+      }
+    };
+    window.markUserVoucherOrderSeen = markUserVoucherOrderSeen;
+    window.refreshUserTransactionHistory = () => {
+      renderUnifiedTransactionHistory();
+      updateUserNotificationBadges();
+      renderNotifications();
+    };
+    window.RekberVoucher?.init(state.currentUser);
     await tryCompletePendingSellerJoin();
   }
+}
+
+async function openHistoryRekberRoom(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (!normalized) return;
+  const payload = await fetchJson(`/api/transactions/${encodeURIComponent(normalized)}`).catch(() => null);
+  const transaction = payload?.transaction
+    || state.transactions.find((item) => item.code === normalized)
+    || state.dashboard.activeTransactions?.find((item) => item.code === normalized)
+    || state.dashboard.completedTransactions?.find((item) => item.code === normalized);
+  if (!transaction) return;
+  state.historySelection = { type: "rekber", code: normalized };
+  state.historyChatType = "rekber";
+  state.historyVoucherOrder = null;
+  state.activeTransaction = transaction;
+  state.transactionScreen = "room";
+  openWorkspaceSection("transactions");
+  renderRoom(transaction);
+}
+
+async function openHistoryVoucherRoom(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (!normalized) return;
+  const payload = await fetchJson(`/api/voucher/orders/${encodeURIComponent(normalized)}`).catch(() => null);
+  const order = payload?.order || window.RekberVoucher?.getOrders?.().find((item) => item.orderCode === normalized);
+  if (!order) return;
+  if (order.status === "awaiting_payment") {
+    await window.RekberVoucher?.ensurePaymentSettings?.().catch(() => {});
+  }
+  state.historySelection = { type: "voucher", code: normalized };
+  state.historyChatType = "voucher";
+  state.historyVoucherOrder = order;
+  state.activeTransaction = null;
+  state.transactionScreen = "room";
+  openWorkspaceSection("transactions");
+  window.RekberVoucher?.renderHistoryRoom?.(order);
+  markUserVoucherOrderSeen(order);
+  renderTransactionScreen();
+  elements.roomPageTitle.textContent = order.product?.name || order.orderCode;
+  elements.roomPageSubtitle.textContent = `${order.orderCode} • ${order.statusLabel || order.status}`;
+  enterRoomMode();
 }
 
 async function fetchJson(url, options = {}) {
@@ -953,6 +1042,31 @@ function markUserTransactionSeen(transaction) {
   saveUserNotificationState();
 }
 
+function getVoucherLatestMessageTime(order) {
+  const lastMessage = order?.messages?.[order.messages.length - 1];
+  return lastMessage?.time || order?.updatedAt || order?.createdAt || "";
+}
+
+function markUserVoucherOrderSeen(order) {
+  if (!state.currentUser || !order?.orderCode) return;
+  const latestMessageTime = getVoucherLatestMessageTime(order);
+  if (!latestMessageTime) return;
+  notificationState.seenMessagesByCode[order.orderCode] = latestMessageTime;
+  saveUserNotificationState();
+  updateUserNotificationBadges();
+  renderUnifiedTransactionHistory();
+}
+
+function getVoucherUnreadCount(order) {
+  if (!state.currentUser || !order?.messages?.length) return 0;
+  const seenAt = notificationState.seenMessagesByCode[order.orderCode];
+  const seenTime = seenAt ? new Date(seenAt).getTime() : 0;
+  return order.messages.filter((message) => {
+    const messageTime = new Date(message.time).getTime();
+    return message.senderRole === "admin" && messageTime > seenTime;
+  }).length;
+}
+
 function getUserUnreadCount(transaction) {
   if (!state.currentUser || !transaction?.messages?.length) return 0;
   const seenAt = notificationState.seenMessagesByCode[transaction.code];
@@ -966,7 +1080,9 @@ function getUserUnreadCount(transaction) {
 
 function getTotalUserUnreadCount() {
   const allTransactions = [...(state.dashboard.activeTransactions || []), ...(state.dashboard.completedTransactions || [])];
-  return allTransactions.reduce((total, transaction) => total + getUserUnreadCount(transaction), 0);
+  const rekberUnread = allTransactions.reduce((total, transaction) => total + getUserUnreadCount(transaction), 0);
+  const voucherUnread = getVoucherOrdersForHistory().reduce((total, order) => total + getVoucherUnreadCount(order), 0);
+  return rekberUnread + voucherUnread;
 }
 
 function setButtonBadge(button, count) {
@@ -1290,24 +1406,45 @@ function bindForms() {
   elements.logoutButton?.addEventListener("click", handleLogout);
   elements.mobileHeaderLogout?.addEventListener("click", handleLogout);
   elements.mobileChatBack?.addEventListener("click", () => {
-    exitRoomMode();
-    state.transactionScreen = "list";
+    openTransactionListView();
     openWorkspaceSection("transactions");
   });
   elements.transactionsNavButton?.addEventListener("click", () => {
-    state.transactionScreen = "list";
+    openTransactionListView();
     openWorkspaceSection("transactions");
   });
   elements.profileNavButton?.addEventListener("click", () => openWorkspaceSection("profile"));
   elements.sidebarHomeButton?.addEventListener("click", () => openWorkspaceSection("dashboard"));
   elements.sidebarTransactionsButton?.addEventListener("click", () => {
-    state.transactionScreen = "list";
+    openTransactionListView();
     openWorkspaceSection("transactions");
+  });
+  const handleUnifiedHistoryClick = async (event) => {
+    const rekberButton = event.target.closest("[data-open-rekber-history]");
+    if (rekberButton) {
+      await openHistoryRekberRoom(rekberButton.dataset.openRekberHistory);
+      return;
+    }
+    const voucherButton = event.target.closest("[data-open-voucher-order]");
+    if (voucherButton) {
+      await openHistoryVoucherRoom(voucherButton.dataset.openVoucherOrder);
+    }
+  };
+  elements.transactionUnifiedHistoryList?.addEventListener("click", handleUnifiedHistoryClick);
+  elements.mobileUnifiedHistoryList?.addEventListener("click", handleUnifiedHistoryClick);
+  elements.mobileActiveTransactionsList?.addEventListener("click", handleUnifiedHistoryClick);
+  document.getElementById("mobile-profile-verification-btn")?.addEventListener("click", () => openWorkspaceSection("verification"));
+  document.getElementById("mobile-profile-guide-btn")?.addEventListener("click", () => {
+    window.location.href = "/security-guide";
   });
   elements.sidebarProfileButton?.addEventListener("click", () => openWorkspaceSection("profile"));
   elements.sidebarNotificationsButton?.addEventListener("click", () => openWorkspaceSection("notifications"));
   elements.sidebarVerificationButton?.addEventListener("click", () => openWorkspaceSection("verification"));
   elements.sidebarCreateTransaction?.addEventListener("click", () => {
+    if (isMobileViewport()) {
+      openMobileCreateTransaction();
+      return;
+    }
     openWorkspaceSection("dashboard");
   });
   elements.workspaceCreateTransactionButton?.addEventListener("click", () => {
@@ -1320,13 +1457,12 @@ function bindForms() {
   elements.sidebarSecurityGuideButton?.addEventListener("click", () => {
     window.location.href = "/security-guide";
   });
-  elements.sidebarLiveChatButton?.addEventListener("click", () => {
-    if (!elements.supportWidgetPanel?.classList.contains("open")) {
-      toggleSupportWidget();
-    }
-  });
+  elements.sidebarLiveChatButton?.addEventListener("click", openSupportWidgetIfClosed);
   elements.mobileQuickCreate?.addEventListener("click", () => {
     openMobileCreateTransaction();
+  });
+  elements.mobileQuickVoucher?.addEventListener("click", () => {
+    openMobileVoucherWorkspace();
   });
   elements.mobileQuickVerification?.addEventListener("click", () => openWorkspaceSection("verification"));
   elements.mobileDashboardSeeAll?.addEventListener("click", () => {
@@ -1334,7 +1470,9 @@ function bindForms() {
     openWorkspaceSection("transactions");
   });
   elements.mobileQuickGuide?.addEventListener("click", openJaminanRekberPage);
-  elements.desktopQuickGuide?.addEventListener("click", openJaminanRekberPage);
+  elements.homeSidebarDashboard?.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
   elements.mobileQuickSecurity?.addEventListener("click", () => {
     openMobileDashboardDetail("workspace-terms-list");
   });
@@ -1348,18 +1486,27 @@ function bindForms() {
     openWorkspaceSection("dashboard");
   });
   elements.mobileNavTransactions?.addEventListener("click", () => {
-    state.transactionScreen = "list";
+    openTransactionListView();
     openWorkspaceSection("transactions");
   });
   elements.mobileNavCreate?.addEventListener("click", () => {
+    openMobileCreateChoiceModal();
+  });
+  elements.mobileCreateChoiceRekber?.addEventListener("click", () => {
+    closeMobileCreateChoiceModal();
     openMobileCreateTransaction();
   });
-  elements.mobileNavSupport?.addEventListener("click", () => {
-    if (!elements.supportWidgetPanel?.classList.contains("open")) {
-      toggleSupportWidget();
-    }
+  elements.mobileCreateChoiceVoucher?.addEventListener("click", () => {
+    closeMobileCreateChoiceModal();
+    openMobileVoucherWorkspace();
   });
+  elements.mobileCreateChoiceCancel?.addEventListener("click", closeMobileCreateChoiceModal);
+  elements.mobileCreateChoiceModal?.addEventListener("click", (event) => {
+    if (event.target === elements.mobileCreateChoiceModal) closeMobileCreateChoiceModal();
+  });
+  elements.mobileNavSupport?.addEventListener("click", openSupportWidgetIfClosed);
   elements.mobileNavAccount?.addEventListener("click", () => openWorkspaceSection("profile"));
+  elements.mobileChatHeaderMenu?.addEventListener("click", () => toggleMobileDetailSheet());
   elements.mobileRoomDetailButton?.addEventListener("click", () => {
     if (isMobileViewport()) {
       toggleMobileDetailSheet();
@@ -1372,11 +1519,7 @@ function bindForms() {
   elements.mobileRoomUploadButton?.addEventListener("click", () => elements.proofUpload?.click());
   elements.mobileRoomGuideButton?.addEventListener("click", () => window.open("/security-guide", "_blank", "noopener"));
   elements.mobileRoomDisputeButton?.addEventListener("click", () => elements.openDispute?.click());
-  elements.homeLiveChatShortcut?.addEventListener("click", () => {
-    if (!elements.supportWidgetPanel?.classList.contains("open")) {
-      toggleSupportWidget();
-    }
-  });
+  elements.homeLiveChatShortcut?.addEventListener("click", openSupportWidgetIfClosed);
   elements.telegramDirectLogin.addEventListener("click", () => startProviderLogin("Telegram"));
   elements.googleDirectLogin.addEventListener("click", () => startProviderLogin("Google"));
   elements.facebookDirectLogin.addEventListener("click", () => startProviderLogin("Facebook"));
@@ -1446,6 +1589,8 @@ function bindForms() {
   elements.approveLocationConsentModal?.addEventListener("click", () => closeLocationConsentModal(true));
   elements.confirmModalCancel?.addEventListener("click", () => closeConfirmModal(false));
   elements.confirmModalApprove?.addEventListener("click", () => closeConfirmModal(true));
+  elements.promptModalCancel?.addEventListener("click", () => closePromptModal(null));
+  elements.promptModalApprove?.addEventListener("click", () => closePromptModal(elements.promptModalInput?.value || ""));
   elements.supportWidgetToggle?.addEventListener("click", toggleSupportWidget);
   elements.supportWidgetClose?.addEventListener("click", toggleSupportWidget);
   elements.supportWidgetForm?.addEventListener("submit", handleSupportMessageSubmit);
@@ -1468,6 +1613,13 @@ function bindForms() {
   elements.closeLoginModal?.addEventListener("click", closeLoginModal);
   elements.closeUserProfileModal?.addEventListener("click", closeUserProfileModal);
   document.addEventListener("click", handleProfileTriggerClick);
+  document.addEventListener("keydown", (event) => {
+    const trigger = event.target.closest("[data-profile-trigger]");
+    if (!trigger || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    const role = String(trigger.dataset.profileTrigger || "");
+    if (role) openUserProfileModal(role);
+  });
   initSupportWidgetDrag();
 }
 
@@ -1475,11 +1627,13 @@ function updateProviderAvailability() {
   if (!state.providerConfig?.providers) return;
   const providerMap = new Map(state.providerConfig.providers.map((item) => [item.name, item]));
   document.querySelectorAll("[data-provider]").forEach((button) => {
-    const provider = providerMap.get(normalizeProviderName(button.dataset.provider));
     if (normalizeProviderName(button.dataset.provider) === "Facebook") {
-      button.title = "Login Facebook saat ini sedang pengembangan. Silakan gunakan social media lain.";
+      button.classList.add("hidden");
+      button.disabled = true;
+      button.setAttribute("aria-hidden", "true");
       return;
     }
+    const provider = providerMap.get(normalizeProviderName(button.dataset.provider));
     if (!provider || provider.enabled) return;
     button.disabled = true;
     button.title = `Provider ${button.dataset.provider} belum diaktifkan di file .env backend.`;
@@ -1641,7 +1795,9 @@ async function handleCreateTransaction(event) {
     setWarrantyFieldError(form, "");
     toggleVerificationFieldsForForm(form);
     updateTransactionFeePreview(form);
-    if (isMobileViewport() && openMobileTransactionChat(payload.transaction.code)) {
+    if (isMobileViewport() && await openMobileTransactionChat(payload.transaction.code)) {
+      await refreshTransactions();
+      await refreshDashboard();
       return;
     }
     renderAll();
@@ -1869,7 +2025,8 @@ async function enterTransactionRoom(code, transaction) {
   const normalized = String(code || "").trim().toUpperCase();
   closeJoinRoleModal();
   closeVerificationModal();
-  if (isMobileViewport() && openMobileTransactionChat(normalized)) {
+  if (transaction) state.activeTransaction = transaction;
+  if (isMobileViewport() && await openMobileTransactionChat(normalized)) {
     return;
   }
   state.activeTransaction = transaction;
@@ -1979,7 +2136,7 @@ async function handleJoinTransaction() {
 
     if (alreadyParticipantLocal || (localTransaction.buyer && localTransaction.seller)) {
       closeJoinRoleModal();
-      if (isMobileViewport() && openMobileTransactionChat(code)) {
+      if (isMobileViewport() && await openMobileTransactionChat(code)) {
         return;
       }
       let latestTransaction = localTransaction;
@@ -2034,7 +2191,7 @@ async function handleJoinTransaction() {
 
   elements.joinRoleBox.classList.add("hidden");
   closeJoinRoleModal();
-  if (isMobileViewport() && openMobileTransactionChat(code)) {
+  if (isMobileViewport() && await openMobileTransactionChat(code)) {
     return;
   }
   state.activeTransaction = transaction;
@@ -2064,7 +2221,7 @@ async function handleRoleJoin(role) {
     });
     state.pendingJoinTransaction = null;
     closeJoinRoleModal();
-    if (isMobileViewport() && openMobileTransactionChat(code)) {
+    if (isMobileViewport() && await openMobileTransactionChat(code)) {
       return;
     }
     state.activeTransaction = joined.transaction;
@@ -2433,12 +2590,23 @@ function renderTermsAndConditions() {
   });
 }
 
+function syncRoomModeBodyClass() {
+  if (!document.body.classList.contains("in-room-mode")) {
+    document.body.classList.remove("in-voucher-room");
+    return;
+  }
+  const isVoucherRoom = state.historyChatType === "voucher" && state.transactionScreen === "room";
+  document.body.classList.toggle("in-voucher-room", isVoucherRoom);
+}
+
 function enterRoomMode() {
   document.body.classList.add("in-room-mode");
+  syncRoomModeBodyClass();
 }
 
 function exitRoomMode() {
   document.body.classList.remove("in-room-mode");
+  document.body.classList.remove("in-voucher-room");
   toggleMobileDetailSheet(false);
 }
 
@@ -2510,11 +2678,13 @@ function openLoginModal() {
     openWorkspaceSection("dashboard");
     return;
   }
-  elements.loginModal?.classList.remove("hidden");
+  openAccessibleModalShell(elements.loginModal);
+  bindModalEscape(elements.loginModal, closeLoginModal);
+  elements.telegramDirectLogin?.focus();
 }
 
 function closeLoginModal() {
-  elements.loginModal?.classList.add("hidden");
+  closeAccessibleModalShell(elements.loginModal);
 }
 
 function renderMemberVisibility() {
@@ -2592,6 +2762,7 @@ function updateWorkspaceMenuState() {
     [elements.mobileNavDashboard, state.workspaceSection === "dashboard"],
     [elements.mobileNavTransactions, state.workspaceSection === "transactions"],
     [elements.mobileNavAccount, state.workspaceSection === "profile"],
+    [elements.mobileHeaderNotifications, state.workspaceSection === "notifications"],
   ];
   mapping.forEach(([button, active]) => {
     button?.classList.toggle("is-active", Boolean(active));
@@ -2685,14 +2856,11 @@ function renderMobileDashboard() {
   `).join("");
 
   elements.mobileDashboardTransactions.querySelectorAll("[data-transaction-code]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const transaction = state.transactions.find((item) => item.code === button.dataset.transactionCode)
-        || activeTransactions.find((item) => item.code === button.dataset.transactionCode);
-      if (!transaction) return;
-      state.activeTransaction = transaction;
-      state.transactionScreen = "room";
-      openWorkspaceSection("transactions");
-      renderRoom(transaction);
+    button.addEventListener("click", async () => {
+      const opened = await openMobileTransactionChat(button.dataset.transactionCode);
+      if (!opened) {
+        setAuthStatus("Gagal membuka transaksi.", true);
+      }
     });
   });
 }
@@ -2724,9 +2892,24 @@ function buildMobileTransactionProgress(transaction) {
   `;
 }
 
+function openMobileCreateChoiceModal() {
+  if (!elements.mobileCreateChoiceModal) {
+    openMobileCreateTransaction();
+    return;
+  }
+  openAccessibleModalShell(elements.mobileCreateChoiceModal);
+  bindModalEscape(elements.mobileCreateChoiceModal, closeMobileCreateChoiceModal);
+  elements.mobileCreateChoiceRekber?.focus();
+}
+
+function closeMobileCreateChoiceModal() {
+  closeAccessibleModalShell(elements.mobileCreateChoiceModal);
+}
+
 function openMobileCreateTransaction() {
   state.mobileCreateOpen = true;
   openWorkspaceSection("dashboard");
+  window.RekberVoucher?.openService?.("rekber");
   renderTransactionScreen();
   const target = document.getElementById("workspace-inline-transaction-panel");
   target?.scrollIntoView({ behavior: window.innerWidth <= 768 ? "auto" : "smooth", block: "start" });
@@ -2976,10 +3159,6 @@ function handleProfileTriggerClick(event) {
 function openUserProfileModal(role) {
   const transaction = state.activeTransaction;
   if (!transaction) return;
-  if (isMobileViewport()) {
-    window.location.href = `/transaksi/${encodeURIComponent(transaction.code)}/profil/${role}`;
-    return;
-  }
   const profile = buildTransactionProfileDetails(role, transaction);
   if (!profile || !elements.userProfileModal) return;
   elements.userProfileModalAvatar.innerHTML = renderProfileAvatar(profile);
@@ -2988,11 +3167,13 @@ function openUserProfileModal(role) {
   elements.userProfileModalBadge.textContent = profile.verified ? "Verified ✓" : "Unverified ✕";
   elements.userProfileModalBadge.className = `mini-note ${profile.verified ? "chat-badge-verified" : "chat-badge-unverified"}`;
   elements.userProfileModalGrid.innerHTML = buildUserProfileModalGrid(profile, state.transactions);
-  elements.userProfileModal.classList.remove("hidden");
+  openAccessibleModalShell(elements.userProfileModal);
+  bindModalEscape(elements.userProfileModal, closeUserProfileModal);
+  elements.closeUserProfileModal?.focus();
 }
 
 function closeUserProfileModal() {
-  elements.userProfileModal?.classList.add("hidden");
+  closeAccessibleModalShell(elements.userProfileModal);
 }
 
 function buildTransactionProfileDetails(role, transaction) {
@@ -3344,9 +3525,9 @@ function buildChatHistoryRows(messages) {
 
 function bindOpenTransactionButtons() {
   document.querySelectorAll(".open-transaction-btn").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const code = button.dataset.transactionCode;
-      if (isMobileViewport() && openMobileTransactionChat(code)) {
+      if (isMobileViewport() && await openMobileTransactionChat(code)) {
         return;
       }
       elements.joinCode.value = code;
@@ -3388,6 +3569,17 @@ function openWorkspaceSection(section) {
   }
   if (section === "notifications") {
     renderNotifications();
+  }
+  if (section === "transactions") {
+    renderUnifiedTransactionHistory();
+    Promise.all([
+      refreshTransactions().catch(() => {}),
+      refreshDashboard().catch(() => {}),
+      window.RekberVoucher?.refresh?.().catch(() => {}),
+    ]).then(() => {
+      renderActivityTabs();
+      renderUnifiedTransactionHistory();
+    });
   }
   renderTransactionScreen();
   updateWorkspaceMenuState();
@@ -3459,28 +3651,108 @@ function closeVerificationModal() {
   elements.verificationModal.classList.add("hidden");
 }
 
+function isSupportWidgetOpen() {
+  return Boolean(elements.supportWidgetPanel && !elements.supportWidgetPanel.classList.contains("hidden"));
+}
+
+function openSupportWidgetIfClosed() {
+  if (!isSupportWidgetOpen()) toggleSupportWidget();
+}
+
+function bindModalEscape(modal, onEscape) {
+  unbindModalEscape();
+  if (!modal) return;
+  activeModalEscapeHandler = (event) => {
+    if (event.key !== "Escape") return;
+    onEscape();
+  };
+  document.addEventListener("keydown", activeModalEscapeHandler);
+}
+
+function unbindModalEscape() {
+  if (!activeModalEscapeHandler) return;
+  document.removeEventListener("keydown", activeModalEscapeHandler);
+  activeModalEscapeHandler = null;
+}
+
+function openAccessibleModalShell(modal) {
+  modal?.classList.remove("hidden");
+  modal?.setAttribute("aria-hidden", "false");
+}
+
+function closeAccessibleModalShell(modal) {
+  modal?.classList.add("hidden");
+  modal?.setAttribute("aria-hidden", "true");
+  unbindModalEscape();
+}
+
+function openMobileVoucherWorkspace() {
+  state.mobileCreateOpen = true;
+  openWorkspaceSection("dashboard");
+  window.RekberVoucher?.openService?.("voucher");
+  renderTransactionScreen();
+  document.getElementById("workspace-inline-transaction-panel")?.scrollIntoView({
+    behavior: window.innerWidth <= 768 ? "auto" : "smooth",
+    block: "start",
+  });
+}
+
 function isMobileViewport() {
   return window.matchMedia("(max-width: 768px)").matches;
 }
 
-function openMobileTransactionChat(code) {
+function initViewportListener() {
+  const media = window.matchMedia("(max-width: 768px)");
+  const handleViewportChange = () => {
+    renderTransactionScreen();
+    renderMemberVisibility();
+    updateWorkspaceMenuState();
+    if (state.currentMemberView === "transactions") {
+      renderUnifiedTransactionHistory();
+    }
+    if (state.workspaceSection === "dashboard" && isMobileViewport()) {
+      renderMobileDashboard();
+    }
+    if (state.transactionScreen === "room" && state.activeTransaction) {
+      renderRoom(state.activeTransaction);
+    }
+  };
+  if (typeof media.addEventListener === "function") {
+    media.addEventListener("change", handleViewportChange);
+  } else if (typeof media.addListener === "function") {
+    media.addListener(handleViewportChange);
+  }
+}
+
+async function openMobileTransactionChat(code) {
   const normalized = String(code || "").trim().toUpperCase();
   if (!normalized) return false;
-  const transaction = state.transactions.find((item) => item.code === normalized)
+  let transaction = state.transactions.find((item) => item.code === normalized)
     || state.dashboard.activeTransactions?.find((item) => item.code === normalized)
-    || state.activeTransaction;
-  if (transaction?.code === normalized) {
-    markUserTransactionSeen(transaction);
-    updateUserNotificationBadges();
+    || (state.activeTransaction?.code === normalized ? state.activeTransaction : null);
+  if (!transaction) {
+    try {
+      const payload = await fetchJson(`/api/transactions/${encodeURIComponent(normalized)}`);
+      transaction = payload.transaction;
+    } catch {
+      return false;
+    }
   }
-  window.location.href = `/transaksi/${encodeURIComponent(normalized)}`;
+  if (!transaction) return false;
+  markUserTransactionSeen(transaction);
+  updateUserNotificationBadges();
+  state.activeTransaction = transaction;
+  state.transactionScreen = "room";
+  state.historyChatType = null;
+  state.historyVoucherOrder = null;
+  state.mobileCreateOpen = false;
+  openWorkspaceSection("transactions");
+  renderRoom(transaction);
+  history.replaceState({}, "", `?trx=${normalized}`);
   return true;
 }
 
 function renderRoom(transaction) {
-  if (isMobileViewport() && openMobileTransactionChat(transaction?.code)) {
-    return;
-  }
   roomChatScrollState = captureScrollState(elements.chatBox);
   state.transactionScreen = "room";
   renderTransactionScreen();
@@ -3953,18 +4225,48 @@ function openConfirmModal(title, text) {
   }
   elements.confirmModalTitle.textContent = title || "Konfirmasi";
   elements.confirmModalText.textContent = text || "Pastikan tindakan ini memang benar.";
-  elements.confirmModal.classList.remove("hidden");
+  openAccessibleModalShell(elements.confirmModal);
+  bindModalEscape(elements.confirmModal, () => closeConfirmModal(false));
+  elements.confirmModalApprove?.focus();
   return new Promise((resolve) => {
     confirmModalResolver = resolve;
   });
 }
 
 function closeConfirmModal(approved) {
-  elements.confirmModal?.classList.add("hidden");
+  closeAccessibleModalShell(elements.confirmModal);
   if (confirmModalResolver) {
     const resolve = confirmModalResolver;
     confirmModalResolver = null;
     resolve(Boolean(approved));
+  }
+}
+
+function openPromptModal(title, options = {}) {
+  if (!elements.promptModal) {
+    const fallback = window.prompt(options.label || title || "Masukkan catatan:") || "";
+    return Promise.resolve(fallback.trim() ? fallback : null);
+  }
+  elements.promptModalEyebrow.textContent = options.eyebrow || "Catatan";
+  elements.promptModalTitle.textContent = title || "Masukkan informasi";
+  elements.promptModalLabel.textContent = options.label || "Alasan";
+  elements.promptModalInput.value = "";
+  elements.promptModalInput.placeholder = options.placeholder || "Tulis alasan di sini...";
+  openAccessibleModalShell(elements.promptModal);
+  bindModalEscape(elements.promptModal, () => closePromptModal(null));
+  elements.promptModalInput.focus();
+  return new Promise((resolve) => {
+    promptModalResolver = resolve;
+  });
+}
+
+function closePromptModal(value) {
+  const result = value === null ? null : String(elements.promptModalInput?.value || "").trim();
+  closeAccessibleModalShell(elements.promptModal);
+  if (promptModalResolver) {
+    const resolve = promptModalResolver;
+    promptModalResolver = null;
+    resolve(result || null);
   }
 }
 
@@ -4314,6 +4616,21 @@ async function handleSupportRoute() {
   history.replaceState({}, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
 }
 
+async function handleVoucherRoute() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("voucher");
+  if (!code) return;
+  if (!state.currentUser) {
+    setAuthStatus("Silakan login terlebih dahulu untuk membuka order voucher dari link email.", true);
+    openLoginModal();
+    return;
+  }
+  params.delete("voucher");
+  const cleanQuery = params.toString();
+  history.replaceState({}, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
+  await openHistoryVoucherRoom(code);
+}
+
 async function handleInitialRoute() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("trx") || consumePendingTransactionRoute();
@@ -4442,17 +4759,145 @@ function formatBytes(bytes) {
 function renderActivityTabs() {
   elements.activeRekberList.innerHTML = buildTransactionList(state.dashboard.activeTransactions, true);
   elements.historyRekberList.innerHTML = buildTransactionList(state.dashboard.completedTransactions, false);
-  if (elements.mobileActiveRekberList) {
-    elements.mobileActiveRekberList.innerHTML = buildTransactionList(state.dashboard.activeTransactions, true);
-  }
-  if (elements.mobileHistoryRekberList) {
-    elements.mobileHistoryRekberList.innerHTML = buildTransactionList(state.dashboard.completedTransactions, false);
-  }
   if (elements.historyChatList) {
     elements.historyChatList.innerHTML = buildChatHistoryRows(state.dashboard.chatHistory);
   }
+  renderUnifiedTransactionHistory();
   bindOpenTransactionButtons();
   updateUserNotificationBadges();
+}
+
+const REKBER_HISTORY_LOGO = "/assets/rekberwe-logo-shield.png?v=7";
+
+function getVoucherHistoryImage(order) {
+  return order?.product?.displayImage || order?.product?.imageUrl || REKBER_HISTORY_LOGO;
+}
+
+function renderHistoryTransactionItem({
+  isActive,
+  imageUrl,
+  imageAlt,
+  badge,
+  title,
+  meta,
+  dataAttr,
+  dataValue,
+  unreadCount = 0,
+}) {
+  return `
+    <button
+      type="button"
+      class="history-transaction-item ${isActive ? "is-active" : ""}"
+      data-${dataAttr}="${escapeAttribute(dataValue)}"
+    >
+      <span class="history-item-thumb">
+        <img src="${escapeAttribute(imageUrl)}" alt="${escapeAttribute(imageAlt)}" loading="lazy" />
+      </span>
+      <span class="history-item-copy">
+        <span class="history-item-top">
+          <span class="history-item-badge">${escapeHtml(badge)}</span>
+          ${unreadCount ? `<span class="notif-badge list-notif-badge">${unreadCount > 99 ? "99+" : unreadCount}</span>` : ""}
+        </span>
+        <strong>${escapeHtml(title)}</strong>
+        <span class="history-item-meta">${escapeHtml(meta)}</span>
+      </span>
+    </button>
+  `;
+}
+
+function getVoucherOrdersForHistory() {
+  return window.RekberVoucher?.getOrders?.() || [];
+}
+
+function isVoucherOrderActive(order) {
+  return !["completed", "cancelled"].includes(String(order?.status || ""));
+}
+
+function renderUnifiedHistoryRow(row) {
+  if (row.type === "voucher") {
+    const order = row.order;
+    const isActive = state.historySelection.type === "voucher" && state.historySelection.code === order.orderCode;
+    return renderHistoryTransactionItem({
+      isActive,
+      imageUrl: getVoucherHistoryImage(order),
+      imageAlt: order.product?.name || order.orderCode,
+      badge: "Voucher",
+      title: order.product?.name || order.orderCode,
+      meta: `${order.orderCode} • ${order.statusLabel || order.status}`,
+      dataAttr: "open-voucher-order",
+      dataValue: order.orderCode,
+      unreadCount: getVoucherUnreadCount(order),
+    });
+  }
+  const transaction = row.transaction;
+  const isActive = state.historySelection.type === "rekber" && state.historySelection.code === transaction.code;
+  return renderHistoryTransactionItem({
+    isActive,
+    imageUrl: REKBER_HISTORY_LOGO,
+    imageAlt: "RekberWE",
+    badge: "Rekber",
+    title: transaction.title,
+    meta: `${transaction.code} • ${transaction.label}`,
+    dataAttr: "open-rekber-history",
+    dataValue: transaction.code,
+    unreadCount: getUserUnreadCount(transaction),
+  });
+}
+
+function sortHistoryRows(rows) {
+  return [...rows].sort((a, b) => {
+    const timeA = new Date(a.sortTime || 0).getTime();
+    const timeB = new Date(b.sortTime || 0).getTime();
+    return timeB - timeA;
+  });
+}
+
+function renderUnifiedTransactionHistory() {
+  const allRekber = Array.isArray(state.transactions) ? state.transactions : [];
+  const activeRekber = allRekber.filter((item) => {
+    const status = String(item.status || "").toLowerCase();
+    return !["completed", "cancelled"].includes(status);
+  });
+  const completedRekber = allRekber.filter((item) => {
+    const status = String(item.status || "").toLowerCase();
+    return ["completed", "cancelled"].includes(status);
+  });
+  const voucherOrders = getVoucherOrdersForHistory();
+  const activeVoucherRows = voucherOrders
+    .filter((order) => isVoucherOrderActive(order))
+    .map((order) => ({ type: "voucher", order, sortTime: order.updatedAt || order.createdAt || "" }));
+  const historyVoucherRows = voucherOrders
+    .filter((order) => !isVoucherOrderActive(order))
+    .map((order) => ({ type: "voucher", order, sortTime: order.updatedAt || order.createdAt || "" }));
+  const activeRekberRows = activeRekber.map((transaction) => ({
+    type: "rekber",
+    transaction: { ...transaction, label: "Aktif" },
+    sortTime: transaction.updatedAt || transaction.createdAt || "",
+  }));
+  const historyRekberRows = completedRekber.map((transaction) => ({
+    type: "rekber",
+    transaction: { ...transaction, label: "Selesai" },
+    sortTime: transaction.updatedAt || transaction.createdAt || "",
+  }));
+  const desktopRows = sortHistoryRows([
+    ...activeRekberRows,
+    ...historyRekberRows,
+    ...activeVoucherRows,
+    ...historyVoucherRows,
+  ]);
+  const mobileActiveRows = sortHistoryRows([...activeRekberRows, ...activeVoucherRows]);
+  const mobileHistoryRows = sortHistoryRows([...historyRekberRows, ...historyVoucherRows]);
+
+  const desktopHtml = desktopRows.map(renderUnifiedHistoryRow).join("")
+    || "<p class='mini-note'>Belum ada riwayat transaksi Rekber/Voucher.</p>";
+  const mobileActiveHtml = mobileActiveRows.map(renderUnifiedHistoryRow).join("")
+    || "<p class='mini-note'>Belum ada transaksi aktif.</p>";
+  const mobileHistoryHtml = mobileHistoryRows.map(renderUnifiedHistoryRow).join("")
+    || "<p class='mini-note'>Belum ada riwayat transaksi selesai.</p>";
+
+  if (elements.transactionUnifiedHistoryList) elements.transactionUnifiedHistoryList.innerHTML = desktopHtml;
+  if (elements.mobileActiveTransactionsList) elements.mobileActiveTransactionsList.innerHTML = mobileActiveHtml;
+  if (elements.mobileUnifiedHistoryList) elements.mobileUnifiedHistoryList.innerHTML = mobileHistoryHtml;
 }
 
 function updateUserNotificationBadges() {
@@ -4498,6 +4943,20 @@ function buildUserNotifications() {
         read: false,
       });
     }
+  });
+
+  getVoucherOrdersForHistory().forEach((order) => {
+    const unreadCount = getVoucherUnreadCount(order);
+    if (!unreadCount) return;
+    notifications.push({
+      id: `voucher-msg-${order.orderCode}`,
+      title: `Update order ${order.product?.name || order.orderCode}`,
+      text: `${unreadCount} pesan baru dari admin • ${order.orderCode}`,
+      time: getVoucherLatestMessageTime(order),
+      type: "voucher",
+      code: order.orderCode,
+      read: false,
+    });
   });
 
   completedTransactions.slice(0, 8).forEach((transaction) => {
@@ -4550,19 +5009,20 @@ function renderNotifications() {
     `;
 
   document.querySelectorAll("[data-notification-type]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       if (button.dataset.notificationType === "support") {
         if (elements.supportWidgetPanel?.classList.contains("hidden")) {
           toggleSupportWidget();
         }
         return;
       }
-      const transaction = state.transactions.find((item) => item.code === button.dataset.transactionCode);
-      if (!transaction) return;
-      state.activeTransaction = transaction;
-      state.transactionScreen = "room";
-      openWorkspaceSection("transactions");
-      renderRoom(transaction);
+      if (button.dataset.notificationType === "voucher") {
+        await openHistoryVoucherRoom(button.dataset.transactionCode);
+        return;
+      }
+      const code = String(button.dataset.transactionCode || "").trim().toUpperCase();
+      if (!code) return;
+      await openHistoryRekberRoom(code);
     });
   });
 }
@@ -4575,12 +5035,20 @@ function renderTransactionScreen() {
   const showProfile = section === "profile";
   const showVerification = section === "verification";
   const showNotifications = section === "notifications";
-  const showRoom = inWorkspace && showTransactionsSection && state.transactionScreen === "room" && Boolean(state.activeTransaction);
-  const showTransactionEmpty = inWorkspace && showTransactionsSection && !showRoom;
-  const showMobileTransactionsView = inWorkspace && showTransactionsSection && state.transactionScreen !== "room";
+  const showRekberRoom = inWorkspace && showTransactionsSection && state.transactionScreen === "room"
+    && Boolean(state.activeTransaction) && state.historyChatType !== "voucher";
+  const showVoucherRoom = inWorkspace && showTransactionsSection && state.transactionScreen === "room"
+    && state.historyChatType === "voucher" && Boolean(state.historyVoucherOrder);
+  const showRoom = showRekberRoom;
+  const showAnyRoom = showRekberRoom || showVoucherRoom;
+  const showTransactionEmpty = inWorkspace && showTransactionsSection && !showAnyRoom;
+  const showMobileTransactionsView = isMobileViewport() && inWorkspace && showTransactionsSection && state.transactionScreen !== "room";
 
-  elements.activeRekberSection.classList.toggle("hidden", !showTransactionsSection);
-  elements.historyRekberSection.classList.toggle("hidden", !showTransactionsSection);
+  const showSidebarLists = inWorkspace && !isMobileViewport() && showTransactionsSection && state.transactionScreen !== "room";
+
+  elements.activeRekberSection?.classList.toggle("hidden", !showSidebarLists);
+  elements.historyRekberSection?.classList.toggle("hidden", !showSidebarLists);
+  elements.voucherOrdersSidebarSection?.classList.toggle("hidden", !showSidebarLists);
   elements.transactionRoomSection.classList.toggle("hidden", !inWorkspace);
   elements.workspaceDashboardView?.classList.toggle("hidden", !showDashboard);
   elements.workspaceDashboardView?.classList.toggle("mobile-create-open", Boolean(showDashboard && state.mobileCreateOpen));
@@ -4588,14 +5056,21 @@ function renderTransactionScreen() {
   elements.workspaceVerificationView?.classList.toggle("hidden", !showVerification);
   elements.workspaceNotificationsView?.classList.toggle("hidden", !showNotifications);
   elements.workspaceMobileTransactionsView?.classList.toggle("hidden", !showMobileTransactionsView);
-  elements.transactionRoom.classList.toggle("hidden", !showRoom);
+  elements.transactionRoom.classList.toggle("hidden", !showRekberRoom);
+  elements.voucherHistoryRoom?.classList.toggle("hidden", !showVoucherRoom);
   elements.transactionRoomEmpty.classList.toggle("hidden", !showTransactionEmpty || showMobileTransactionsView);
-  elements.joinRoleBox.classList.toggle("hidden", !showTransactionEmpty);
-  elements.transactionShell?.classList.toggle("room-open", Boolean(showRoom));
+  elements.joinRoleBox.classList.toggle("hidden", !showTransactionEmpty || !state.pendingJoinTransaction);
+  elements.transactionShell?.classList.toggle("room-open", Boolean(showAnyRoom));
+  elements.historyRoomToolbar?.classList.toggle("hidden", !showAnyRoom);
+  if (showTransactionEmpty) {
+    renderUnifiedTransactionHistory();
+  }
 
   if (showDashboard) {
     elements.roomPageTitle.textContent = "Dashboard";
-    elements.roomPageSubtitle.textContent = "Gunakan menu kiri untuk membuat transaksi, membuka ruang chat, dan mengelola akun Anda.";
+    elements.roomPageSubtitle.textContent = isMobileViewport()
+      ? "Gunakan aksi cepat atau tombol Buat untuk membuat transaksi dan beli voucher."
+      : "Gunakan menu kiri untuk membuat transaksi, membuka ruang chat, dan mengelola akun Anda.";
   } else if (showProfile) {
     elements.roomPageTitle.textContent = "Akun Saya";
     elements.roomPageSubtitle.textContent = "Kelola profil dan social media tanpa meninggalkan workspace.";
@@ -4605,24 +5080,38 @@ function renderTransactionScreen() {
   } else if (showNotifications) {
     elements.roomPageTitle.textContent = "Notifikasi";
     elements.roomPageSubtitle.textContent = "Semua pemberitahuan transaksi dan live chat tampil di sini.";
-  } else if (!showRoom) {
-    elements.roomPageTitle.textContent = "Pilih transaksi";
-    elements.roomPageSubtitle.textContent = "Klik judul transaksi di panel kiri untuk membuka ruang chat.";
+  } else if (!showAnyRoom) {
+    elements.roomPageTitle.textContent = "Riwayat Transaksi";
+    elements.roomPageSubtitle.textContent = "Klik salah satu transaksi di bawah untuk masuk ke ruang chat.";
   }
+
+  syncRoomModeBodyClass();
 }
 
 function openTransactionListView() {
   exitRoomMode();
   state.transactionScreen = "list";
   state.pendingJoinTransaction = null;
+  state.historyChatType = null;
+  state.historyVoucherOrder = null;
+  state.historySelection = { type: "", code: "" };
+  state.activeTransaction = null;
+  window.RekberVoucher?.clearHistoryRoom?.();
   renderTransactionScreen();
   scrollWorkspaceTarget("transactions-panel");
 }
 
+function stopRoomRefresh() {
+  if (roomRefreshTimer) {
+    clearInterval(roomRefreshTimer);
+    roomRefreshTimer = null;
+  }
+}
+
 function startRoomRefresh() {
-  if (roomRefreshTimer) clearInterval(roomRefreshTimer);
+  stopRoomRefresh();
   roomRefreshTimer = setInterval(async () => {
-    if (!state.currentUser || !state.activeTransaction) return;
+    if (!state.currentUser || !state.activeTransaction || state.transactionScreen !== "room") return;
     try {
       const payload = await fetchJson(`/api/transactions/${state.activeTransaction.code}`);
       state.activeTransaction = payload.transaction;
@@ -4749,6 +5238,30 @@ function setupLiveEvents() {
         }
       }
 
+      if (payload.type === "voucher_order_updated") {
+        if (payload.deleted) {
+          const deletedCode = String(payload.orderCode || payload.code || "").trim().toUpperCase();
+          if (deletedCode && state.historyVoucherOrder?.orderCode === deletedCode) {
+            openTransactionListView();
+          }
+        }
+        if (payload.order) {
+          const previousOrder = getVoucherOrdersForHistory().find((item) => item.orderCode === payload.order.orderCode);
+          const previousCount = previousOrder?.messages?.length || 0;
+          const nextCount = payload.order.messages?.length || 0;
+          const lastMessage = payload.order.messages?.[nextCount - 1];
+          if (nextCount > previousCount && lastMessage?.senderRole === "admin") {
+            shouldPlayChatSound = true;
+          }
+          if (previousOrder && previousOrder.status !== payload.order.status) {
+            if (["needs_verification", "completed", "processing", "awaiting_confirmation"].includes(payload.order.status)) {
+              shouldPlayChatSound = true;
+            }
+          }
+        }
+        window.RekberVoucher?.handleLiveEvent?.(payload);
+      }
+
       if (payload.type === "verification_updated" && payload.user && payload.user.id === state.currentUser?.id) {
         const previousStatus = state.currentUser?.verificationStatus;
         const previousBanned = Boolean(state.currentUser?.banned);
@@ -4780,7 +5293,9 @@ function setupLiveEvents() {
 
       if (payload.type === "transaction_updated" && payload.transaction && state.activeTransaction?.code === payload.code) {
         state.activeTransaction = payload.transaction;
-        renderRoom(state.activeTransaction);
+        if (state.transactionScreen === "room") {
+          renderRoom(state.activeTransaction);
+        }
       }
 
       await refreshTransactions();

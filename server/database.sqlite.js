@@ -1,8 +1,25 @@
 import dotenv from "dotenv";
 import path from "node:path";
 import fs from "node:fs";
-
 import Database from "better-sqlite3";
+
+import {
+  DEFAULT_VOUCHER_PRODUCT_IMAGE,
+  generateVoucherOrderCode,
+  getProductReadyState,
+  getVoucherBuyerDisplayName,
+  getVoucherStatusLabel,
+  normalizeVoucherAccountPayload,
+  normalizeVoucherPaymentSettings,
+  parseVoucherAccountAccounts,
+  applyVoucherBestsellerFlags,
+} from "./voucher-utils.js";
+
+import {
+  decryptVoucherCredentialFields,
+  encryptVoucherCredentialFields,
+  migratePlaintextVoucherCredentials,
+} from "./voucher-credentials-crypto.js";
 
 import { phoneToLocalWhatsapp } from "./phone-utils.js";
 
@@ -197,6 +214,20 @@ ensureColumn("users", "banned_reason", "TEXT DEFAULT ''");
 ensureColumn("users", "phone_number", "TEXT DEFAULT ''");
 ensureColumn("users", "phone_verified", "INTEGER DEFAULT 0");
 ensureColumn("users", "phone_verified_at", "TEXT DEFAULT ''");
+ensureColumn("voucher_products", "requires_account_login", "INTEGER DEFAULT 0");
+ensureColumn("voucher_products", "cost_price", "INTEGER DEFAULT 0");
+ensureColumn("voucher_products", "cost_currency", "TEXT DEFAULT 'IDR'");
+ensureColumn("voucher_products", "cost_amount_original", "REAL DEFAULT 0");
+ensureColumn("voucher_products", "cost_fx_rate", "REAL DEFAULT 1");
+ensureColumn("voucher_products", "cost_fx_fetched_at", "TEXT DEFAULT ''");
+ensureColumn("voucher_orders", "account_email", "TEXT DEFAULT ''");
+ensureColumn("voucher_orders", "account_password", "TEXT DEFAULT ''");
+ensureColumn("voucher_orders", "cost_price", "INTEGER DEFAULT 0");
+ensureColumn("voucher_orders", "quantity", "INTEGER DEFAULT 1");
+ensureColumn("voucher_orders", "account_accounts", "TEXT DEFAULT '[]'");
+ensureColumn("voucher_orders", "account_revision_requested", "INTEGER DEFAULT 0");
+ensureColumn("voucher_orders", "order_source", "TEXT DEFAULT 'platform'");
+ensureColumn("voucher_orders", "buyer_telegram", "TEXT DEFAULT ''");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS otp_verifications (
@@ -231,6 +262,55 @@ db.exec(`
     created_at TEXT NOT NULL,
     PRIMARY KEY (user_id, transaction_code)
   );
+
+  CREATE TABLE IF NOT EXISTS voucher_products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    price INTEGER NOT NULL,
+    image_url TEXT DEFAULT '',
+    image_name TEXT DEFAULT '',
+    ready_mode TEXT DEFAULT '24h',
+    ready_start TEXT DEFAULT '',
+    ready_end TEXT DEFAULT '',
+    is_active INTEGER DEFAULT 1,
+    stock INTEGER DEFAULT -1,
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS voucher_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_code TEXT UNIQUE NOT NULL,
+    product_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    payment_proof_url TEXT DEFAULT '',
+    payment_proof_name TEXT DEFAULT '',
+    dispute_reason TEXT DEFAULT '',
+    cancel_reason TEXT DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS voucher_order_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_code TEXT NOT NULL,
+    sender_user_id TEXT,
+    sender_name TEXT NOT NULL,
+    sender_role TEXT NOT NULL,
+    message_text TEXT DEFAULT '',
+    attachment_name TEXT DEFAULT '',
+    attachment_url TEXT DEFAULT '',
+    attachment_type TEXT DEFAULT '',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_voucher_orders_user ON voucher_orders(user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_voucher_orders_status ON voucher_orders(status, updated_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_voucher_order_messages_code ON voucher_order_messages(order_code, id);
 `);
 
 const statements = {
@@ -1163,6 +1243,7 @@ function defaultFeeSettings() {
     },
     maintenanceMode: false,
     maintenanceMessage: defaultMaintenanceMessage(),
+    voucherPayment: normalizeVoucherPaymentSettings(),
   };
 }
 
@@ -1229,6 +1310,7 @@ function normalizeFeeSettings(input) {
     },
     maintenanceMode: Boolean(raw.maintenanceMode),
     maintenanceMessage: String(raw.maintenanceMessage || defaultMaintenanceMessage()).trim() || defaultMaintenanceMessage(),
+    voucherPayment: normalizeVoucherPaymentSettings(raw.voucherPayment),
   };
 }
 
@@ -1563,6 +1645,12 @@ export function getLocalUploadAccessContext(uploadPath) {
   const supportRows = db.prepare(`
     SELECT DISTINCT thread_id FROM support_messages WHERE attachment_url = ?
   `).all(uploadPath);
+  const voucherRows = db.prepare(`
+    SELECT DISTINCT order_code AS code FROM voucher_order_messages WHERE attachment_url = ?
+  `).all(uploadPath);
+  const voucherProofRows = db.prepare(`
+    SELECT order_code AS code FROM voucher_orders WHERE payment_proof_url = ?
+  `).all(uploadPath);
   const ownerUserIds = [...new Set([
     ...avatarOwners.map((row) => row.id),
     ...ktpOwners.map((row) => row.id),
@@ -1573,6 +1661,10 @@ export function getLocalUploadAccessContext(uploadPath) {
     ktpOwnerUserIds: ktpOwners.map((row) => row.id),
     transactionCodes: transactionRows.map((row) => row.code),
     supportThreadIds: supportRows.map((row) => row.thread_id),
+    voucherOrderCodes: [...new Set([
+      ...voucherRows.map((row) => row.code),
+      ...voucherProofRows.map((row) => row.code),
+    ])],
   };
 }
 
@@ -1641,3 +1733,563 @@ export function completePendingSellerJoinsForUser(userId) {
   }
   return joined;
 }
+
+function normalizeVoucherProductRow(row) {
+  if (!row) return null;
+  const product = {
+    id: row.id,
+    name: row.name,
+    description: row.description || "",
+    price: Number(row.price || 0),
+    costPrice: Number(row.cost_price || 0),
+    costCurrency: String(row.cost_currency || "IDR").toUpperCase(),
+    costAmountOriginal: Number(row.cost_amount_original ?? row.cost_price ?? 0),
+    costFxRate: Number(row.cost_fx_rate || 1),
+    costFxFetchedAt: row.cost_fx_fetched_at || "",
+    imageUrl: row.image_url || "",
+    imageName: row.image_name || "",
+    readyMode: row.ready_mode === "schedule" ? "schedule" : "24h",
+    readyStart: row.ready_start || "",
+    readyEnd: row.ready_end || "",
+    isActive: Boolean(row.is_active),
+    stock: Number(row.stock ?? -1),
+    sortOrder: Number(row.sort_order || 0),
+    requiresAccountLogin: Boolean(row.requires_account_login),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+  product.readyState = getProductReadyState(product);
+  product.displayImage = product.imageUrl || DEFAULT_VOUCHER_PRODUCT_IMAGE;
+  return product;
+}
+
+function hydrateVoucherOrder(row) {
+  if (!row) return null;
+  const credentials = decryptVoucherCredentialFields(row);
+  const credentialRow = {
+    ...row,
+    account_email: credentials.accountEmail,
+    account_password: credentials.accountPassword,
+    account_accounts: credentials.accountAccountsJson,
+  };
+  const product = normalizeVoucherProductRow(
+    db.prepare("SELECT * FROM voucher_products WHERE id = ?").get(row.product_id),
+  );
+  const user = getUserById(row.user_id);
+  const messages = db.prepare(`
+    SELECT * FROM voucher_order_messages WHERE order_code = ? ORDER BY id ASC
+  `).all(row.order_code).map((item) => ({
+    id: item.id,
+    senderUserId: item.sender_user_id || null,
+    senderName: item.sender_name,
+    senderRole: item.sender_role,
+    text: item.message_text || "",
+    attachmentName: item.attachment_name || "",
+    attachmentUrl: item.attachment_url || "",
+    attachmentType: item.attachment_type || "",
+    time: item.created_at,
+  }));
+
+  return {
+    id: row.id,
+    orderCode: row.order_code,
+    productId: row.product_id,
+    userId: row.user_id,
+    price: Number(row.price || 0),
+    costPrice: Number(row.cost_price || 0),
+    status: row.status,
+    statusLabel: getVoucherStatusLabel(row.status),
+    paymentProofUrl: row.payment_proof_url || "",
+    paymentProofName: row.payment_proof_name || "",
+    disputeReason: row.dispute_reason || "",
+    cancelReason: row.cancel_reason || "",
+    accountEmail: credentials.accountEmail,
+    accountPassword: credentials.accountPassword,
+    quantity: Math.max(1, Number(row.quantity || 1)),
+    accountAccounts: parseVoucherAccountAccounts(credentialRow),
+    accountRevisionRequested: Boolean(row.account_revision_requested),
+    orderSource: row.order_source || "platform",
+    buyerTelegram: row.buyer_telegram || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    product,
+    user: user ? {
+      id: user.id,
+      displayName: user.displayName,
+      email: user.email || "",
+      avatar: user.avatar || "",
+      verified: Boolean(user.verified),
+    } : null,
+    messages,
+  };
+}
+
+export function getActiveVoucherProducts() {
+  const salesRows = db.prepare(`
+    SELECT product_id, COUNT(*) AS sales_count
+    FROM voucher_orders
+    WHERE status = 'completed'
+    GROUP BY product_id
+  `).all();
+  const salesByProductId = new Map(
+    salesRows.map((row) => [Number(row.product_id), Number(row.sales_count || 0)]),
+  );
+  const products = db.prepare(`
+    SELECT * FROM voucher_products
+    WHERE is_active = 1
+    ORDER BY sort_order ASC, id DESC
+  `).all().map((row) => normalizeVoucherProductRow(row));
+  return applyVoucherBestsellerFlags(products, salesByProductId);
+}
+
+export function getAllVoucherProducts() {
+  return db.prepare(`
+    SELECT * FROM voucher_products ORDER BY sort_order ASC, id DESC
+  `).all().map((row) => normalizeVoucherProductRow(row));
+}
+
+export function getVoucherProductById(productId) {
+  return normalizeVoucherProductRow(
+    db.prepare("SELECT * FROM voucher_products WHERE id = ?").get(productId),
+  );
+}
+
+export function isVoucherProductCatalogImage(uploadPath) {
+  const row = db.prepare(`
+    SELECT 1 AS ok FROM voucher_products
+    WHERE image_url = ? AND is_active = 1
+    LIMIT 1
+  `).get(String(uploadPath || "").trim());
+  return Boolean(row);
+}
+
+export function createVoucherProduct(input = {}) {
+  const now = new Date().toISOString();
+  const result = db.prepare(`
+    INSERT INTO voucher_products (
+      name, description, price, cost_price, cost_currency, cost_amount_original, cost_fx_rate, cost_fx_fetched_at,
+      image_url, image_name, ready_mode, ready_start, ready_end,
+      is_active, stock, sort_order, requires_account_login, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    String(input.name || "").trim(),
+    String(input.description || "").trim(),
+    Math.max(0, Number(input.price || 0)),
+    Math.max(0, Number(input.costPrice || 0)),
+    String(input.costCurrency || "IDR").toUpperCase(),
+    Number(input.costAmountOriginal ?? input.costPrice ?? 0),
+    Number(input.costFxRate || 1),
+    String(input.costFxFetchedAt || "").trim(),
+    String(input.imageUrl || "").trim(),
+    String(input.imageName || "").trim(),
+    input.readyMode === "schedule" ? "schedule" : "24h",
+    String(input.readyStart || "").trim(),
+    String(input.readyEnd || "").trim(),
+    input.isActive === false ? 0 : 1,
+    Number.isFinite(Number(input.stock)) ? Number(input.stock) : -1,
+    Number(input.sortOrder || 0),
+    input.requiresAccountLogin ? 1 : 0,
+    now,
+    now,
+  );
+  return getVoucherProductById(result.lastInsertRowid);
+}
+
+export function updateVoucherProduct(productId, input = {}) {
+  const current = getVoucherProductById(productId);
+  if (!current) return null;
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE voucher_products
+    SET name = ?, description = ?, price = ?, cost_price = ?, cost_currency = ?, cost_amount_original = ?,
+        cost_fx_rate = ?, cost_fx_fetched_at = ?, image_url = ?, image_name = ?,
+        ready_mode = ?, ready_start = ?, ready_end = ?, is_active = ?, stock = ?,
+        sort_order = ?, requires_account_login = ?, updated_at = ?
+    WHERE id = ?
+  `).run(
+    String(input.name ?? current.name).trim(),
+    String(input.description ?? current.description).trim(),
+    Math.max(0, Number(input.price ?? current.price)),
+    Math.max(0, Number(input.costPrice ?? current.costPrice)),
+    String(input.costCurrency ?? current.costCurrency ?? "IDR").toUpperCase(),
+    Number(input.costAmountOriginal ?? current.costAmountOriginal ?? input.costPrice ?? current.costPrice ?? 0),
+    Number(input.costFxRate ?? current.costFxRate ?? 1),
+    String(input.costFxFetchedAt ?? current.costFxFetchedAt ?? "").trim(),
+    String(input.imageUrl ?? current.imageUrl).trim(),
+    String(input.imageName ?? current.imageName).trim(),
+    (input.readyMode ?? current.readyMode) === "schedule" ? "schedule" : "24h",
+    String(input.readyStart ?? current.readyStart).trim(),
+    String(input.readyEnd ?? current.readyEnd).trim(),
+    (input.isActive ?? current.isActive) ? 1 : 0,
+    Number.isFinite(Number(input.stock ?? current.stock)) ? Number(input.stock ?? current.stock) : -1,
+    Number(input.sortOrder ?? current.sortOrder),
+    (input.requiresAccountLogin ?? current.requiresAccountLogin) ? 1 : 0,
+    now,
+    productId,
+  );
+  return getVoucherProductById(productId);
+}
+
+export function deleteVoucherProduct(productId) {
+  const current = getVoucherProductById(productId);
+  if (!current) return false;
+  db.prepare("DELETE FROM voucher_products WHERE id = ?").run(productId);
+  return true;
+}
+
+export function deleteVoucherOrder(orderCode) {
+  const normalized = String(orderCode || "").trim().toUpperCase();
+  if (!normalized) return false;
+  const current = db.prepare("SELECT order_code FROM voucher_orders WHERE order_code = ?").get(normalized);
+  if (!current) return false;
+  db.prepare("DELETE FROM voucher_order_messages WHERE order_code = ?").run(normalized);
+  db.prepare("DELETE FROM voucher_orders WHERE order_code = ?").run(normalized);
+  return true;
+}
+
+export function createVoucherOrder(userId, productId, options = {}) {
+  const product = getVoucherProductById(productId);
+  if (!product || !product.isActive) {
+    throw new Error("Produk tidak ditemukan atau tidak aktif.");
+  }
+  if (!product.readyState?.canPurchase) {
+    throw new Error(product.readyState?.scheduleLabel
+      ? `Produk belum ready. ${product.readyState.scheduleLabel}.`
+      : "Produk belum tersedia untuk dibeli.");
+  }
+
+  const quantity = Math.max(1, Math.min(20, Number(options.quantity || 1)));
+  const unitPrice = Number(product.price || 0);
+  const unitCost = Number(product.costPrice || 0);
+  const totalPrice = unitPrice * quantity;
+  const totalCost = unitCost * quantity;
+
+  const createOrderTransaction = db.transaction(() => {
+    const freshRow = db.prepare("SELECT * FROM voucher_products WHERE id = ?").get(productId);
+    if (!freshRow || !freshRow.is_active) {
+      throw new Error("Produk tidak ditemukan atau tidak aktif.");
+    }
+    const stock = Number(freshRow.stock ?? -1);
+    if (stock === 0) {
+      throw new Error("Stok produk habis.");
+    }
+    if (stock > 0 && stock < quantity) {
+      throw new Error(`Stok produk hanya tersedia ${stock} pcs.`);
+    }
+
+    const now = new Date().toISOString();
+    if (stock > 0) {
+      const stockUpdate = db.prepare(
+        "UPDATE voucher_products SET stock = stock - ?, updated_at = ? WHERE id = ? AND stock >= ?",
+      ).run(quantity, now, productId, quantity);
+      if (stockUpdate.changes === 0) {
+        throw new Error("Stok produk tidak mencukupi. Silakan coba lagi.");
+      }
+    }
+
+    let orderCode = generateVoucherOrderCode();
+    while (db.prepare("SELECT 1 FROM voucher_orders WHERE order_code = ?").get(orderCode)) {
+      orderCode = generateVoucherOrderCode();
+    }
+
+    db.prepare(`
+      INSERT INTO voucher_orders (
+        order_code, product_id, user_id, price, cost_price, quantity, status,
+        account_email, account_password, account_accounts, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'awaiting_payment', '', '', '[]', ?, ?)
+    `).run(orderCode, productId, userId, totalPrice, totalCost, quantity, now, now);
+
+    db.prepare(`
+      INSERT INTO voucher_order_messages (
+        order_code, sender_user_id, sender_name, sender_role, message_text, created_at
+      ) VALUES (?, NULL, 'Admin', 'admin', ?, ?)
+    `).run(
+      orderCode,
+      `Order voucher ${product.name} (${quantity} pcs) dibuat. Silakan transfer sesuai total harga lalu upload bukti pembayaran.`,
+      now,
+    );
+
+    return orderCode;
+  });
+
+  const orderCode = createOrderTransaction();
+  return hydrateVoucherOrder(db.prepare("SELECT * FROM voucher_orders WHERE order_code = ?").get(orderCode));
+}
+
+export function createManualVoucherOrder(adminUserId, payload = {}) {
+  const productId = Number(payload.productId || 0);
+  const product = getVoucherProductById(productId);
+  if (!product || !product.isActive) {
+    throw new Error("Produk tidak ditemukan atau tidak aktif.");
+  }
+
+  const buyerTelegram = String(payload.buyerTelegram || "").trim().replace(/^@+/, "");
+  if (!buyerTelegram) {
+    throw new Error("Username Telegram pembeli wajib diisi.");
+  }
+
+  const accountEmail = String(payload.accountEmail || "").trim();
+  const accountPassword = String(payload.accountPassword || "").trim();
+  if (!accountEmail || !accountEmail.includes("@")) {
+    throw new Error("Email akun wajib diisi dengan format yang benar.");
+  }
+  if (!accountPassword) {
+    throw new Error("Password akun wajib diisi.");
+  }
+
+  const quantity = 1;
+  const totalPrice = Number(product.price || 0) * quantity;
+  const totalCost = Number(product.costPrice || 0) * quantity;
+  const accounts = [{ email: accountEmail, password: accountPassword, label: "Akun 1" }];
+  const encrypted = encryptVoucherCredentialFields({
+    accountEmail,
+    accountPassword,
+    accountAccounts: accounts,
+  });
+
+  const createManualTransaction = db.transaction(() => {
+    const freshRow = db.prepare("SELECT * FROM voucher_products WHERE id = ?").get(productId);
+    if (!freshRow || !freshRow.is_active) {
+      throw new Error("Produk tidak ditemukan atau tidak aktif.");
+    }
+    const stock = Number(freshRow.stock ?? -1);
+    if (stock === 0) {
+      throw new Error("Stok produk habis.");
+    }
+    if (stock > 0 && stock < quantity) {
+      throw new Error(`Stok produk hanya tersedia ${stock} pcs.`);
+    }
+
+    const now = new Date().toISOString();
+    if (stock > 0) {
+      const stockUpdate = db.prepare(
+        "UPDATE voucher_products SET stock = stock - ?, updated_at = ? WHERE id = ? AND stock >= ?",
+      ).run(quantity, now, productId, quantity);
+      if (stockUpdate.changes === 0) {
+        throw new Error("Stok produk tidak mencukupi. Silakan coba lagi.");
+      }
+    }
+
+    let orderCode = generateVoucherOrderCode();
+    while (db.prepare("SELECT 1 FROM voucher_orders WHERE order_code = ?").get(orderCode)) {
+      orderCode = generateVoucherOrderCode();
+    }
+
+    db.prepare(`
+      INSERT INTO voucher_orders (
+        order_code, product_id, user_id, price, cost_price, quantity, status,
+        account_email, account_password, account_accounts, order_source, buyer_telegram,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'manual_pending', ?, ?, ?, 'manual', ?, ?, ?)
+    `).run(
+      orderCode,
+      productId,
+      adminUserId,
+      totalPrice,
+      totalCost,
+      quantity,
+      encrypted.account_email,
+      encrypted.account_password,
+      encrypted.account_accounts,
+      buyerTelegram,
+      now,
+      now,
+    );
+
+    db.prepare(`
+      INSERT INTO voucher_order_messages (
+        order_code, sender_user_id, sender_name, sender_role, message_text, created_at
+      ) VALUES (?, NULL, 'Admin', 'admin', ?, ?)
+    `).run(
+      orderCode,
+      `Order manual @${buyerTelegram} — ${product.name}. Menunggu proses admin.`,
+      now,
+    );
+
+    return orderCode;
+  });
+
+  const orderCode = createManualTransaction();
+  return hydrateVoucherOrder(db.prepare("SELECT * FROM voucher_orders WHERE order_code = ?").get(orderCode));
+}
+
+export function updateVoucherOrderAccounts(orderCode, accounts = []) {
+  const current = getVoucherOrderByCode(orderCode);
+  if (!current) return null;
+  if (!current.product?.requiresAccountLogin) {
+    throw new Error("Produk ini tidak membutuhkan data akun subscription.");
+  }
+  const normalized = normalizeVoucherAccountPayload(accounts, Math.max(1, Number(current.quantity || 1)));
+  const now = new Date().toISOString();
+  const first = normalized[0] || { email: "", password: "" };
+  const encrypted = encryptVoucherCredentialFields({
+    accountEmail: first.email,
+    accountPassword: first.password,
+    accountAccounts: normalized,
+  });
+  db.prepare(`
+    UPDATE voucher_orders
+    SET account_accounts = ?, account_email = ?, account_password = ?, account_revision_requested = 0, updated_at = ?
+    WHERE order_code = ?
+  `).run(encrypted.account_accounts, encrypted.account_email, encrypted.account_password, now, orderCode);
+  return getVoucherOrderByCode(orderCode);
+}
+
+export function getVoucherOrderByCode(orderCode) {
+  return hydrateVoucherOrder(
+    db.prepare("SELECT * FROM voucher_orders WHERE order_code = ?").get(String(orderCode || "").toUpperCase()),
+  );
+}
+
+export function getVoucherOrdersByUserId(userId) {
+  return db.prepare(`
+    SELECT * FROM voucher_orders
+    WHERE user_id = ?
+      AND COALESCE(order_source, 'platform') != 'manual'
+    ORDER BY created_at DESC
+  `).all(userId).map((row) => hydrateVoucherOrder(row));
+}
+
+export function getAllVoucherOrders() {
+  return db.prepare(`
+    SELECT * FROM voucher_orders ORDER BY created_at DESC
+  `).all().map((row) => hydrateVoucherOrder(row));
+}
+
+export function updateVoucherOrderFields(orderCode, fields = {}) {
+  const current = getVoucherOrderByCode(orderCode);
+  if (!current) return null;
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE voucher_orders
+    SET status = ?, payment_proof_url = ?, payment_proof_name = ?,
+        dispute_reason = ?, cancel_reason = ?, account_revision_requested = ?, updated_at = ?
+    WHERE order_code = ?
+  `).run(
+    fields.status ?? current.status,
+    fields.paymentProofUrl ?? current.paymentProofUrl,
+    fields.paymentProofName ?? current.paymentProofName,
+    fields.disputeReason ?? current.disputeReason,
+    fields.cancelReason ?? current.cancelReason,
+    fields.accountRevisionRequested !== undefined
+      ? (fields.accountRevisionRequested ? 1 : 0)
+      : (current.accountRevisionRequested ? 1 : 0),
+    now,
+    orderCode,
+  );
+  return getVoucherOrderByCode(orderCode);
+}
+
+export function addVoucherOrderMessage(orderCode, senderUserId, senderName, senderRole, messageText, attachment = {}) {
+  const current = getVoucherOrderByCode(orderCode);
+  if (!current) return null;
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO voucher_order_messages (
+      order_code, sender_user_id, sender_name, sender_role, message_text,
+      attachment_name, attachment_url, attachment_type, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    orderCode,
+    senderUserId || null,
+    senderName,
+    senderRole,
+    messageText || "",
+    attachment.attachmentName || "",
+    attachment.attachmentUrl || "",
+    attachment.attachmentType || "",
+    now,
+  );
+  db.prepare("UPDATE voucher_orders SET updated_at = ? WHERE order_code = ?").run(now, orderCode);
+  return getVoucherOrderByCode(orderCode);
+}
+
+export function getVoucherOrderOwnerUserId(orderCode) {
+  const row = db.prepare("SELECT user_id FROM voucher_orders WHERE order_code = ?").get(orderCode);
+  return row?.user_id || null;
+}
+
+export function getVoucherSalesReport(fromDate = "", toDate = "") {
+  const from = String(fromDate || "").trim();
+  const to = String(toDate || "").trim();
+  if (!from || !to) {
+    throw new Error("Rentang tanggal wajib diisi.");
+  }
+  const rows = db.prepare(`
+    SELECT * FROM voucher_orders
+    WHERE status = 'completed'
+      AND date(updated_at) >= date(?)
+      AND date(updated_at) <= date(?)
+    ORDER BY updated_at DESC
+  `).all(from, to);
+  const productMap = new Map();
+  let summary = { totalOrders: 0, totalRevenue: 0, totalCost: 0, totalProfit: 0 };
+  rows.forEach((row) => {
+    const order = hydrateVoucherOrder(row);
+    const sellPrice = Number(order.price || 0);
+    const costPrice = Number(order.costPrice || order.product?.costPrice || 0);
+    const profit = sellPrice - costPrice;
+    const key = order.productId;
+    if (!productMap.has(key)) {
+      productMap.set(key, {
+        productId: order.productId,
+        productName: order.product?.name || `Produk #${order.productId}`,
+        imageUrl: order.product?.displayImage || "",
+        orderCount: 0,
+        totalRevenue: 0,
+        totalCost: 0,
+        totalProfit: 0,
+        orders: [],
+      });
+    }
+    const group = productMap.get(key);
+    group.orderCount += 1;
+    group.totalRevenue += sellPrice;
+    group.totalCost += costPrice;
+    group.totalProfit += profit;
+    group.orders.push({
+      orderCode: order.orderCode,
+      userName: getVoucherBuyerDisplayName(order),
+      orderSource: order.orderSource || "platform",
+      paymentProofUrl: order.paymentProofUrl || "",
+      paymentProofName: order.paymentProofName || "",
+      sellPrice,
+      costPrice,
+      profit,
+      completedAt: order.updatedAt,
+    });
+    summary = {
+      totalOrders: summary.totalOrders + 1,
+      totalRevenue: summary.totalRevenue + sellPrice,
+      totalCost: summary.totalCost + costPrice,
+      totalProfit: summary.totalProfit + profit,
+    };
+  });
+  return {
+    fromDate: from,
+    toDate: to,
+    summary,
+    products: Array.from(productMap.values()).sort((a, b) => b.totalProfit - a.totalProfit),
+  };
+}
+
+migratePlaintextVoucherCredentials(
+  async (orderCode, encrypted) => {
+    db.prepare(`
+      UPDATE voucher_orders
+      SET account_email = ?, account_password = ?, account_accounts = ?
+      WHERE order_code = ?
+    `).run(encrypted.account_email, encrypted.account_password, encrypted.account_accounts, orderCode);
+  },
+  async () => db.prepare(`
+    SELECT order_code, account_email, account_password, account_accounts
+    FROM voucher_orders
+    WHERE account_email != '' OR account_password != '' OR account_accounts NOT IN ('', '[]')
+  `).all(),
+).then((count) => {
+  if (count > 0) {
+    console.log(`[voucher-crypto] ${count} order voucher — kredensial dienkripsi.`);
+  }
+}).catch((error) => {
+  console.error("[voucher-crypto] Migrasi enkripsi gagal:", error.message);
+});

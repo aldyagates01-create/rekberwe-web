@@ -9,6 +9,9 @@ import {
   buildSellerFundsReceivedEmail,
   buildTestEmail,
   buildTransactionCreatedEmail,
+  buildVoucherAccountRevisionEmail,
+  buildVoucherOrderCompletedEmail,
+  buildVoucherVerificationCodeEmail,
 } from "./templates.ts";
 
 export type EmailUserLike = {
@@ -23,6 +26,14 @@ export type EmailTransactionLike = {
   price?: number | null;
   buyer?: EmailUserLike | null;
   seller?: EmailUserLike | null;
+};
+
+export type EmailVoucherOrderLike = {
+  orderCode: string;
+  price?: number | null;
+  quantity?: number | null;
+  product?: { name?: string | null } | null;
+  user?: EmailUserLike | null;
 };
 
 type SendEmailInput = {
@@ -75,6 +86,10 @@ function buildTransactionUrl(baseUrl: string, code: string) {
   return `${normalizeBaseUrl(baseUrl)}/?trx=${encodeURIComponent(code)}`;
 }
 
+function buildVoucherOrderUrl(baseUrl: string, code: string) {
+  return `${normalizeBaseUrl(baseUrl)}/?voucher=${encodeURIComponent(code)}`;
+}
+
 function buildProfileUrl(baseUrl: string) {
   return `${normalizeBaseUrl(baseUrl)}/profil`;
 }
@@ -88,6 +103,15 @@ function buildTransactionPayload(transaction: EmailTransactionLike) {
     code: String(transaction.code || "").trim(),
     title: String(transaction.title || transaction.code || "Transaksi").trim(),
     price: Number(transaction.price || 0),
+  };
+}
+
+function buildVoucherOrderPayload(order: EmailVoucherOrderLike) {
+  return {
+    code: String(order.orderCode || "").trim(),
+    productName: String(order.product?.name || "Voucher / Gametime").trim(),
+    price: Number(order.price || 0),
+    quantity: Math.max(1, Number(order.quantity || 1)),
   };
 }
 
@@ -286,6 +310,66 @@ export async function sendTestEmail(to: string) {
     subject: message.subject,
     html: message.html,
     event: "test_email",
+  });
+}
+
+export async function sendVoucherVerificationRequestEmail(order: EmailVoucherOrderLike, baseUrl?: string) {
+  const recipient = resolveRecipient(order.user);
+  if (!recipient) {
+    logEmailResult("-", "voucher_verification_request", "skipped", "missing_user_email");
+    return;
+  }
+  const payload = buildVoucherOrderPayload(order);
+  const message = buildVoucherVerificationCodeEmail(
+    recipient.name,
+    payload,
+    buildVoucherOrderUrl(baseUrl || "", payload.code),
+  );
+  await sendEmail({
+    to: recipient.email,
+    subject: message.subject,
+    html: message.html,
+    event: "voucher_verification_request",
+  });
+}
+
+export async function sendVoucherAccountRevisionEmail(order: EmailVoucherOrderLike, baseUrl?: string) {
+  const recipient = resolveRecipient(order.user);
+  if (!recipient) {
+    logEmailResult("-", "voucher_account_revision", "skipped", "missing_user_email");
+    return;
+  }
+  const payload = buildVoucherOrderPayload(order);
+  const message = buildVoucherAccountRevisionEmail(
+    recipient.name,
+    payload,
+    buildVoucherOrderUrl(baseUrl || "", payload.code),
+  );
+  await sendEmail({
+    to: recipient.email,
+    subject: message.subject,
+    html: message.html,
+    event: "voucher_account_revision",
+  });
+}
+
+export async function sendVoucherOrderCompletedEmail(order: EmailVoucherOrderLike, baseUrl?: string) {
+  const recipient = resolveRecipient(order.user);
+  if (!recipient) {
+    logEmailResult("-", "voucher_order_completed", "skipped", "missing_user_email");
+    return;
+  }
+  const payload = buildVoucherOrderPayload(order);
+  const message = buildVoucherOrderCompletedEmail(
+    recipient.name,
+    payload,
+    buildVoucherOrderUrl(baseUrl || "", payload.code),
+  );
+  await sendEmail({
+    to: recipient.email,
+    subject: message.subject,
+    html: message.html,
+    event: "voucher_order_completed",
   });
 }
 
