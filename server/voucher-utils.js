@@ -369,7 +369,7 @@ export function validateVoucherOrderAction(order, action, actorIsAdmin) {
   if (!order) return { ok: false, message: "Order tidak ditemukan." };
   switch (action) {
     case "submit_payment":
-      if (order.status !== "awaiting_payment") {
+      if (!["awaiting_payment", "awaiting_confirmation"].includes(order.status)) {
         return { ok: false, message: "Order tidak lagi menunggu pembayaran." };
       }
       return { ok: true };

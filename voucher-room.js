@@ -1,5 +1,10 @@
 const roomRoot = document.getElementById("voucher-standalone-room");
+const roomState = {
+  order: null,
+  orderCode: "",
+};
 let roomPaymentSettings = {};
+let roomLiveSource = null;
 
 function getOrderCodeFromPath() {
   const parts = window.location.pathname.split("/").filter(Boolean);
@@ -144,6 +149,86 @@ async function ensurePaymentSettings() {
   roomPaymentSettings = payload.voucherPayment || {};
 }
 
+function hasAccountsComplete(order) {
+  if (!order?.product?.requiresAccountLogin) return true;
+  const quantity = Math.max(1, Number(order.quantity || 1));
+  const accounts = Array.isArray(order.accountAccounts) ? order.accountAccounts : [];
+  if (accounts.length < quantity) return false;
+  return accounts.slice(0, quantity).every((item) => item.email && item.email.includes("@") && item.password);
+}
+
+function shouldShowAccountForm(order) {
+  if (!order?.product?.requiresAccountLogin) return false;
+  if (order.accountRevisionRequested) return true;
+  return !hasAccountsComplete(order);
+}
+
+function buildAccountFormsMarkup(order) {
+  if (!order?.product?.requiresAccountLogin) return "";
+  const isRevision = Boolean(order.accountRevisionRequested);
+  const quantity = Math.max(1, Number(order.quantity || 1));
+  const accounts = Array.isArray(order.accountAccounts) ? order.accountAccounts : [];
+  if (hasAccountsComplete(order) && !isRevision) {
+    return `
+      <section class="voucher-account-forms-card voucher-account-forms-compact is-complete">
+        <div class="voucher-account-forms-head">
+          <h4>Data akun · ${quantity} pcs</h4>
+          <p class="mini-note">Terkirim</p>
+        </div>
+        <div class="voucher-account-complete-list">
+          ${accounts.slice(0, quantity).map((item, index) => `
+            <div class="voucher-account-complete-row">
+              <span class="voucher-account-num">${index + 1}</span>
+              <span class="voucher-account-complete-email">${escapeHtml(item.email)}</span>
+            </div>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  }
+  const revisionNotice = isRevision
+    ? `<p class="mini-note voucher-account-revision-note">Admin meminta perbaikan data akun. Silakan perbarui email dan password lalu kirim ulang.</p>`
+    : "";
+  return `
+    <section class="voucher-account-forms-card voucher-account-forms-compact${isRevision ? " is-revision" : ""}">
+      <div class="voucher-account-forms-head">
+        <h4>${isRevision ? "Perbaiki data akun" : "Data akun"} · ${quantity} pcs</h4>
+      </div>
+      ${revisionNotice}
+      <form id="voucher-standalone-accounts-form" class="voucher-account-forms">
+        ${Array.from({ length: quantity }, (_, index) => {
+    const existing = accounts[index] || {};
+    return `
+          <div class="voucher-account-row">
+            <span class="voucher-account-num" aria-hidden="true">${index + 1}</span>
+            <input type="email" name="account_email_${index}" value="${escapeHtml(existing.email || "")}" required autocomplete="username" placeholder="Email akun ${index + 1}" aria-label="Email akun ${index + 1}" />
+            <input type="password" name="account_password_${index}" value="${escapeHtml(existing.password || "")}" required autocomplete="current-password" placeholder="Password" aria-label="Password akun ${index + 1}" />
+          </div>
+        `;
+  }).join("")}
+        <button type="submit" class="primary-btn voucher-account-submit-btn">${isRevision ? "Kirim perbaikan data akun" : "Kirim data akun"}</button>
+      </form>
+    </section>
+  `;
+}
+
+function buildReplaceProofMarkup() {
+  return `
+    <section class="voucher-replace-proof-card">
+      <h4>Ganti bukti pembayaran</h4>
+      <p class="mini-note">Salah upload? Kirim bukti transfer yang benar di sini.</p>
+      <form id="voucher-standalone-replace-proof-form" class="profile-form voucher-payment-proof-form">
+        <label class="file-upload-field">
+          Upload bukti pembayaran baru
+          <input type="file" id="voucher-standalone-replace-proof-input" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
+          <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
+        </label>
+        <button type="submit" class="ghost-btn voucher-payment-submit-btn">Kirim bukti baru</button>
+      </form>
+    </section>
+  `;
+}
+
 function renderMessage(message) {
   const isAdmin = message.senderRole === "admin";
   const attachment = message.attachmentUrl
@@ -173,6 +258,7 @@ function buildPaymentSection(order) {
     </div>
     <div class="voucher-awaiting-payment-actions">
       <button type="button" class="primary-btn" data-voucher-scroll-payment>Lanjutkan pembayaran</button>
+      <button type="button" class="ghost-btn voucher-chat-action-btn" data-room-order-action="cancel">Batalkan transaksi</button>
     </div>
     <div class="voucher-payment-section" id="voucher-payment-section">
       <div class="voucher-checkout-grid">
@@ -213,31 +299,43 @@ function buildPaymentSection(order) {
   `;
 }
 
-function renderRoom(order) {
-  if (!roomRoot || !order) return;
-  const isAwaitingPayment = order.status === "awaiting_payment";
+function buildChatSection(order) {
   const canChat = ["processing", "needs_verification", "dispute", "awaiting_confirmation"].includes(order.status);
-
-  if (isAwaitingPayment) {
-    roomRoot.innerHTML = `
-      <section class="card voucher-standalone-card">
-        <div class="voucher-chat-head">
-          <a class="ghost-btn" href="/">← Kembali ke dashboard</a>
-          <div>
-            <p class="eyebrow">Order ${escapeHtml(order.orderCode)}</p>
-            <h3>${escapeHtml(order.product?.name || "Voucher")}</h3>
-            <span class="${statusClass(order.status)}">${escapeHtml(order.statusLabel || order.status)}</span>
+  const canCancel = ["awaiting_payment", "awaiting_confirmation", "processing"].includes(order.status);
+  const showAccountForms = shouldShowAccountForm(order) && canChat;
+  return `
+    <section class="voucher-chat-layout voucher-standalone-chat-layout">
+      <div class="voucher-chat-box" id="voucher-standalone-chat-box">
+        ${(order.messages || []).map(renderMessage).join("")}
+      </div>
+      ${showAccountForms ? buildAccountFormsMarkup(order) : ""}
+      ${order.status === "awaiting_confirmation" ? buildReplaceProofMarkup() : ""}
+      ${canChat ? `
+        <div class="voucher-chat-compose">
+          <form id="voucher-standalone-chat-form" class="voucher-chat-form">
+            <label>Pesan<input type="text" id="voucher-standalone-chat-input" placeholder="Tulis pesan ke admin..." /></label>
+            <label class="file-upload-field">Lampiran
+              <input type="file" id="voucher-standalone-chat-upload" accept="image/jpeg,image/png,image/webp" multiple />
+              <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
+            </label>
+            <button type="submit" class="primary-btn">Kirim</button>
+          </form>
+          <div class="voucher-chat-actions">
+            ${canCancel ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-room-order-action="cancel">Batalkan</button>` : ""}
+            ${["processing", "needs_verification", "completed"].includes(order.status)
+    ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-room-order-action="dispute">Sengketa</button>`
+    : ""}
           </div>
         </div>
-        ${buildPaymentSection(order)}
-      </section>
-    `;
-    document.querySelector("[data-voucher-scroll-payment]")?.addEventListener("click", () => {
-      document.getElementById("voucher-payment-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    bindRoomFileUploadFields(roomRoot);
-    return;
-  }
+      ` : `<p class="mini-note">Chat akan aktif setelah admin memproses pembayaran Anda.</p>`}
+    </section>
+  `;
+}
+
+function renderRoom(order) {
+  if (!roomRoot || !order) return;
+  roomState.order = order;
+  const isAwaitingPayment = order.status === "awaiting_payment";
 
   roomRoot.innerHTML = `
     <section class="card voucher-standalone-card">
@@ -249,29 +347,66 @@ function renderRoom(order) {
           <span class="${statusClass(order.status)}">${escapeHtml(order.statusLabel || order.status)}</span>
         </div>
       </div>
-      <div class="voucher-chat-box" id="voucher-standalone-chat-box">
-        ${(order.messages || []).map(renderMessage).join("")}
-      </div>
-      ${canChat ? `
-        <form id="voucher-standalone-chat-form" class="profile-form voucher-chat-form">
-          <label>Pesan<input type="text" id="voucher-standalone-chat-input" placeholder="Tulis pesan ke admin..." /></label>
-          <label class="file-upload-field">Lampiran
-            <input type="file" id="voucher-standalone-chat-upload" accept="image/jpeg,image/png,image/webp" multiple />
-            <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
-          </label>
-          <button type="submit" class="primary-btn">Kirim</button>
-        </form>
-      ` : `<p class="mini-note">Chat akan aktif setelah admin memproses pembayaran Anda.</p>`}
+      ${isAwaitingPayment ? buildPaymentSection(order) : buildChatSection(order)}
     </section>
   `;
-  const box = document.getElementById("voucher-standalone-chat-box");
-  if (box) box.scrollTop = box.scrollHeight;
+
+  if (isAwaitingPayment) {
+    document.querySelector("[data-voucher-scroll-payment]")?.addEventListener("click", () => {
+      document.getElementById("voucher-payment-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  } else {
+    const box = document.getElementById("voucher-standalone-chat-box");
+    if (box) box.scrollTop = box.scrollHeight;
+    if (order.accountRevisionRequested) {
+      window.requestAnimationFrame(() => {
+        document.querySelector(".voucher-account-forms-card.is-revision")
+          ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    }
+  }
   bindRoomFileUploadFields(roomRoot);
 }
 
-async function submitPaymentProof(orderCode) {
-  const form = document.getElementById("voucher-standalone-payment-form");
-  const fileInput = document.getElementById("voucher-standalone-payment-input");
+async function promptOrderNote(action) {
+  const label = action === "dispute" ? "Jelaskan masalah pada order ini:" : "Jelaskan alasan pembatalan:";
+  const note = window.prompt(label);
+  if (note === null) return "";
+  return String(note).trim();
+}
+
+async function runOrderAction(action) {
+  const orderCode = roomState.orderCode;
+  if (!orderCode) return;
+  const note = await promptOrderNote(action);
+  if (!note) return;
+  const payload = await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}/actions`, {
+    method: "POST",
+    body: JSON.stringify({ action, note }),
+  });
+  renderRoom(payload.order);
+}
+
+async function submitAccounts(event) {
+  event.preventDefault();
+  const order = roomState.order;
+  if (!order) return;
+  const form = event.target;
+  const quantity = Math.max(1, Number(order.quantity || 1));
+  const accounts = Array.from({ length: quantity }, (_, index) => ({
+    email: String(form.querySelector(`[name="account_email_${index}"]`)?.value || "").trim(),
+    password: String(form.querySelector(`[name="account_password_${index}"]`)?.value || "").trim(),
+  }));
+  const payload = await fetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/accounts`, {
+    method: "POST",
+    body: JSON.stringify({ accounts }),
+  });
+  renderRoom(payload.order);
+}
+
+async function submitPaymentProof(orderCode, formId = "voucher-standalone-payment-form") {
+  const form = document.getElementById(formId);
+  const fileInput = form?.querySelector('input[type="file"]');
   const submitBtn = form?.querySelector(".voucher-payment-submit-btn, button[type='submit']");
   const progressEl = form?.querySelector(".voucher-payment-upload-progress");
   const file = fileInput?.files?.[0];
@@ -315,12 +450,7 @@ async function submitChat(orderCode) {
   const text = String(textInput?.value || "").trim();
   const files = Array.from(chatUpload?.files || []);
   if (!text && !files.length) return;
-  if (text) {
-    await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}/messages`, {
-      method: "POST",
-      body: JSON.stringify({ text }),
-    });
-  }
+
   if (files.length) {
     const formData = new FormData();
     files.forEach((file) => formData.append("chatFiles", file));
@@ -331,14 +461,109 @@ async function submitChat(orderCode) {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.message || "Upload gagal.");
+    if (text) {
+      await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      });
+    }
     if (textInput) textInput.value = "";
     resetRoomFileInput(chatUpload);
-    renderRoom(payload.order);
+    const latest = await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}`);
+    renderRoom(latest.order);
     return;
   }
+
+  await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
   if (textInput) textInput.value = "";
   const payload = await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}`);
   renderRoom(payload.order);
+}
+
+function startRoomLiveUpdates(orderCode) {
+  roomState.orderCode = orderCode;
+  if (roomLiveSource) {
+    roomLiveSource.close();
+    roomLiveSource = null;
+  }
+  roomLiveSource = new EventSource("/api/events", { withCredentials: true });
+  roomLiveSource.onmessage = async (event) => {
+    try {
+      const payload = JSON.parse(event.data);
+      if (payload.type !== "voucher_order_updated") return;
+      const eventCode = String(payload.orderCode || payload.order?.orderCode || "").trim().toUpperCase();
+      if (eventCode !== orderCode) return;
+      if (payload.deleted) {
+        roomRoot.innerHTML = `
+          <section class="card voucher-standalone-card">
+            <h3>Order tidak tersedia</h3>
+            <p class="mini-note">Order ini telah dihapus atau tidak lagi tersedia.</p>
+            <a class="primary-btn" href="/">Kembali ke dashboard</a>
+          </section>
+        `;
+        return;
+      }
+      if (payload.order) {
+        renderRoom(payload.order);
+        return;
+      }
+      const fresh = await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}`);
+      renderRoom(fresh.order);
+    } catch {
+      // ignore malformed live events
+    }
+  };
+  roomLiveSource.onerror = () => {
+    if (roomLiveSource) {
+      roomLiveSource.close();
+      roomLiveSource = null;
+    }
+  };
+}
+
+function bindRoomEvents(orderCode) {
+  document.addEventListener("submit", async (event) => {
+    if (event.target?.id === "voucher-standalone-chat-form") {
+      event.preventDefault();
+      try {
+        await submitChat(orderCode);
+      } catch (error) {
+        alert(error.message || "Gagal mengirim pesan.");
+      }
+      return;
+    }
+    if (event.target?.id === "voucher-standalone-accounts-form") {
+      event.preventDefault();
+      try {
+        await submitAccounts(event);
+      } catch (error) {
+        alert(error.message || "Gagal mengirim data akun.");
+      }
+      return;
+    }
+    if (event.target?.id === "voucher-standalone-payment-form"
+      || event.target?.id === "voucher-standalone-replace-proof-form") {
+      event.preventDefault();
+      try {
+        await submitPaymentProof(orderCode, event.target.id);
+      } catch (error) {
+        alert(error.message || "Gagal mengirim bukti pembayaran.");
+      }
+    }
+  });
+
+  document.addEventListener("click", async (event) => {
+    const actionButton = event.target.closest("[data-room-order-action]");
+    if (!actionButton) return;
+    try {
+      await runOrderAction(actionButton.dataset.roomOrderAction);
+    } catch (error) {
+      alert(error.message || "Gagal memperbarui order.");
+    }
+  });
 }
 
 async function bootstrapVoucherRoom() {
@@ -361,26 +586,9 @@ async function bootstrapVoucherRoom() {
     }
     await ensurePaymentSettings();
     const payload = await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}`);
+    bindRoomEvents(orderCode);
+    startRoomLiveUpdates(orderCode);
     renderRoom(payload.order);
-    document.addEventListener("submit", async (event) => {
-      if (event.target?.id === "voucher-standalone-chat-form") {
-        event.preventDefault();
-        try {
-          await submitChat(orderCode);
-        } catch (error) {
-          alert(error.message || "Gagal mengirim pesan.");
-        }
-        return;
-      }
-      if (event.target?.id === "voucher-standalone-payment-form") {
-        event.preventDefault();
-        try {
-          await submitPaymentProof(orderCode);
-        } catch (error) {
-          alert(error.message || "Gagal mengirim bukti pembayaran.");
-        }
-      }
-    });
   } catch (error) {
     roomRoot.innerHTML = `<p class="mini-note">${escapeHtml(error.message || "Gagal memuat order voucher.")}</p>`;
   }

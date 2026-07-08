@@ -8999,9 +8999,19 @@ body.widget-dragging * {
 
   body.in-room-mode.in-voucher-room #voucher-history-room:not(.hidden) .voucher-account-forms-card {
     flex-shrink: 0;
-    max-height: min(24vh, 180px);
+    max-height: min(46vh, 320px);
     overflow-y: auto;
     margin-bottom: 4px;
+  }
+
+  #voucher-chat-view:not(.hidden) .voucher-account-forms-card {
+    max-height: min(40vh, 280px);
+    overflow-y: auto;
+  }
+
+  .voucher-standalone-page .voucher-account-forms-card {
+    max-height: min(46vh, 320px);
+    overflow-y: auto;
   }
 
   body.in-room-mode.in-voucher-room #voucher-history-room:not(.hidden) .voucher-chat-box {
@@ -11246,6 +11256,30 @@ body.admin-locked .admin-notif-floating {
   margin: 0;
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+.voucher-replace-proof-card {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px dashed rgba(224, 178, 50, 0.35);
+  background: rgba(224, 178, 50, 0.03);
+}
+
+.voucher-replace-proof-card h4 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.voucher-standalone-page .voucher-standalone-chat-layout {
+  min-height: 0;
+}
+
+.voucher-standalone-page .voucher-chat-box {
+  max-height: min(50vh, 420px);
 }
 
 .voucher-account-forms {

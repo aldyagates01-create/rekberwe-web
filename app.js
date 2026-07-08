@@ -433,6 +433,7 @@ async function bootstrap() {
       renderNotifications();
     };
     window.RekberVoucher?.init(state.currentUser);
+    await window.RekberVoucher?.refresh?.().catch(() => {});
     await tryCompletePendingSellerJoin();
   }
 }
@@ -981,6 +982,17 @@ async function refreshDashboard() {
   if (!state.currentUser) {
     state.dashboard = {
       profile: null,
+      linkedProviders: [],
+      activeTransactions: [],
+      completedTransactions: [],
+      chatHistory: [],
+    };
+    state.supportThread = null;
+    return;
+  }
+  if (state.currentUser.banned) {
+    state.dashboard = {
+      profile: state.currentUser,
       linkedProviders: [],
       activeTransactions: [],
       completedTransactions: [],

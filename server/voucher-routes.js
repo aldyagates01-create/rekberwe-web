@@ -161,9 +161,10 @@ export function registerVoucherRoutes(app, {
       res.status(400).json({ message: "Bukti pembayaran wajib diupload." });
       return;
     }
+    const isReplacement = order.status === "awaiting_confirmation";
     const stored = await persistUploadFile(file, code, req.session.user.id, { sensitive: true });
     await updateVoucherOrderFields(code, {
-      status: "awaiting_confirmation",
+      ...(isReplacement ? {} : { status: "awaiting_confirmation" }),
       paymentProofUrl: stored.fileUrl,
       paymentProofName: file.originalname,
     });
@@ -172,7 +173,9 @@ export function registerVoucherRoutes(app, {
       req.session.user.id,
       req.session.user.displayName,
       "user",
-      "Bukti pembayaran telah dikirim. Menunggu konfirmasi admin.",
+      isReplacement
+        ? "Bukti pembayaran telah diperbarui. Menunggu konfirmasi admin."
+        : "Bukti pembayaran telah dikirim. Menunggu konfirmasi admin.",
       {
         attachmentName: file.originalname,
         attachmentUrl: stored.fileUrl,

@@ -9,6 +9,7 @@ const voucherState = {
   catalogSearchQuery: "",
   paymentSettings: null,
   historyRoomOrderCode: "",
+  creatingOrder: false,
 };
 
 const voucherElements = {
@@ -639,19 +640,36 @@ function renderVoucherProductDetail() {
 }
 
 async function createVoucherOrderForProduct(product, options = {}) {
-  const quantity = Math.max(1, Number(options.quantity || 1));
-  const payload = await voucherFetchJson("/api/voucher/orders", {
-    method: "POST",
-    body: JSON.stringify({
-      productId: product.id,
-      quantity,
-    }),
-  });
-  voucherState.activeOrder = payload.order;
-  voucherState.orders.unshift(payload.order);
-  renderVoucherCheckout(payload.order);
-  openVoucherScreen("checkout");
-  renderVoucherOrdersSidebar();
+  if (voucherState.creatingOrder) return;
+  voucherState.creatingOrder = true;
+  const buyButton = document.querySelector(`[data-voucher-confirm-buy="${product.id}"]`);
+  if (buyButton) {
+    buyButton.disabled = true;
+    buyButton.dataset.voucherBuyBusy = "1";
+  }
+  try {
+    const quantity = Math.max(1, Number(options.quantity || 1));
+    const payload = await voucherFetchJson("/api/voucher/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        productId: product.id,
+        quantity,
+      }),
+    });
+    voucherState.activeOrder = payload.order;
+    voucherState.orders.unshift(payload.order);
+    renderVoucherCheckout(payload.order);
+    openVoucherScreen("checkout");
+    renderVoucherOrdersSidebar();
+    window.refreshUserTransactionHistory?.();
+  } finally {
+    voucherState.creatingOrder = false;
+    if (buyButton) {
+      delete buyButton.dataset.voucherBuyBusy;
+      const ready = product.readyState || {};
+      buyButton.disabled = !ready.canPurchase;
+    }
+  }
 }
 
 async function startVoucherCheckout(productId) {
@@ -659,6 +677,7 @@ async function startVoucherCheckout(productId) {
 }
 
 async function confirmVoucherPurchase(productId) {
+  if (voucherState.creatingOrder) return;
   const product = voucherState.products.find((item) => item.id === Number(productId))
     || voucherState.detailProduct;
   if (!product) return;
@@ -687,6 +706,25 @@ function renderVoucherCheckout(order) {
     })}
   `;
   bindFileUploadFields(voucherElements.checkoutView);
+}
+
+function buildVoucherReplaceProofMarkup(order, options = {}) {
+  const formId = options.formId || "voucher-replace-proof-form";
+  const inputId = options.inputId || "voucher-replace-proof-input";
+  return `
+    <section class="voucher-replace-proof-card">
+      <h4>Ganti bukti pembayaran</h4>
+      <p class="mini-note">Salah upload? Kirim bukti transfer yang benar di sini.</p>
+      <form id="${voucherEscapeHtml(formId)}" class="profile-form voucher-payment-proof-form">
+        <label class="file-upload-field">
+          Upload bukti pembayaran baru
+          <input type="file" id="${voucherEscapeHtml(inputId)}" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
+          <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
+        </label>
+        <button type="submit" class="ghost-btn voucher-payment-submit-btn">Kirim bukti baru</button>
+      </form>
+    </section>
+  `;
 }
 
 function buildVoucherPaymentBankMarkup(payment = {}) {
@@ -874,6 +912,10 @@ function buildVoucherChatMarkup(order, options = {}) {
       ${(order.messages || []).map(renderVoucherMessageItem).join("")}
     </div>
     ${showAccountForms ? buildVoucherAccountFormsMarkup(order, { formId: accountsFormId }) : ""}
+    ${order.status === "awaiting_confirmation" ? buildVoucherReplaceProofMarkup(order, {
+    formId: options.replaceProofFormId || "voucher-replace-proof-form",
+    inputId: options.replaceProofInputId || "voucher-replace-proof-input",
+  }) : ""}
     ${canChat ? `
       <div class="voucher-chat-compose">
         <form id="${voucherEscapeHtml(formId)}" class="voucher-chat-form">
@@ -924,6 +966,8 @@ function renderVoucherHistoryRoom(order) {
     inputId: "voucher-history-chat-input",
     uploadId: "voucher-history-chat-upload",
     accountsFormId: "voucher-history-accounts-form",
+    replaceProofFormId: "voucher-history-replace-proof-form",
+    replaceProofInputId: "voucher-history-replace-proof-input",
   });
   const box = document.getElementById("voucher-history-chat-box");
   if (box) box.scrollTop = box.scrollHeight;
@@ -1008,9 +1052,14 @@ async function submitVoucherPaymentProof(event) {
     else voucherState.orders.unshift(payload.order);
 
     const inHistoryRoom = voucherState.historyRoomOrderCode === payload.order.orderCode;
+    const isReplaceForm = form.id === "voucher-replace-proof-form"
+      || form.id === "voucher-history-replace-proof-form";
+    const wasAwaitingConfirmation = voucherState.activeOrder?.status === "awaiting_confirmation";
     if (inHistoryRoom) {
       refreshActiveVoucherChatView();
       window.syncHistoryVoucherOrder?.(payload.order);
+    } else if (isReplaceForm || wasAwaitingConfirmation || voucherState.screen === "chat") {
+      renderVoucherChat();
     } else {
       renderVoucherChat();
       openVoucherScreen("chat");
@@ -1018,7 +1067,11 @@ async function submitVoucherPaymentProof(event) {
     renderVoucherOrdersSidebar();
     window.markUserVoucherOrderSeen?.(payload.order);
     window.refreshUserTransactionHistory?.();
-    window.setAuthStatus?.("Bukti pembayaran terkirim. Lengkapi data akun di ruang chat jika diperlukan.");
+    window.setAuthStatus?.(
+      isReplaceForm || wasAwaitingConfirmation
+        ? "Bukti pembayaran baru terkirim."
+        : "Bukti pembayaran terkirim. Lengkapi data akun di ruang chat jika diperlukan.",
+    );
     resetFileUploadInput(fileInput);
     refreshVoucherData().catch(() => {});
   } catch (error) {
@@ -1209,7 +1262,10 @@ function bindVoucherEvents() {
   });
 
   document.addEventListener("submit", async (event) => {
-    if (event.target?.id === "voucher-payment-proof-form" || event.target?.id === "voucher-history-payment-proof-form") {
+    if (event.target?.id === "voucher-payment-proof-form"
+      || event.target?.id === "voucher-history-payment-proof-form"
+      || event.target?.id === "voucher-replace-proof-form"
+      || event.target?.id === "voucher-history-replace-proof-form") {
       event.preventDefault();
       try {
         await submitVoucherPaymentProof(event);
@@ -1290,6 +1346,9 @@ window.RekberVoucher = {
     if (!currentUser) return;
     bindVoucherEvents();
     setWorkspaceService("rekber");
+    if (!currentUser.banned) {
+      refreshVoucherData().catch(() => {});
+    }
   },
   refresh: refreshVoucherData,
   handleLiveEvent: handleVoucherLiveEvent,
