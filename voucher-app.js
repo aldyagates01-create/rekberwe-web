@@ -43,9 +43,31 @@ function voucherEscapeHtml(value) {
     .replaceAll("\"", "&quot;");
 }
 
+function voucherLinkifyText(text) {
+  const source = String(text || "");
+  const pattern = /(?:https?:\/\/|www\.)[^\s<]+[^\s.,;:!?)\]}"']/gi;
+  let result = "";
+  let lastIndex = 0;
+  let match = pattern.exec(source);
+  while (match) {
+    result += voucherEscapeHtml(source.slice(lastIndex, match.index));
+    const rawUrl = match[0];
+    const href = /^www\./i.test(rawUrl) ? `https://${rawUrl}` : rawUrl;
+    if (/^https?:\/\//i.test(href)) {
+      result += `<a href="${voucherEscapeHtml(href)}" target="_blank" rel="noreferrer noopener">${voucherEscapeHtml(rawUrl)}</a>`;
+    } else {
+      result += voucherEscapeHtml(rawUrl);
+    }
+    lastIndex = pattern.lastIndex;
+    match = pattern.exec(source);
+  }
+  result += voucherEscapeHtml(source.slice(lastIndex));
+  return result;
+}
+
 function voucherFormatMultiline(value, fallback = "") {
   const text = String(value || "").trim() || fallback;
-  return voucherEscapeHtml(text).replace(/\r?\n/g, "<br>");
+  return voucherLinkifyText(text).replace(/\r?\n/g, "<br>");
 }
 
 function bindFileUploadFields(root = document) {
@@ -97,7 +119,7 @@ function renderWorkspaceVoucherSidePanel() {
   const items = raw.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
   if (termsList) {
     termsList.innerHTML = items.length
-      ? items.map((item) => `<li>${voucherEscapeHtml(item)}</li>`).join("")
+      ? items.map((item) => `<li>${voucherLinkifyText(item)}</li>`).join("")
       : "<li>Syarat voucher belum diatur admin.</li>";
   }
 }

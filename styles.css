@@ -11462,6 +11462,24 @@ body.admin-locked .admin-notif-floating {
   line-height: 1.55;
 }
 
+.voucher-multiline-text a,
+.voucher-product-desc a,
+.voucher-detail-description a,
+#workspace-side-terms-box a,
+#workspace-terms-list a {
+  color: #e0b232;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.voucher-multiline-text a:hover,
+.voucher-product-desc a:hover,
+.voucher-detail-description a:hover,
+#workspace-side-terms-box a:hover,
+#workspace-terms-list a:hover {
+  color: #f3cf5a;
+}
+
 body.workspace-voucher-active #workspace-rekber-fee-card {
   display: none;
 }
