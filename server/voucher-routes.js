@@ -309,6 +309,7 @@ export function registerVoucherRoutes(app, {
         break;
       case "complete":
         nextStatus = "completed";
+        patch.completedAt = new Date().toISOString();
         break;
       case "dispute":
         if (!note) {
@@ -361,7 +362,11 @@ export function registerVoucherRoutes(app, {
         dispatchEmail(() => sendVoucherOrderCompletedEmail(updated, baseUrl));
       }
     }
-    await broadcastEvent("voucher_order_updated", code, { order: updated });
+    await broadcastEvent("voucher_order_updated", code, {
+      order: updated,
+      pushTrigger: "status_change",
+      pushMeta: { body: actionLabel || `Status order diperbarui: ${getVoucherStatusLabel(updated.status)}` },
+    });
     const viewerOrder = voucherOrderForViewer(
       resolveVoucherOrderMediaUrls(updated),
       getVoucherViewer(req),
@@ -385,7 +390,7 @@ export function registerVoucherRoutes(app, {
       const converted = await convertCurrencyToIdr(amount, currency);
       res.json({
         ...converted,
-        profit: Math.max(0, Math.round(sellPrice)) - converted.idrAmount,
+        profit: Math.max(0, Math.round(sellPrice) - converted.idrAmount),
       });
     } catch (error) {
       res.status(400).json({ message: error.message || "Gagal menghitung konversi mata uang." });

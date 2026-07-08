@@ -86,6 +86,7 @@ import {
 import { registerVoucherRoutes } from "./voucher-routes.js";
 import { voucherOrderForViewer } from "./voucher-utils.js";
 import { resolveVoucherOrderMediaUrls } from "./upload-url.js";
+import { createSqliteSessionStore } from "./sqlite-session-store.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -108,6 +109,8 @@ const adminUserIds = new Set(
     .filter(Boolean),
 );
 const uploadsDir = path.resolve(process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads"));
+const dataDir = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), "data"));
+const postgresEnabled = Boolean(String(process.env.DATABASE_URL || process.env.SUPABASE_DATABASE_URL || "").trim());
 const cloudinaryFolder = String(process.env.CLOUDINARY_FOLDER || "rekberwe").trim() || "rekberwe";
 
 function getRequestBaseUrl(req) {
@@ -409,10 +412,21 @@ if (!sessionSecret && isProduction) {
   throw new Error("SESSION_SECRET wajib diset di production.");
 }
 
+let sessionStore = null;
+if (!postgresEnabled) {
+  try {
+    sessionStore = createSqliteSessionStore(dataDir);
+    console.log("Session store SQLite aktif.");
+  } catch (error) {
+    console.warn("Session store SQLite gagal, fallback MemoryStore:", error.message);
+  }
+}
+
 app.use(
   session({
     name: "rekberwe.sid",
     secret: sessionSecret || crypto.randomBytes(32).toString("hex"),
+    store: sessionStore || undefined,
     resave: false,
     saveUninitialized: false,
     cookie: {

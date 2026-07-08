@@ -114,6 +114,10 @@ export async function dispatchPushForEvent(type, code, payload = {}, { adminUser
   }
   if (type === "verification_updated" && payload.user) {
     await handleVerificationPush(payload, adminUserIds, base);
+    return;
+  }
+  if (type === "voucher_order_updated" && payload.order) {
+    await handleVoucherOrderPush(payload, adminUserIds, base);
   }
 }
 
@@ -210,6 +214,60 @@ async function handleSupportPush(payload, adminUserIds, base) {
     url: `${base}/admin`,
     tag: `admin-support-${thread.id}`,
   });
+}
+
+async function handleVoucherOrderPush(payload, adminUserIds, base) {
+  const order = payload.order;
+  const trigger = payload.pushTrigger;
+  const code = order.orderCode;
+  const productName = order.product?.name || code;
+  const tag = `voucher-${code}`;
+  const url = `${base}/?voucher=${encodeURIComponent(code)}`;
+
+  if (trigger === "new_message") {
+    const message = payload.pushMeta?.message || order.messages?.[order.messages.length - 1];
+    if (!message) return;
+    const isAdmin = message.senderRole === "admin";
+    const body = truncateText(message.text) || "Ada pesan baru pada order voucher.";
+    if (isAdmin) {
+      if (order.userId) {
+        await sendPushToUser(order.userId, "user", {
+          title: `Pesan voucher — ${productName}`,
+          body,
+          url,
+          tag,
+        });
+      }
+      return;
+    }
+    await sendPushToAdmins(adminUserIds, {
+      title: `Pesan voucher — ${productName}`,
+      body: truncateText(`${message.senderName || "Pembeli"}: ${message.text || ""}`) || "Pembeli mengirim pesan voucher.",
+      url: `${base}/admin`,
+      tag: `admin-${tag}`,
+    });
+    return;
+  }
+
+  if (trigger === "status_change") {
+    const body = payload.pushMeta?.body || `Status order ${productName} diperbarui.`;
+    if (order.userId) {
+      await sendPushToUser(order.userId, "user", {
+        title: `Update voucher — ${productName}`,
+        body,
+        url,
+        tag,
+      });
+    }
+    if (payload.pushMeta?.notifyAdmins) {
+      await sendPushToAdmins(adminUserIds, {
+        title: `Update voucher — ${productName}`,
+        body,
+        url: `${base}/admin`,
+        tag: `admin-${tag}`,
+      });
+    }
+  }
 }
 
 async function handleVerificationPush(payload, adminUserIds, base) {

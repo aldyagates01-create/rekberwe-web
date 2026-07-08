@@ -8,11 +8,13 @@ import {
   generateVoucherOrderCode,
   getProductReadyState,
   getVoucherBuyerDisplayName,
+  getVoucherOrderStockQuantity,
   getVoucherStatusLabel,
   normalizeVoucherAccountPayload,
   normalizeVoucherPaymentSettings,
   parseVoucherAccountAccounts,
   applyVoucherBestsellerFlags,
+  shouldRestoreVoucherProductStock,
 } from "./voucher-utils.js";
 
 import {
@@ -291,6 +293,7 @@ db.exec(`
     buyer_telegram TEXT DEFAULT '',
     dispute_reason TEXT DEFAULT '',
     cancel_reason TEXT DEFAULT '',
+    completed_at TEXT DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -327,6 +330,16 @@ ensureColumn("voucher_orders", "account_accounts", "TEXT DEFAULT '[]'");
 ensureColumn("voucher_orders", "account_revision_requested", "INTEGER DEFAULT 0");
 ensureColumn("voucher_orders", "order_source", "TEXT DEFAULT 'platform'");
 ensureColumn("voucher_orders", "buyer_telegram", "TEXT DEFAULT ''");
+ensureColumn("voucher_orders", "completed_at", "TEXT DEFAULT ''");
+
+function restoreVoucherProductStock(productId, quantity) {
+  const productRow = db.prepare("SELECT stock FROM voucher_products WHERE id = ?").get(productId);
+  const stock = Number(productRow?.stock ?? -1);
+  if (stock < 0) return;
+  const now = new Date().toISOString();
+  db.prepare("UPDATE voucher_products SET stock = stock + ?, updated_at = ? WHERE id = ?")
+    .run(quantity, now, productId);
+}
 
 const statements = {
   getUserById: db.prepare("SELECT * FROM users WHERE id = ?"),
@@ -1827,6 +1840,7 @@ function hydrateVoucherOrder(row) {
     buyerTelegram: row.buyer_telegram || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    completedAt: row.completed_at || "",
     product,
     user: user ? {
       id: user.id,
@@ -1955,8 +1969,11 @@ export function deleteVoucherProduct(productId) {
 export function deleteVoucherOrder(orderCode) {
   const normalized = String(orderCode || "").trim().toUpperCase();
   if (!normalized) return false;
-  const current = db.prepare("SELECT order_code FROM voucher_orders WHERE order_code = ?").get(normalized);
+  const current = getVoucherOrderByCode(normalized);
   if (!current) return false;
+  if (shouldRestoreVoucherProductStock(current)) {
+    restoreVoucherProductStock(current.productId, getVoucherOrderStockQuantity(current));
+  }
   db.prepare("DELETE FROM voucher_order_messages WHERE order_code = ?").run(normalized);
   db.prepare("DELETE FROM voucher_orders WHERE order_code = ?").run(normalized);
   return true;
@@ -2175,13 +2192,18 @@ export function updateVoucherOrderFields(orderCode, fields = {}) {
   const current = getVoucherOrderByCode(orderCode);
   if (!current) return null;
   const now = new Date().toISOString();
+  const nextStatus = fields.status ?? current.status;
+  if (nextStatus === "cancelled" && current.status !== "cancelled" && shouldRestoreVoucherProductStock(current)) {
+    restoreVoucherProductStock(current.productId, getVoucherOrderStockQuantity(current));
+  }
   db.prepare(`
     UPDATE voucher_orders
     SET status = ?, payment_proof_url = ?, payment_proof_name = ?,
-        dispute_reason = ?, cancel_reason = ?, account_revision_requested = ?, updated_at = ?
+        dispute_reason = ?, cancel_reason = ?, account_revision_requested = ?,
+        completed_at = ?, updated_at = ?
     WHERE order_code = ?
   `).run(
-    fields.status ?? current.status,
+    nextStatus,
     fields.paymentProofUrl ?? current.paymentProofUrl,
     fields.paymentProofName ?? current.paymentProofName,
     fields.disputeReason ?? current.disputeReason,
@@ -2189,6 +2211,7 @@ export function updateVoucherOrderFields(orderCode, fields = {}) {
     fields.accountRevisionRequested !== undefined
       ? (fields.accountRevisionRequested ? 1 : 0)
       : (current.accountRevisionRequested ? 1 : 0),
+    fields.completedAt !== undefined ? fields.completedAt : (current.completedAt || ""),
     now,
     orderCode,
   );
@@ -2233,9 +2256,9 @@ export function getVoucherSalesReport(fromDate = "", toDate = "") {
   const rows = db.prepare(`
     SELECT * FROM voucher_orders
     WHERE status = 'completed'
-      AND date(updated_at) >= date(?)
-      AND date(updated_at) <= date(?)
-    ORDER BY updated_at DESC
+      AND date(COALESCE(NULLIF(completed_at, ''), updated_at)) >= date(?)
+      AND date(COALESCE(NULLIF(completed_at, ''), updated_at)) <= date(?)
+    ORDER BY COALESCE(NULLIF(completed_at, ''), updated_at) DESC
   `).all(from, to);
   const productMap = new Map();
   let summary = { totalOrders: 0, totalRevenue: 0, totalCost: 0, totalProfit: 0 };
@@ -2271,7 +2294,7 @@ export function getVoucherSalesReport(fromDate = "", toDate = "") {
       sellPrice,
       costPrice,
       profit,
-      completedAt: order.updatedAt,
+      completedAt: order.completedAt || order.updatedAt,
     });
     summary = {
       totalOrders: summary.totalOrders + 1,
@@ -2307,4 +2330,7 @@ migratePlaintextVoucherCredentials(
   }
 }).catch((error) => {
   console.error("[voucher-crypto] Migrasi enkripsi gagal:", error.message);
+  if (process.env.NODE_ENV === "production") {
+    throw error;
+  }
 });

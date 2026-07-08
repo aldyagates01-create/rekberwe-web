@@ -3,10 +3,12 @@ import {
   generateVoucherOrderCode,
   getProductReadyState,
   getVoucherBuyerDisplayName,
+  getVoucherOrderStockQuantity,
   getVoucherStatusLabel,
   normalizeVoucherAccountPayload,
   parseVoucherAccountAccounts,
   applyVoucherBestsellerFlags,
+  shouldRestoreVoucherProductStock,
 } from "./voucher-utils.js";
 
 import {
@@ -14,6 +16,17 @@ import {
   encryptVoucherCredentialFields,
   migratePlaintextVoucherCredentials,
 } from "./voucher-credentials-crypto.js";
+
+async function restoreVoucherProductStock(queryOneFn, queryFn, productId, quantity) {
+  const productRow = await queryOneFn("SELECT stock FROM voucher_products WHERE id = $1", [productId]);
+  const stock = Number(productRow?.stock ?? -1);
+  if (stock < 0) return;
+  const now = new Date().toISOString();
+  await queryFn(
+    "UPDATE voucher_products SET stock = stock + $2, updated_at = $3 WHERE id = $1",
+    [productId, quantity, now],
+  );
+}
 
 export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, getUserById, withTransaction }) {
   function mapProduct(row) {
@@ -92,6 +105,7 @@ export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, get
       cancelReason: row.cancel_reason || "",
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      completedAt: row.completed_at || "",
       product,
       user: user ? {
         id: user.id,
@@ -210,8 +224,11 @@ export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, get
     async deleteVoucherOrder(orderCode) {
       const normalized = String(orderCode || "").trim().toUpperCase();
       if (!normalized) return false;
-      const current = await queryOne("SELECT order_code FROM voucher_orders WHERE order_code = $1", [normalized]);
+      const current = await this.getVoucherOrderByCode(normalized);
       if (!current) return false;
+      if (shouldRestoreVoucherProductStock(current)) {
+        await restoreVoucherProductStock(queryOne, query, current.productId, getVoucherOrderStockQuantity(current));
+      }
       await query("DELETE FROM voucher_order_messages WHERE order_code = $1", [normalized]);
       await query("DELETE FROM voucher_orders WHERE order_code = $1", [normalized]);
       return true;
@@ -412,16 +429,21 @@ export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, get
       const current = await this.getVoucherOrderByCode(orderCode);
       if (!current) return null;
       const now = new Date().toISOString();
+      const nextStatus = fields.status ?? current.status;
+      if (nextStatus === "cancelled" && current.status !== "cancelled" && shouldRestoreVoucherProductStock(current)) {
+        await restoreVoucherProductStock(queryOne, query, current.productId, getVoucherOrderStockQuantity(current));
+      }
       await query(
         `
           UPDATE voucher_orders
           SET status = $2, payment_proof_url = $3, payment_proof_name = $4,
-              dispute_reason = $5, cancel_reason = $6, account_revision_requested = $7, updated_at = $8
+              dispute_reason = $5, cancel_reason = $6, account_revision_requested = $7,
+              completed_at = $8, updated_at = $9
           WHERE order_code = $1
         `,
         [
           orderCode,
-          fields.status ?? current.status,
+          nextStatus,
           fields.paymentProofUrl ?? current.paymentProofUrl,
           fields.paymentProofName ?? current.paymentProofName,
           fields.disputeReason ?? current.disputeReason,
@@ -429,6 +451,7 @@ export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, get
           fields.accountRevisionRequested !== undefined
             ? Boolean(fields.accountRevisionRequested)
             : Boolean(current.accountRevisionRequested),
+          fields.completedAt !== undefined ? fields.completedAt : (current.completedAt || null),
           now,
         ],
       );
@@ -474,9 +497,9 @@ export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, get
         `
           SELECT * FROM voucher_orders
           WHERE status = 'completed'
-            AND updated_at::date >= $1::date
-            AND updated_at::date <= $2::date
-          ORDER BY updated_at DESC
+            AND COALESCE(completed_at, updated_at)::date >= $1::date
+            AND COALESCE(completed_at, updated_at)::date <= $2::date
+          ORDER BY COALESCE(completed_at, updated_at) DESC
         `,
         [from, to],
       );
@@ -514,7 +537,7 @@ export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, get
           sellPrice,
           costPrice,
           profit,
-          completedAt: order.updatedAt,
+          completedAt: order.completedAt || order.updatedAt,
         });
         summary = {
           totalOrders: summary.totalOrders + 1,

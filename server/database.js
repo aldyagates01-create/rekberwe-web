@@ -985,6 +985,7 @@ async function initializePostgres() {
       buyer_telegram TEXT DEFAULT '',
       dispute_reason TEXT DEFAULT '',
       cancel_reason TEXT DEFAULT '',
+      completed_at TIMESTAMPTZ NULL,
       created_at TIMESTAMPTZ NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL
     );
@@ -1022,6 +1023,7 @@ async function initializePostgres() {
     ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_revision_requested BOOLEAN DEFAULT FALSE;
     ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS order_source TEXT DEFAULT 'platform';
     ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS buyer_telegram TEXT DEFAULT '';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ NULL;
   `);
 
   if (sqliteImportEnabled) {
@@ -1061,6 +1063,13 @@ async function migrateFromSqliteIfNeeded() {
   const existingUserCount = await queryValue("SELECT COUNT(*)::int AS count FROM users");
   if (Number(existingUserCount || 0) > 0) return;
 
+  function tableExists(sqliteDb, tableName) {
+    const row = sqliteDb.prepare(
+      "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1",
+    ).get(tableName);
+    return Boolean(row);
+  }
+
   const sqlite = new Database(sqliteImportPath, { readonly: true });
   try {
     const users = sqlite.prepare("SELECT * FROM users").all();
@@ -1069,6 +1078,15 @@ async function migrateFromSqliteIfNeeded() {
     const messages = sqlite.prepare("SELECT * FROM transaction_messages").all();
     const uploads = sqlite.prepare("SELECT * FROM transaction_uploads").all();
     const settings = sqlite.prepare("SELECT * FROM app_settings").all();
+    const voucherProducts = tableExists(sqlite, "voucher_products")
+      ? sqlite.prepare("SELECT * FROM voucher_products").all()
+      : [];
+    const voucherOrders = tableExists(sqlite, "voucher_orders")
+      ? sqlite.prepare("SELECT * FROM voucher_orders").all()
+      : [];
+    const voucherOrderMessages = tableExists(sqlite, "voucher_order_messages")
+      ? sqlite.prepare("SELECT * FROM voucher_order_messages").all()
+      : [];
 
     for (const row of users) {
       await query(
@@ -1201,10 +1219,77 @@ async function migrateFromSqliteIfNeeded() {
       );
     }
 
+    for (const row of voucherProducts) {
+      await query(
+        `
+          INSERT INTO voucher_products (
+            id, name, description, price, image_url, image_name, ready_mode, ready_start, ready_end,
+            is_active, stock, sort_order, requires_account_login, cost_price, cost_currency,
+            cost_amount_original, cost_fx_rate, cost_fx_fetched_at, created_at, updated_at
+          ) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+          )
+          ON CONFLICT (id) DO NOTHING
+        `,
+        [
+          row.id, row.name, row.description || "", row.price, row.image_url || "", row.image_name || "",
+          row.ready_mode || "24h", row.ready_start || "", row.ready_end || "",
+          Boolean(row.is_active), Number(row.stock ?? -1), Number(row.sort_order || 0),
+          Boolean(row.requires_account_login), Number(row.cost_price || 0), row.cost_currency || "IDR",
+          Number(row.cost_amount_original || 0), Number(row.cost_fx_rate || 1), row.cost_fx_fetched_at || "",
+          row.created_at, row.updated_at,
+        ],
+      );
+    }
+
+    for (const row of voucherOrders) {
+      await query(
+        `
+          INSERT INTO voucher_orders (
+            id, order_code, product_id, user_id, price, cost_price, quantity, status,
+            payment_proof_url, payment_proof_name, account_email, account_password, account_accounts,
+            account_revision_requested, order_source, buyer_telegram, dispute_reason, cancel_reason,
+            completed_at, created_at, updated_at
+          ) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
+          )
+          ON CONFLICT (order_code) DO NOTHING
+        `,
+        [
+          row.id, row.order_code, row.product_id, row.user_id, row.price, Number(row.cost_price || 0),
+          Number(row.quantity || 1), row.status, row.payment_proof_url || "", row.payment_proof_name || "",
+          row.account_email || "", row.account_password || "", row.account_accounts || "[]",
+          Boolean(row.account_revision_requested), row.order_source || "platform", row.buyer_telegram || "",
+          row.dispute_reason || "", row.cancel_reason || "", row.completed_at || null,
+          row.created_at, row.updated_at,
+        ],
+      );
+    }
+
+    for (const row of voucherOrderMessages) {
+      await query(
+        `
+          INSERT INTO voucher_order_messages (
+            id, order_code, sender_user_id, sender_name, sender_role, message_text,
+            attachment_name, attachment_url, attachment_type, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          ON CONFLICT DO NOTHING
+        `,
+        [
+          row.id, row.order_code, row.sender_user_id || null, row.sender_name, row.sender_role,
+          row.message_text || "", row.attachment_name || "", row.attachment_url || "",
+          row.attachment_type || "", row.created_at,
+        ],
+      );
+    }
+
     await query(`
       SELECT setval(pg_get_serial_sequence('linked_providers', 'id'), COALESCE((SELECT MAX(id) FROM linked_providers), 1), true);
       SELECT setval(pg_get_serial_sequence('transaction_messages', 'id'), COALESCE((SELECT MAX(id) FROM transaction_messages), 1), true);
       SELECT setval(pg_get_serial_sequence('transaction_uploads', 'id'), COALESCE((SELECT MAX(id) FROM transaction_uploads), 1), true);
+      SELECT setval(pg_get_serial_sequence('voucher_products', 'id'), COALESCE((SELECT MAX(id) FROM voucher_products), 1), true);
+      SELECT setval(pg_get_serial_sequence('voucher_orders', 'id'), COALESCE((SELECT MAX(id) FROM voucher_orders), 1), true);
+      SELECT setval(pg_get_serial_sequence('voucher_order_messages', 'id'), COALESCE((SELECT MAX(id) FROM voucher_order_messages), 1), true);
     `);
   } finally {
     sqlite.close();

@@ -119,14 +119,26 @@ function getVoucherGridClass(count) {
 
 function getVoucherMaxQuantity(product) {
   if (!product) return 1;
+  if (Number(product.stock) === 0) return 0;
   if (product.stock > 0) return Math.min(20, product.stock);
   return 20;
+}
+
+function formatVoucherDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("id-ID");
 }
 
 function setVoucherDetailQuantity(nextQuantity) {
   const product = voucherState.detailProduct;
   if (!product) return 1;
   const maxQty = getVoucherMaxQuantity(product);
+  if (maxQty === 0) {
+    voucherState.detailQuantity = 0;
+    return 0;
+  }
   const quantity = Math.max(1, Math.min(maxQty, Number(nextQuantity || 1)));
   voucherState.detailQuantity = quantity;
   const input = document.getElementById("voucher-detail-quantity");
@@ -310,7 +322,7 @@ function renderVoucherCatalog(options = {}) {
           <p class="voucher-product-price">${voucherFormatCurrency(product.price)}</p>
           <p class="mini-note voucher-product-desc">${voucherEscapeHtml(product.description || "Produk digital RekberWE.id")}</p>
           <button type="button" class="primary-btn voucher-product-buy-btn" data-voucher-buy="${product.id}" ${disabled ? "disabled" : ""}>
-            ${disabled ? "Belum Ready" : "Beli Sekarang"}
+            ${disabled ? voucherEscapeHtml(ready.label || "Belum Ready") : "Beli Sekarang"}
           </button>
         </div>
       </article>
@@ -420,7 +432,7 @@ function renderVoucherProductDetail() {
         </div>
         <p class="voucher-detail-total">Total bayar: <strong id="voucher-detail-total">${voucherFormatCurrency(totalPrice)}</strong></p>
         <button type="button" class="primary-btn" data-voucher-confirm-buy="${product.id}" ${ready.canPurchase ? "" : "disabled"}>
-          ${ready.canPurchase ? "Beli" : "Belum Ready"}
+          ${ready.canPurchase ? "Beli" : (ready.label || "Belum Ready")}
         </button>
       </section>
     </div>
@@ -607,7 +619,7 @@ function renderVoucherMessageItem(message) {
     <article class="voucher-chat-message ${isAdmin ? "is-admin" : "is-user"}">
       <div class="voucher-chat-meta">
         <strong>${voucherEscapeHtml(message.senderName || (isAdmin ? "Admin" : "Anda"))}</strong>
-        <span>${voucherEscapeHtml(new Date(message.time).toLocaleString("id-ID"))}</span>
+        <span>${voucherEscapeHtml(formatVoucherDateTime(message.time))}</span>
       </div>
       ${message.text ? `<p>${voucherEscapeHtml(message.text)}</p>` : ""}
       ${attachment}
@@ -810,6 +822,7 @@ async function submitVoucherChatMessage(event, options = {}) {
   const uploadId = options.uploadId || "voucher-chat-upload";
   const text = String(document.getElementById(inputId)?.value || "").trim();
   const files = Array.from(document.getElementById(uploadId)?.files || []);
+  if (!text && !files.length) return;
   if (text) {
     await voucherFetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/messages`, {
       method: "POST",

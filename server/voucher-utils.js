@@ -215,12 +215,32 @@ export function getNextProductReadyAt(product, now = new Date()) {
   return target.toISOString();
 }
 
+export function shouldRestoreVoucherProductStock(order) {
+  if (!order) return false;
+  const status = String(order.status || "");
+  return status !== "completed" && status !== "cancelled";
+}
+
+export function getVoucherOrderStockQuantity(order) {
+  return Math.max(1, Number(order?.quantity || 1));
+}
+
 export function getProductReadyState(product, now = new Date()) {
   if (!product?.isActive) {
     return {
       ready: false,
       label: "Nonaktif",
       scheduleLabel: "Produk nonaktif",
+      canPurchase: false,
+      nextReadyAt: null,
+    };
+  }
+
+  if (Number(product.stock) === 0) {
+    return {
+      ready: false,
+      label: "Stok Habis",
+      scheduleLabel: "Stok habis",
       canPurchase: false,
       nextReadyAt: null,
     };
@@ -391,6 +411,9 @@ export function validateVoucherOrderAction(order, action, actorIsAdmin) {
       if (!actorIsAdmin) return { ok: false, message: "Hanya admin yang bisa menyelesaikan order." };
       if (!["processing", "needs_verification", "dispute"].includes(order.status)) {
         return { ok: false, message: "Order belum bisa diselesaikan." };
+      }
+      if (!hasCompleteVoucherAccountCredentials(order)) {
+        return { ok: false, message: "Data akun subscription belum lengkap. Pembeli harus mengisi email dan password terlebih dahulu." };
       }
       return { ok: true };
     case "dispute":

@@ -43,6 +43,13 @@ function getDefaultVoucherReportRange() {
   return { from: toInput(start), to: toInput(end) };
 }
 
+function formatAdminDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("id-ID");
+}
+
 function formatProductCostDetail(product) {
   const costIdr = formatCurrency(product?.costPrice || 0);
   const currency = String(product?.costCurrency || "IDR").toUpperCase();
@@ -184,7 +191,7 @@ function renderAdminVoucherReport() {
                 <span>${formatCurrency(order.sellPrice || 0)}</span>
                 <span>${formatCurrency(order.costPrice || 0)}</span>
                 <span><strong>${formatCurrency(order.profit || 0)}</strong></span>
-                <span>${escapeHtml(order.completedAt ? new Date(order.completedAt).toLocaleString("id-ID") : "-")}</span>
+                <span>${escapeHtml(formatAdminDateTime(order.completedAt))}</span>
                 <span class="voucher-report-order-actions">
                   ${order.paymentProofUrl ? `<a href="${escapeAttribute(order.paymentProofUrl)}" target="_blank" rel="noreferrer" class="ghost-btn voucher-proof-link">Lihat bukti TF</a>` : ""}
                   <button type="button" class="ghost-btn danger-btn voucher-report-delete-btn" data-admin-voucher-report-delete="${escapeAttribute(order.orderCode)}">Hapus</button>
@@ -568,7 +575,7 @@ function renderAdminVoucherOrderRoom() {
         <article><p class="mini-label">Harga jual</p><strong>${formatCurrency(order.price)}</strong></article>
         <article><p class="mini-label">Harga modal</p><strong>${formatCurrency(order.costPrice || order.product?.costPrice || 0)}</strong></article>
         <article><p class="mini-label">Profit</p><strong>${formatCurrency(profit)}</strong></article>
-        <article><p class="mini-label">Waktu input</p><strong>${escapeHtml(new Date(order.createdAt).toLocaleString("id-ID"))}</strong></article>
+        <article><p class="mini-label">Waktu input</p><strong>${escapeHtml(formatAdminDateTime(order.createdAt))}</strong></article>
       </div>
       ${renderAdminVoucherAccountCredentials(order)}
       <div class="voucher-admin-chat-actions voucher-manual-order-actions">
@@ -607,7 +614,7 @@ function renderAdminVoucherOrderRoom() {
       <article><p class="mini-label">Harga jual</p><strong>${formatCurrency(order.price)}</strong></article>
       <article><p class="mini-label">Harga modal</p><strong>${formatCurrency(order.costPrice || order.product?.costPrice || 0)}</strong></article>
       <article><p class="mini-label">Profit</p><strong>${formatCurrency((order.price || 0) - (order.costPrice || order.product?.costPrice || 0))}</strong></article>
-      <article><p class="mini-label">Waktu order</p><strong>${escapeHtml(new Date(order.createdAt).toLocaleString("id-ID"))}</strong></article>
+      <article><p class="mini-label">Waktu order</p><strong>${escapeHtml(formatAdminDateTime(order.createdAt))}</strong></article>
     </div>
     ${renderAdminVoucherAccountCredentials(order)}
     ${order.paymentProofUrl ? `<p><a href="${escapeAttribute(order.paymentProofUrl)}" target="_blank" rel="noreferrer">Lihat bukti pembayaran</a></p>` : ""}
@@ -661,7 +668,9 @@ async function runAdminVoucherAction(action, orderCode = "") {
   }
   await refreshAdminVoucherData();
   if (action === "complete") {
-    await loadAdminVoucherReport().catch(() => {});
+    await loadAdminVoucherReport().catch((error) => {
+      showStatus(error.message || "Gagal memuat laporan voucher.", true);
+    });
   }
   showStatus(`Status order diperbarui: ${payload.statusLabel || payload.order.status}`);
 }
@@ -708,8 +717,12 @@ async function deleteAdminVoucherOrder(orderCode) {
     renderAdminVoucherOrderRoom();
   }
   await Promise.all([
-    refreshAdminVoucherData().catch(() => {}),
-    loadAdminVoucherReport().catch(() => {}),
+    refreshAdminVoucherData().catch((error) => {
+      showStatus(error.message || "Gagal memuat data voucher.", true);
+    }),
+    loadAdminVoucherReport().catch((error) => {
+      showStatus(error.message || "Gagal memuat laporan voucher.", true);
+    }),
   ]);
   showStatus(`Order ${normalized} berhasil dihapus.`);
 }
