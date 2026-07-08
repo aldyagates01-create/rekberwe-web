@@ -214,20 +214,6 @@ ensureColumn("users", "banned_reason", "TEXT DEFAULT ''");
 ensureColumn("users", "phone_number", "TEXT DEFAULT ''");
 ensureColumn("users", "phone_verified", "INTEGER DEFAULT 0");
 ensureColumn("users", "phone_verified_at", "TEXT DEFAULT ''");
-ensureColumn("voucher_products", "requires_account_login", "INTEGER DEFAULT 0");
-ensureColumn("voucher_products", "cost_price", "INTEGER DEFAULT 0");
-ensureColumn("voucher_products", "cost_currency", "TEXT DEFAULT 'IDR'");
-ensureColumn("voucher_products", "cost_amount_original", "REAL DEFAULT 0");
-ensureColumn("voucher_products", "cost_fx_rate", "REAL DEFAULT 1");
-ensureColumn("voucher_products", "cost_fx_fetched_at", "TEXT DEFAULT ''");
-ensureColumn("voucher_orders", "account_email", "TEXT DEFAULT ''");
-ensureColumn("voucher_orders", "account_password", "TEXT DEFAULT ''");
-ensureColumn("voucher_orders", "cost_price", "INTEGER DEFAULT 0");
-ensureColumn("voucher_orders", "quantity", "INTEGER DEFAULT 1");
-ensureColumn("voucher_orders", "account_accounts", "TEXT DEFAULT '[]'");
-ensureColumn("voucher_orders", "account_revision_requested", "INTEGER DEFAULT 0");
-ensureColumn("voucher_orders", "order_source", "TEXT DEFAULT 'platform'");
-ensureColumn("voucher_orders", "buyer_telegram", "TEXT DEFAULT ''");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS otp_verifications (
@@ -276,6 +262,12 @@ db.exec(`
     is_active INTEGER DEFAULT 1,
     stock INTEGER DEFAULT -1,
     sort_order INTEGER DEFAULT 0,
+    requires_account_login INTEGER DEFAULT 0,
+    cost_price INTEGER DEFAULT 0,
+    cost_currency TEXT DEFAULT 'IDR',
+    cost_amount_original REAL DEFAULT 0,
+    cost_fx_rate REAL DEFAULT 1,
+    cost_fx_fetched_at TEXT DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -286,9 +278,17 @@ db.exec(`
     product_id INTEGER NOT NULL,
     user_id TEXT NOT NULL,
     price INTEGER NOT NULL,
+    cost_price INTEGER DEFAULT 0,
+    quantity INTEGER DEFAULT 1,
     status TEXT NOT NULL,
     payment_proof_url TEXT DEFAULT '',
     payment_proof_name TEXT DEFAULT '',
+    account_email TEXT DEFAULT '',
+    account_password TEXT DEFAULT '',
+    account_accounts TEXT DEFAULT '[]',
+    account_revision_requested INTEGER DEFAULT 0,
+    order_source TEXT DEFAULT 'platform',
+    buyer_telegram TEXT DEFAULT '',
     dispute_reason TEXT DEFAULT '',
     cancel_reason TEXT DEFAULT '',
     created_at TEXT NOT NULL,
@@ -312,6 +312,21 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_voucher_orders_status ON voucher_orders(status, updated_at DESC);
   CREATE INDEX IF NOT EXISTS idx_voucher_order_messages_code ON voucher_order_messages(order_code, id);
 `);
+
+ensureColumn("voucher_products", "requires_account_login", "INTEGER DEFAULT 0");
+ensureColumn("voucher_products", "cost_price", "INTEGER DEFAULT 0");
+ensureColumn("voucher_products", "cost_currency", "TEXT DEFAULT 'IDR'");
+ensureColumn("voucher_products", "cost_amount_original", "REAL DEFAULT 0");
+ensureColumn("voucher_products", "cost_fx_rate", "REAL DEFAULT 1");
+ensureColumn("voucher_products", "cost_fx_fetched_at", "TEXT DEFAULT ''");
+ensureColumn("voucher_orders", "account_email", "TEXT DEFAULT ''");
+ensureColumn("voucher_orders", "account_password", "TEXT DEFAULT ''");
+ensureColumn("voucher_orders", "cost_price", "INTEGER DEFAULT 0");
+ensureColumn("voucher_orders", "quantity", "INTEGER DEFAULT 1");
+ensureColumn("voucher_orders", "account_accounts", "TEXT DEFAULT '[]'");
+ensureColumn("voucher_orders", "account_revision_requested", "INTEGER DEFAULT 0");
+ensureColumn("voucher_orders", "order_source", "TEXT DEFAULT 'platform'");
+ensureColumn("voucher_orders", "buyer_telegram", "TEXT DEFAULT ''");
 
 const statements = {
   getUserById: db.prepare("SELECT * FROM users WHERE id = ?"),
