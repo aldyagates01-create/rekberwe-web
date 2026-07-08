@@ -5318,4 +5318,6 @@ function setupLiveEvents() {
   });
 }
 
+window.renderPublicFeeList = renderPublicFeeList;
+window.renderTermsAndConditions = renderTermsAndConditions;
 

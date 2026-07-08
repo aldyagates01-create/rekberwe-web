@@ -63,6 +63,7 @@ const elements = {
   voucherPaymentBankHolder: document.getElementById("voucher-payment-bank-holder"),
   voucherPaymentQrisUrl: document.getElementById("voucher-payment-qris-url"),
   voucherPaymentInstructions: document.getElementById("voucher-payment-instructions"),
+  voucherPaymentTerms: document.getElementById("voucher-payment-terms"),
   adminFeeForm: document.getElementById("admin-fee-form"),
   maintenanceSettingsCard: document.getElementById("maintenance-settings-card"),
   maintenanceModeEnabled: document.getElementById("maintenance-mode-enabled"),
@@ -2062,6 +2063,7 @@ async function handleSaveFeeSettings(event) {
         bankHolder: String(elements.voucherPaymentBankHolder?.value || "").trim(),
         qrisUrl: String(elements.voucherPaymentQrisUrl?.value || "").trim(),
         instructions: String(elements.voucherPaymentInstructions?.value || "").trim(),
+        termsAndConditions: String(elements.voucherPaymentTerms?.value || "").trim(),
       },
     }),
   });

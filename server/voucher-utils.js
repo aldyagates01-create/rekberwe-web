@@ -92,6 +92,12 @@ export function defaultVoucherPaymentSettings() {
       "Upload bukti pembayaran setelah transfer.",
       "Order diproses setelah admin mengonfirmasi pembayaran.",
     ].join("\n"),
+    termsAndConditions: [
+      "Pembayaran voucher/gametime wajib sesuai nominal order.",
+      "Proses order dimulai setelah admin mengonfirmasi bukti transfer.",
+      "Data akun subscription wajib dikirim jika produk membutuhkan login akun.",
+      "Sengketa diajukan melalui chat order sebelum status selesai.",
+    ].join("\n"),
   };
 }
 
@@ -104,6 +110,8 @@ export function normalizeVoucherPaymentSettings(input = {}) {
     qrisUrl: String(raw.qrisUrl || "").trim(),
     instructions: String(raw.instructions || defaultVoucherPaymentSettings().instructions).trim()
       || defaultVoucherPaymentSettings().instructions,
+    termsAndConditions: String(raw.termsAndConditions || defaultVoucherPaymentSettings().termsAndConditions).trim()
+      || defaultVoucherPaymentSettings().termsAndConditions,
   };
 }
 

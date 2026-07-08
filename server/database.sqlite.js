@@ -391,10 +391,12 @@ const statements = {
   upsertUser: db.prepare(`
     INSERT INTO users (
       id, provider, social_id, username, display_name, legal_name, email, avatar, profile_url,
-      verified_provider, verified, ktp, whatsapp, ktp_photo_url, ktp_video_url, ktp_photo_name, ktp_video_name, created_at, updated_at
+      verified_provider, verified, ktp, whatsapp, verification_note, banned, banned_reason,
+      ktp_photo_url, ktp_video_url, ktp_photo_name, ktp_video_name, created_at, updated_at
     ) VALUES (
       @id, @provider, @social_id, @username, @display_name, @legal_name, @email, @avatar, @profile_url,
-      @verified_provider, @verified, @ktp, @whatsapp, @ktp_photo_url, @ktp_video_url, @ktp_photo_name, @ktp_video_name, @created_at, @updated_at
+      @verified_provider, @verified, @ktp, @whatsapp, @verification_note, @banned, @banned_reason,
+      @ktp_photo_url, @ktp_video_url, @ktp_photo_name, @ktp_video_name, @created_at, @updated_at
     )
     ON CONFLICT(id) DO UPDATE SET
       provider = excluded.provider,

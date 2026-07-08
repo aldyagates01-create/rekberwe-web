@@ -50,6 +50,40 @@ async function fetchJson(url, options = {}) {
   return payload;
 }
 
+function bindRoomFileUploadFields(root = document) {
+  root.querySelectorAll('input[type="file"]').forEach((input) => {
+    if (input.dataset.uploadUiBound === "1") return;
+    input.dataset.uploadUiBound = "1";
+    const label = input.closest("label");
+    if (!label) return;
+    label.classList.add("file-upload-field");
+    const syncHint = () => {
+      const files = input.multiple
+        ? Array.from(input.files || [])
+        : [input.files?.[0]].filter(Boolean);
+      let hint = label.querySelector(".file-upload-hint");
+      if (!hint) {
+        hint = document.createElement("span");
+        hint.className = "file-upload-hint mini-note";
+        hint.textContent = "Belum ada file dipilih";
+        input.insertAdjacentElement("afterend", hint);
+      }
+      hint.textContent = files.length
+        ? (files.length === 1 ? files[0].name : `${files.length} file dipilih`)
+        : "Belum ada file dipilih";
+      label.classList.toggle("has-file", files.length > 0);
+    };
+    input.addEventListener("change", syncHint);
+    syncHint();
+  });
+}
+
+function resetRoomFileInput(input) {
+  if (!input) return;
+  input.value = "";
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 async function ensurePaymentSettings() {
   if (roomPaymentSettings?.bankNumber || roomPaymentSettings?.bankName) return;
   const payload = await fetchJson("/api/config");
@@ -104,9 +138,10 @@ function buildPaymentSection(order) {
         </article>
       </div>
       <form id="voucher-standalone-payment-form" class="profile-form voucher-payment-proof-form">
-        <label>
+        <label class="file-upload-field">
           Upload bukti pembayaran
           <input type="file" id="voucher-standalone-payment-input" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
+          <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
         </label>
         <button type="submit" class="primary-btn">Kirim bukti pembayaran</button>
       </form>
@@ -136,6 +171,7 @@ function renderRoom(order) {
     document.querySelector("[data-voucher-scroll-payment]")?.addEventListener("click", () => {
       document.getElementById("voucher-payment-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+    bindRoomFileUploadFields(roomRoot);
     return;
   }
 
@@ -155,7 +191,10 @@ function renderRoom(order) {
       ${canChat ? `
         <form id="voucher-standalone-chat-form" class="profile-form voucher-chat-form">
           <label>Pesan<input type="text" id="voucher-standalone-chat-input" placeholder="Tulis pesan ke admin..." /></label>
-          <label>Lampiran<input type="file" id="voucher-standalone-chat-upload" accept="image/jpeg,image/png,image/webp" multiple /></label>
+          <label class="file-upload-field">Lampiran
+            <input type="file" id="voucher-standalone-chat-upload" accept="image/jpeg,image/png,image/webp" multiple />
+            <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
+          </label>
           <button type="submit" class="primary-btn">Kirim</button>
         </form>
       ` : `<p class="mini-note">Chat akan aktif setelah admin memproses pembayaran Anda.</p>`}
@@ -163,6 +202,7 @@ function renderRoom(order) {
   `;
   const box = document.getElementById("voucher-standalone-chat-box");
   if (box) box.scrollTop = box.scrollHeight;
+  bindRoomFileUploadFields(roomRoot);
 }
 
 async function submitPaymentProof(orderCode) {
@@ -182,8 +222,10 @@ async function submitPaymentProof(orderCode) {
 }
 
 async function submitChat(orderCode) {
-  const text = String(document.getElementById("voucher-standalone-chat-input")?.value || "").trim();
-  const files = Array.from(document.getElementById("voucher-standalone-chat-upload")?.files || []);
+  const textInput = document.getElementById("voucher-standalone-chat-input");
+  const chatUpload = document.getElementById("voucher-standalone-chat-upload");
+  const text = String(textInput?.value || "").trim();
+  const files = Array.from(chatUpload?.files || []);
   if (!text && !files.length) return;
   if (text) {
     await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}/messages`, {
@@ -201,9 +243,12 @@ async function submitChat(orderCode) {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.message || "Upload gagal.");
+    if (textInput) textInput.value = "";
+    resetRoomFileInput(chatUpload);
     renderRoom(payload.order);
     return;
   }
+  if (textInput) textInput.value = "";
   const payload = await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}`);
   renderRoom(payload.order);
 }

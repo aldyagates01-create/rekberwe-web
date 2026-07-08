@@ -11446,11 +11446,55 @@ body.admin-locked .admin-notif-floating {
 .voucher-product-body .mini-note {
   margin: 0;
   font-size: 0.76rem;
-  line-height: 1.3;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
   display: -webkit-box;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.voucher-multiline-text,
+.voucher-detail-description p {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+}
+
+body.workspace-voucher-active #workspace-rekber-fee-card {
+  display: none;
+}
+
+.file-upload-field {
+  display: grid;
+  gap: 8px;
+}
+
+.file-upload-field input[type="file"] {
+  width: 100%;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  cursor: pointer;
+}
+
+.file-upload-field.has-file input[type="file"] {
+  border-color: rgba(224, 178, 50, 0.55);
+  background: rgba(224, 178, 50, 0.08);
+}
+
+.file-upload-hint {
+  display: block;
+  margin: 0;
+}
+
+.voucher-chat-attach-btn.has-file {
+  border-color: rgba(224, 178, 50, 0.55);
+  color: #e0b232;
 }
 
 .voucher-product-price {

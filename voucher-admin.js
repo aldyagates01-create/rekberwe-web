@@ -24,6 +24,7 @@ const adminVoucherElements = {
   voucherPaymentBankHolder: document.getElementById("voucher-payment-bank-holder"),
   voucherPaymentQrisUrl: document.getElementById("voucher-payment-qris-url"),
   voucherPaymentInstructions: document.getElementById("voucher-payment-instructions"),
+  voucherPaymentTerms: document.getElementById("voucher-payment-terms"),
   manualForm: document.getElementById("admin-voucher-manual-form"),
   manualProductSelect: document.getElementById("admin-voucher-manual-product"),
   manualPreview: document.getElementById("admin-voucher-manual-preview"),
@@ -348,6 +349,41 @@ function renderAdminVoucherProducts() {
   `).join("") || "<p class='mini-note'>Belum ada produk katalog.</p>";
 }
 
+function bindAdminFileUploadFields(root = document) {
+  root.querySelectorAll('input[type="file"]').forEach((input) => {
+    if (input.dataset.uploadUiBound === "1") return;
+    input.dataset.uploadUiBound = "1";
+    const label = input.closest("label");
+    if (!label) return;
+    label.classList.add("file-upload-field");
+    let hint = label.querySelector(".file-upload-hint");
+    if (!hint) {
+      hint = document.createElement("span");
+      hint.className = "file-upload-hint mini-note";
+      hint.textContent = "Belum ada file dipilih";
+      input.insertAdjacentElement("afterend", hint);
+    }
+    const syncHint = () => {
+      const files = input.multiple
+        ? Array.from(input.files || [])
+        : [input.files?.[0]].filter(Boolean);
+      hint.textContent = files.length
+        ? (files.length === 1 ? files[0].name : `${files.length} file dipilih`)
+        : (input.dataset.emptyHint || "Belum ada file dipilih");
+      label.classList.toggle("has-file", files.length > 0);
+    };
+    input.addEventListener("change", syncHint);
+    syncHint();
+  });
+}
+
+function resetAdminFileUploadInput(input, emptyHint = "Belum ada file dipilih") {
+  if (!input) return;
+  input.dataset.emptyHint = emptyHint;
+  input.value = "";
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 function fillAdminVoucherProductForm(product = null) {
   if (!adminVoucherElements.productForm) return;
   adminVoucherState.editingProductId = product?.id || null;
@@ -366,6 +402,14 @@ function fillAdminVoucherProductForm(product = null) {
   adminVoucherElements.productForm.sortOrder.value = product?.sortOrder || 0;
   if (adminVoucherElements.productForm.requiresAccountLogin) {
     adminVoucherElements.productForm.requiresAccountLogin.checked = Boolean(product?.requiresAccountLogin);
+  }
+  const imageInput = adminVoucherElements.productForm.image;
+  if (imageInput) {
+    const imageName = product?.displayImage ? decodeURIComponent(String(product.displayImage).split("/").pop() || "") : "";
+    resetAdminFileUploadInput(
+      imageInput,
+      product?.displayImage ? `Foto saat ini: ${imageName || "tersimpan"} (pilih file baru untuk mengganti)` : "Belum ada file dipilih",
+    );
   }
 }
 
@@ -455,6 +499,7 @@ async function submitManualVoucherOrder(event) {
   if (proofFile) formData.append("paymentProof", proofFile);
   const payload = await uploadWithProgress("/api/admin/voucher/orders/manual", formData);
   form.reset();
+  resetAdminFileUploadInput(form.paymentProof);
   updateManualVoucherPreview();
   adminVoucherState.activeOrder = payload.order;
   await refreshAdminVoucherData();
@@ -629,12 +674,16 @@ function renderAdminVoucherOrderRoom() {
     <div class="voucher-chat-box" id="admin-voucher-chat-box">${(order.messages || []).map(renderAdminVoucherMessage).join("")}</div>
     <form id="admin-voucher-chat-form" class="profile-form">
       <label>Pesan admin<input type="text" id="admin-voucher-chat-input" /></label>
-      <label>Lampiran<input type="file" id="admin-voucher-chat-upload" accept="image/jpeg,image/png,image/webp" multiple /></label>
+      <label class="file-upload-field">Lampiran
+        <input type="file" id="admin-voucher-chat-upload" accept="image/jpeg,image/png,image/webp" multiple />
+        <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
+      </label>
       <button type="submit" class="primary-btn">Kirim ke pembeli</button>
     </form>
   `;
   const box = document.getElementById("admin-voucher-chat-box");
   if (box) box.scrollTop = box.scrollHeight;
+  bindAdminFileUploadFields(adminVoucherElements.orderRoom || document.getElementById("admin-voucher-order-room"));
 }
 
 async function openAdminVoucherOrder(orderCode) {
@@ -680,7 +729,9 @@ async function submitAdminVoucherChat(event) {
   const order = adminVoucherState.activeOrder;
   if (!order) return;
   const text = String(document.getElementById("admin-voucher-chat-input")?.value || "").trim();
-  const files = Array.from(document.getElementById("admin-voucher-chat-upload")?.files || []);
+  const chatUpload = document.getElementById("admin-voucher-chat-upload");
+  const files = Array.from(chatUpload?.files || []);
+  if (!text && !files.length) return;
   if (text) {
     await fetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/messages`, {
       method: "POST",
@@ -692,6 +743,8 @@ async function submitAdminVoucherChat(event) {
     files.forEach((file) => formData.append("chatFiles", file));
     await uploadWithProgress(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/uploads`, formData);
   }
+  document.getElementById("admin-voucher-chat-input").value = "";
+  resetAdminFileUploadInput(chatUpload);
   await openAdminVoucherOrder(order.orderCode);
 }
 
@@ -702,6 +755,7 @@ function renderAdminVoucherPaymentSettings(settings) {
   if (adminVoucherElements.voucherPaymentBankHolder) adminVoucherElements.voucherPaymentBankHolder.value = payment.bankHolder || "";
   if (adminVoucherElements.voucherPaymentQrisUrl) adminVoucherElements.voucherPaymentQrisUrl.value = payment.qrisUrl || "";
   if (adminVoucherElements.voucherPaymentInstructions) adminVoucherElements.voucherPaymentInstructions.value = payment.instructions || "";
+  if (adminVoucherElements.voucherPaymentTerms) adminVoucherElements.voucherPaymentTerms.value = payment.termsAndConditions || "";
 }
 
 async function deleteAdminVoucherOrder(orderCode) {
@@ -842,6 +896,8 @@ function handleAdminVoucherLiveEvent(payload) {
 window.RekberAdminVoucher = {
   init() {
     bindAdminVoucherEvents();
+    bindAdminFileUploadFields(adminVoucherElements.productForm || document);
+    bindAdminFileUploadFields(adminVoucherElements.manualForm || document);
     initVoucherReportDateInputs();
     loadCostCurrencyOptions("IDR").finally(() => {
       fillAdminVoucherProductForm();

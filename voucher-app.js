@@ -43,6 +43,73 @@ function voucherEscapeHtml(value) {
     .replaceAll("\"", "&quot;");
 }
 
+function voucherFormatMultiline(value, fallback = "") {
+  const text = String(value || "").trim() || fallback;
+  return voucherEscapeHtml(text).replace(/\r?\n/g, "<br>");
+}
+
+function bindFileUploadFields(root = document) {
+  root.querySelectorAll('input[type="file"]').forEach((input) => {
+    if (input.dataset.uploadUiBound === "1") return;
+    input.dataset.uploadUiBound = "1";
+    const label = input.closest("label");
+    if (!label) return;
+    label.classList.add("file-upload-field");
+    const attachLabel = label.querySelector(".voucher-chat-attach-label");
+    const syncHint = () => {
+      const files = input.multiple
+        ? Array.from(input.files || [])
+        : [input.files?.[0]].filter(Boolean);
+      if (attachLabel && input.hidden) {
+        attachLabel.textContent = files.length ? `${files.length} file` : "File";
+        label.classList.toggle("has-file", files.length > 0);
+        return;
+      }
+      let hint = label.querySelector(".file-upload-hint");
+      if (!hint) {
+        hint = document.createElement("span");
+        hint.className = "file-upload-hint mini-note";
+        hint.textContent = "Belum ada file dipilih";
+        input.insertAdjacentElement("afterend", hint);
+      }
+      hint.textContent = files.length
+        ? (files.length === 1 ? files[0].name : `${files.length} file dipilih`)
+        : (input.dataset.emptyHint || "Belum ada file dipilih");
+      label.classList.toggle("has-file", files.length > 0);
+    };
+    input.addEventListener("change", syncHint);
+    syncHint();
+  });
+}
+
+function resetFileUploadInput(input) {
+  if (!input) return;
+  input.value = "";
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function renderWorkspaceVoucherSidePanel() {
+  document.body.classList.add("workspace-voucher-active");
+  const termsHead = document.querySelector("#workspace-side-terms-box h4");
+  const termsList = document.getElementById("workspace-terms-list");
+  if (termsHead) termsHead.textContent = "Syarat dan ketentuan voucher / gametime";
+  const raw = String(voucherState.paymentSettings?.termsAndConditions || "").trim();
+  const items = raw.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+  if (termsList) {
+    termsList.innerHTML = items.length
+      ? items.map((item) => `<li>${voucherEscapeHtml(item)}</li>`).join("")
+      : "<li>Syarat voucher belum diatur admin.</li>";
+  }
+}
+
+function renderWorkspaceRekberSidePanel() {
+  document.body.classList.remove("workspace-voucher-active");
+  const termsHead = document.querySelector("#workspace-side-terms-box h4");
+  if (termsHead) termsHead.textContent = "Syarat dan ketentuan";
+  window.renderPublicFeeList?.();
+  window.renderTermsAndConditions?.();
+}
+
 function voucherFormatCurrency(value) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(value || 0));
 }
@@ -257,7 +324,11 @@ function setWorkspaceService(service) {
   if (isVoucher) {
     refreshVoucherData().catch((error) => {
       window.setAuthStatus?.(error.message || "Gagal memuat katalog voucher.", true);
+    }).finally(() => {
+      renderWorkspaceVoucherSidePanel();
     });
+  } else {
+    renderWorkspaceRekberSidePanel();
   }
 }
 
@@ -272,6 +343,9 @@ async function refreshVoucherData() {
   voucherState.paymentSettings = configPayload.voucherPayment || {};
   renderVoucherCatalog();
   renderVoucherOrdersSidebar();
+  if (document.body.classList.contains("workspace-voucher-active")) {
+    renderWorkspaceVoucherSidePanel();
+  }
   if (voucherState.activeOrder) {
     const latest = voucherState.orders.find((item) => item.orderCode === voucherState.activeOrder.orderCode);
     if (latest) {
@@ -320,7 +394,7 @@ function renderVoucherCatalog(options = {}) {
             <span class="${voucherReadyChipClass(ready)}">${voucherEscapeHtml(buildVoucherReadyLabel(ready))}</span>
           </div>
           <p class="voucher-product-price">${voucherFormatCurrency(product.price)}</p>
-          <p class="mini-note voucher-product-desc">${voucherEscapeHtml(product.description || "Produk digital RekberWE.id")}</p>
+          <p class="mini-note voucher-product-desc">${voucherFormatMultiline(product.description, "Produk digital RekberWE.id")}</p>
           <button type="button" class="primary-btn voucher-product-buy-btn" data-voucher-buy="${product.id}" ${disabled ? "disabled" : ""}>
             ${disabled ? voucherEscapeHtml(ready.label || "Belum Ready") : "Beli Sekarang"}
           </button>
@@ -415,7 +489,7 @@ function renderVoucherProductDetail() {
           <p class="voucher-product-price">${voucherFormatCurrency(product.price)} <span class="mini-note">/ pcs</span></p>
           <div class="voucher-detail-description">
             <h4>Keterangan produk</h4>
-            <p>${voucherEscapeHtml(product.description || "Produk digital RekberWE.id")}</p>
+            <p class="voucher-multiline-text">${voucherFormatMultiline(product.description, "Produk digital RekberWE.id")}</p>
           </div>
           ${product.requiresAccountLogin ? `<p class="mini-note voucher-login-note">Setelah pembayaran, Anda akan diminta mengisi email & password akun di ruang chat.</p>` : ""}
           <p class="mini-note voucher-ready-note">${voucherEscapeHtml(ready.scheduleLabel || "")}</p>
@@ -488,6 +562,7 @@ function renderVoucherCheckout(order) {
       showMessages: false,
     })}
   `;
+  bindFileUploadFields(voucherElements.checkoutView);
 }
 
 function buildVoucherPaymentBankMarkup(payment = {}) {
@@ -534,14 +609,15 @@ function buildVoucherAwaitingPaymentBody(order, options = {}) {
           <p><strong>${voucherEscapeHtml(order.product?.name || "-")}</strong></p>
           <p class="mini-note">${quantity} pcs × ${voucherFormatCurrency(unitPrice)}</p>
           <p class="voucher-product-price">Total: ${voucherFormatCurrency(order.price)}</p>
-          <p class="mini-note">${voucherEscapeHtml(order.product?.description || "")}</p>
+          <p class="mini-note voucher-multiline-text">${voucherFormatMultiline(order.product?.description || "")}</p>
         </article>
         ${buildVoucherPaymentBankMarkup(payment)}
       </div>
       <form id="${voucherEscapeHtml(formId)}" class="profile-form voucher-payment-proof-form">
-        <label>
+        <label class="file-upload-field">
           Upload bukti pembayaran
-          <input type="file" id="${voucherEscapeHtml(inputId)}" name="paymentProof" accept="image/jpeg,image/png,image/webp,application/pdf" required />
+          <input type="file" id="${voucherEscapeHtml(inputId)}" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
+          <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
         </label>
         <p class="mini-note">Setelah bukti terkirim, Anda akan masuk ke ruang chat untuk melengkapi data akun (jika diperlukan).</p>
         <div class="topbar-actions">
@@ -645,6 +721,7 @@ function renderVoucherChat() {
         ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
   }
+  bindFileUploadFields(voucherElements.chatView);
 }
 
 function buildVoucherChatMarkup(order, options = {}) {
@@ -703,21 +780,17 @@ function renderVoucherHistoryRoom(order) {
   voucherState.activeOrder = order;
   voucherState.historyRoomOrderCode = order.orderCode;
   if (order.status === "awaiting_payment") {
-    ensureVoucherPaymentSettings()
-      .then(() => {
-        container.innerHTML = buildVoucherAwaitingPaymentMarkup(order, {
-          formId: "voucher-history-payment-proof-form",
-          inputId: "voucher-history-payment-proof-input",
-          showMessages: true,
-        });
-      })
-      .catch(() => {
-        container.innerHTML = buildVoucherAwaitingPaymentMarkup(order, {
-          formId: "voucher-history-payment-proof-form",
-          inputId: "voucher-history-payment-proof-input",
-          showMessages: true,
-        });
+    const renderAwaiting = () => {
+      container.innerHTML = buildVoucherAwaitingPaymentMarkup(order, {
+        formId: "voucher-history-payment-proof-form",
+        inputId: "voucher-history-payment-proof-input",
+        showMessages: true,
       });
+      bindFileUploadFields(container);
+    };
+    ensureVoucherPaymentSettings()
+      .then(renderAwaiting)
+      .catch(renderAwaiting);
     return;
   }
   container.innerHTML = buildVoucherChatMarkup(order, {
@@ -735,6 +808,7 @@ function renderVoucherHistoryRoom(order) {
         ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
   }
+  bindFileUploadFields(container);
 }
 
 async function openVoucherOrderChat(orderCode) {
@@ -800,6 +874,7 @@ async function submitVoucherPaymentProof(event) {
   window.markUserVoucherOrderSeen?.(payload.order);
   window.refreshUserTransactionHistory?.();
   window.setAuthStatus?.("Bukti pembayaran terkirim. Lengkapi data akun di ruang chat jika diperlukan.");
+  resetFileUploadInput(fileInput);
 }
 
 function refreshActiveVoucherChatView() {
@@ -820,8 +895,10 @@ async function submitVoucherChatMessage(event, options = {}) {
   if (!order) return;
   const inputId = options.inputId || "voucher-chat-input";
   const uploadId = options.uploadId || "voucher-chat-upload";
-  const text = String(document.getElementById(inputId)?.value || "").trim();
-  const files = Array.from(document.getElementById(uploadId)?.files || []);
+  const textInput = document.getElementById(inputId);
+  const uploadInput = document.getElementById(uploadId);
+  const text = String(textInput?.value || "").trim();
+  const files = Array.from(uploadInput?.files || []);
   if (!text && !files.length) return;
   if (text) {
     await voucherFetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/messages`, {
@@ -844,6 +921,8 @@ async function submitVoucherChatMessage(event, options = {}) {
     const payload = await voucherFetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}`);
     voucherState.activeOrder = payload.order;
   }
+  if (textInput) textInput.value = "";
+  resetFileUploadInput(uploadInput);
   refreshActiveVoucherChatView();
   window.refreshUserTransactionHistory?.();
 }

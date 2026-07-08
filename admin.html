@@ -210,7 +210,10 @@
               <p class="mini-note">Isi nominal modal dan harga jual untuk melihat konversi IDR dan estimasi profit.</p>
             </div>
             <label>Harga jual (user, IDR)<input type="number" name="price" min="1" required /></label>
-            <label>Foto produk (JPG/PNG/WEBP)<input type="file" name="image" accept="image/jpeg,image/png,image/webp" /></label>
+            <label class="file-upload-field">Foto produk (JPG/PNG/WEBP)
+              <input type="file" name="image" accept="image/jpeg,image/png,image/webp" />
+              <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
+            </label>
             <label>Ready mode
               <select name="readyMode">
                 <option value="24h">Ready 24 Jam</option>
@@ -255,8 +258,9 @@
                 <option value="">Pilih produk dari katalog...</option>
               </select>
             </label>
-            <label>Upload bukti transfer
-              <input type="file" name="paymentProof" accept="image/jpeg,image/png,image/webp,application/pdf" />
+            <label class="file-upload-field">Upload bukti transfer
+              <input type="file" name="paymentProof" accept="image/jpeg,image/png,image/webp" />
+              <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
             </label>
             <div class="voucher-manual-preview" id="admin-voucher-manual-preview">
               <p class="mini-note">Pilih produk untuk melihat estimasi harga jual, modal, dan profit.</p>
@@ -324,6 +328,7 @@
             <label>Nama pemilik rekening<input type="text" id="voucher-payment-bank-holder" placeholder="Qhead Gold" /></label>
             <label>URL QRIS (opsional)<input type="url" id="voucher-payment-qris-url" placeholder="https://..." /></label>
             <label>Instruksi pembayaran<textarea id="voucher-payment-instructions" rows="4"></textarea></label>
+            <label>Syarat & ketentuan voucher / gametime<textarea id="voucher-payment-terms" rows="6" placeholder="Satu poin per baris. Tampil di panel kanan saat user memilih layanan voucher/gametime."></textarea></label>
           </div>
           <div class="settings-section-card">
             <h4>Pengaturan fee & kontak</h4>
