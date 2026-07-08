@@ -605,18 +605,18 @@ function renderVoucherProductDetail() {
             ${buildVoucherCountdownBadge(ready)}
             <img src="${voucherEscapeHtml(product.displayImage)}" alt="${voucherEscapeHtml(product.name)}" />
           </div>
+          <div class="voucher-detail-copy">
+            <p class="eyebrow">Detail produk</p>
+            <h3>${voucherEscapeHtml(product.name)}</h3>
+            <span class="${voucherReadyChipClass(ready)}">${voucherEscapeHtml(buildVoucherReadyLabel(ready))}</span>
+            <p class="voucher-product-price">${voucherFormatCurrency(product.price)} <span class="mini-note">/ pcs</span></p>
+            ${product.requiresAccountLogin ? `<p class="mini-note voucher-login-note">Setelah pembayaran, Anda akan diminta mengisi email & password akun di ruang chat.</p>` : ""}
+            <p class="mini-note voucher-ready-note">${voucherEscapeHtml(ready.scheduleLabel || "")}</p>
+          </div>
           <div class="voucher-detail-description">
             <h4>Keterangan produk</h4>
             <p class="voucher-multiline-text">${voucherFormatMultiline(product.description, "Produk digital RekberWE.id")}</p>
           </div>
-        </div>
-        <div class="voucher-detail-copy">
-          <p class="eyebrow">Detail produk</p>
-          <h3>${voucherEscapeHtml(product.name)}</h3>
-          <span class="${voucherReadyChipClass(ready)}">${voucherEscapeHtml(buildVoucherReadyLabel(ready))}</span>
-          <p class="voucher-product-price">${voucherFormatCurrency(product.price)} <span class="mini-note">/ pcs</span></p>
-          ${product.requiresAccountLogin ? `<p class="mini-note voucher-login-note">Setelah pembayaran, Anda akan diminta mengisi email & password akun di ruang chat.</p>` : ""}
-          <p class="mini-note voucher-ready-note">${voucherEscapeHtml(ready.scheduleLabel || "")}</p>
         </div>
       </div>
       <section class="voucher-detail-purchase card">
