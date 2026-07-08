@@ -410,13 +410,15 @@ function renderVoucherCatalog(options = {}) {
           ${buildVoucherCountdownBadge(ready)}
           <img src="${voucherEscapeHtml(product.displayImage)}" alt="${voucherEscapeHtml(product.name)}" loading="lazy" />
         </div>
+        <div class="voucher-product-desc-panel">
+          <p class="voucher-product-desc">${voucherFormatMultiline(product.description, "Produk digital RekberWE.id")}</p>
+        </div>
         <div class="voucher-product-body">
           <div class="voucher-product-head">
             <h4>${voucherEscapeHtml(product.name)}</h4>
             <span class="${voucherReadyChipClass(ready)}">${voucherEscapeHtml(buildVoucherReadyLabel(ready))}</span>
           </div>
           <p class="voucher-product-price">${voucherFormatCurrency(product.price)}</p>
-          <p class="mini-note voucher-product-desc">${voucherFormatMultiline(product.description, "Produk digital RekberWE.id")}</p>
           <button type="button" class="primary-btn voucher-product-buy-btn" data-voucher-buy="${product.id}" ${disabled ? "disabled" : ""}>
             ${disabled ? voucherEscapeHtml(ready.label || "Belum Ready") : "Beli Sekarang"}
           </button>
@@ -500,19 +502,21 @@ function renderVoucherProductDetail() {
     <div class="voucher-detail-layout">
       <button type="button" class="ghost-btn" data-voucher-screen="catalog">← Kembali ke katalog</button>
       <div class="voucher-detail-hero">
-        <div class="voucher-product-image-wrap voucher-detail-image">
-          ${buildVoucherCountdownBadge(ready)}
-          <img src="${voucherEscapeHtml(product.displayImage)}" alt="${voucherEscapeHtml(product.name)}" />
+        <div class="voucher-detail-media">
+          <div class="voucher-product-image-wrap voucher-detail-image">
+            ${buildVoucherCountdownBadge(ready)}
+            <img src="${voucherEscapeHtml(product.displayImage)}" alt="${voucherEscapeHtml(product.name)}" />
+          </div>
+          <div class="voucher-detail-description">
+            <h4>Keterangan produk</h4>
+            <p class="voucher-multiline-text">${voucherFormatMultiline(product.description, "Produk digital RekberWE.id")}</p>
+          </div>
         </div>
         <div class="voucher-detail-copy">
           <p class="eyebrow">Detail produk</p>
           <h3>${voucherEscapeHtml(product.name)}</h3>
           <span class="${voucherReadyChipClass(ready)}">${voucherEscapeHtml(buildVoucherReadyLabel(ready))}</span>
           <p class="voucher-product-price">${voucherFormatCurrency(product.price)} <span class="mini-note">/ pcs</span></p>
-          <div class="voucher-detail-description">
-            <h4>Keterangan produk</h4>
-            <p class="voucher-multiline-text">${voucherFormatMultiline(product.description, "Produk digital RekberWE.id")}</p>
-          </div>
           ${product.requiresAccountLogin ? `<p class="mini-note voucher-login-note">Setelah pembayaran, Anda akan diminta mengisi email & password akun di ruang chat.</p>` : ""}
           <p class="mini-note voucher-ready-note">${voucherEscapeHtml(ready.scheduleLabel || "")}</p>
         </div>

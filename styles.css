@@ -11065,28 +11065,41 @@ body.admin-locked .admin-notif-floating {
 
 .voucher-detail-hero {
   display: grid;
-  gap: 18px;
+  gap: 16px;
+}
+
+.voucher-detail-media {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
 }
 
 .voucher-detail-image {
   border-radius: 20px;
   overflow: hidden;
+  width: 100%;
 }
 
 .voucher-detail-copy {
   display: grid;
   gap: 10px;
+  width: 100%;
+  max-width: 360px;
 }
 
 .voucher-detail-description {
-  padding: 14px 16px;
-  border-radius: 16px;
+  padding: 10px 12px;
+  border-radius: 14px;
   border: 1px solid rgba(143, 164, 205, 0.14);
   background: rgba(255, 255, 255, 0.03);
 }
 
 .voucher-detail-description h4 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b8c7df;
 }
 
 .voucher-detail-purchase {
@@ -11312,8 +11325,14 @@ body.admin-locked .admin-notif-floating {
 
 @media (min-width: 769px) {
   .voucher-detail-hero {
-    grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
     align-items: start;
+    gap: 20px;
+  }
+
+  .voucher-detail-media,
+  .voucher-detail-copy {
+    max-width: 360px;
   }
 }
 
@@ -11442,24 +11461,34 @@ body.admin-locked .admin-notif-floating {
   flex-shrink: 0;
 }
 
+.voucher-product-desc-panel {
+  padding: 8px 12px 0;
+}
+
 .voucher-product-desc,
 .voucher-product-body .mini-note {
   margin: 0;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  max-width: 100%;
 }
 
 .voucher-multiline-text,
 .voucher-detail-description p {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.55;
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 
 .voucher-multiline-text a,
@@ -11960,10 +11989,14 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
     font-size: 0.88rem;
   }
 
+  .voucher-product-desc-panel {
+    padding: 6px 10px 0;
+  }
+
   .voucher-product-desc,
   .voucher-product-body .mini-note {
-    font-size: 0.72rem;
-    -webkit-line-clamp: 2;
+    font-size: 0.68rem;
+    -webkit-line-clamp: 3;
   }
 
   .voucher-product-buy-btn {
