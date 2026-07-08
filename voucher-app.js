@@ -110,6 +110,87 @@ function resetFileUploadInput(input) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+function mergeVoucherOrderPreservingMessages(current, incoming) {
+  if (!incoming) return current;
+  if (!current || current.orderCode !== incoming.orderCode) return incoming;
+  const currentMessages = Array.isArray(current.messages) ? current.messages : [];
+  const incomingMessages = Array.isArray(incoming.messages) ? incoming.messages : [];
+  return {
+    ...incoming,
+    messages: incomingMessages.length >= currentMessages.length ? incomingMessages : currentMessages,
+  };
+}
+
+function voucherUploadWithProgress(url, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url, true);
+    xhr.withCredentials = true;
+    xhr.responseType = "text";
+    xhr.upload.addEventListener("progress", (event) => {
+      if (!event.lengthComputable) return;
+      const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      onProgress?.(percent);
+    });
+    xhr.addEventListener("load", () => {
+      let payload = {};
+      try {
+        payload = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+      } catch {
+        payload = {};
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100);
+        resolve(payload);
+        return;
+      }
+      reject(new Error(payload.message || "Upload bukti gagal."));
+    });
+    xhr.addEventListener("error", () => reject(new Error("Koneksi upload terputus.")));
+    xhr.addEventListener("abort", () => reject(new Error("Upload dibatalkan.")));
+    xhr.send(formData);
+  });
+}
+
+function setVoucherPaymentUploadProgress(container, message, percent = 0, state = "uploading", detail = "Menyiapkan file...") {
+  if (!container) return;
+  const normalized = Math.max(0, Math.min(100, Math.round(percent)));
+  container.classList.remove("hidden", "upload-progress-done", "upload-progress-error");
+  if (state === "done") container.classList.add("upload-progress-done");
+  if (state === "error") container.classList.add("upload-progress-error");
+  const label = container.querySelector(".voucher-payment-upload-label");
+  const value = container.querySelector(".voucher-payment-upload-value");
+  const detailEl = container.querySelector(".voucher-payment-upload-detail");
+  const bar = container.querySelector(".voucher-payment-upload-bar");
+  if (label) label.innerHTML = `<span class="upload-spinner"></span>${voucherEscapeHtml(message)}`;
+  if (value) value.textContent = `${normalized}%`;
+  if (detailEl) detailEl.textContent = detail;
+  if (bar) bar.style.width = `${normalized}%`;
+}
+
+function hideVoucherPaymentUploadProgress(container) {
+  if (!container) return;
+  container.classList.add("hidden");
+  container.classList.remove("upload-progress-done", "upload-progress-error");
+  const bar = container.querySelector(".voucher-payment-upload-bar");
+  if (bar) bar.style.width = "0%";
+}
+
+function buildVoucherPaymentUploadProgressMarkup() {
+  return `
+    <div class="upload-progress hidden voucher-payment-upload-progress" aria-live="polite">
+      <div class="upload-progress-top">
+        <strong class="voucher-payment-upload-label"><span class="upload-spinner"></span>Sedang upload bukti...</strong>
+        <span class="voucher-payment-upload-value">0%</span>
+      </div>
+      <p class="upload-progress-detail voucher-payment-upload-detail">Menyiapkan file...</p>
+      <div class="upload-progress-track">
+        <span class="voucher-payment-upload-bar"></span>
+      </div>
+    </div>
+  `;
+}
+
 function renderWorkspaceVoucherSidePanel() {
   document.body.classList.add("workspace-voucher-active");
   const termsHead = document.querySelector("#workspace-side-terms-box h4");
@@ -371,8 +452,8 @@ async function refreshVoucherData() {
   if (voucherState.activeOrder) {
     const latest = voucherState.orders.find((item) => item.orderCode === voucherState.activeOrder.orderCode);
     if (latest) {
-      voucherState.activeOrder = latest;
-      renderVoucherChat();
+      voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder, latest);
+      if (voucherState.screen === "chat") renderVoucherChat();
     }
   }
 }
@@ -645,10 +726,11 @@ function buildVoucherAwaitingPaymentBody(order, options = {}) {
           <input type="file" id="${voucherEscapeHtml(inputId)}" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
           <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
         </label>
+        ${buildVoucherPaymentUploadProgressMarkup()}
         <p class="mini-note">Setelah bukti terkirim, Anda akan masuk ke ruang chat untuk melengkapi data akun (jika diperlukan).</p>
         <div class="topbar-actions">
           ${showBackButton ? `<button type="button" class="ghost-btn" data-voucher-screen="catalog">Kembali ke katalog</button>` : ""}
-          <button type="submit" class="primary-btn">Kirim bukti pembayaran</button>
+          <button type="submit" class="primary-btn voucher-payment-submit-btn">Kirim bukti pembayaran</button>
         </div>
       </form>
     </div>
@@ -714,7 +796,7 @@ function renderVoucherMessageItem(message) {
   const isAdmin = message.senderRole === "admin";
   const attachment = message.attachmentUrl
     ? (String(message.attachmentType || "").startsWith("image/")
-      ? `<a href="${voucherEscapeHtml(message.attachmentUrl)}" target="_blank" rel="noreferrer"><img class="voucher-chat-image" src="${voucherEscapeHtml(message.attachmentUrl)}" alt="${voucherEscapeHtml(message.attachmentName || "Lampiran")}" /></a>`
+      ? `<a href="${voucherEscapeHtml(message.attachmentUrl)}" target="_blank" rel="noreferrer"><img class="voucher-chat-image" src="${voucherEscapeHtml(message.attachmentUrl)}" alt="${voucherEscapeHtml(message.attachmentName || "Lampiran")}" loading="eager" decoding="async" /></a>`
       : `<a href="${voucherEscapeHtml(message.attachmentUrl)}" target="_blank" rel="noreferrer">${voucherEscapeHtml(message.attachmentName || "Lihat lampiran")}</a>`)
     : "";
   return `
@@ -876,31 +958,59 @@ async function submitVoucherPaymentProof(event) {
   event.preventDefault();
   const form = event.target;
   const fileInput = form.querySelector('input[type="file"]');
+  const submitBtn = form.querySelector(".voucher-payment-submit-btn, button[type='submit']");
+  const progressEl = form.querySelector(".voucher-payment-upload-progress");
   const file = fileInput?.files?.[0];
   if (!file || !voucherState.activeOrder) return;
+  const orderCode = voucherState.activeOrder.orderCode;
   const formData = new FormData();
   formData.append("paymentProof", file);
-  const response = await fetch(`/api/voucher/orders/${encodeURIComponent(voucherState.activeOrder.orderCode)}/payment-proof`, {
-    method: "POST",
-    credentials: "same-origin",
-    body: formData,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.message || "Upload bukti gagal.");
-  voucherState.activeOrder = payload.order;
-  await refreshVoucherData();
-  const inHistoryRoom = voucherState.historyRoomOrderCode === payload.order.orderCode;
-  if (inHistoryRoom) {
-    refreshActiveVoucherChatView();
-    window.syncHistoryVoucherOrder?.(payload.order);
-  } else {
-    renderVoucherChat();
-    openVoucherScreen("chat");
+
+  if (submitBtn) submitBtn.disabled = true;
+  setVoucherPaymentUploadProgress(progressEl, "Mengupload bukti pembayaran...", 0, "uploading", file.name);
+
+  try {
+    const payload = await voucherUploadWithProgress(
+      `/api/voucher/orders/${encodeURIComponent(orderCode)}/payment-proof`,
+      formData,
+      (percent) => {
+        setVoucherPaymentUploadProgress(
+          progressEl,
+          "Mengupload bukti pembayaran...",
+          percent,
+          "uploading",
+          `${file.name} • ${percent}%`,
+        );
+      },
+    );
+    if (!payload.order) throw new Error("Upload bukti gagal.");
+    setVoucherPaymentUploadProgress(progressEl, "Bukti pembayaran terkirim.", 100, "done", "Membuka ruang chat...");
+    voucherState.activeOrder = payload.order;
+    const index = voucherState.orders.findIndex((item) => item.orderCode === payload.order.orderCode);
+    if (index >= 0) voucherState.orders[index] = payload.order;
+    else voucherState.orders.unshift(payload.order);
+
+    const inHistoryRoom = voucherState.historyRoomOrderCode === payload.order.orderCode;
+    if (inHistoryRoom) {
+      refreshActiveVoucherChatView();
+      window.syncHistoryVoucherOrder?.(payload.order);
+    } else {
+      renderVoucherChat();
+      openVoucherScreen("chat");
+    }
+    renderVoucherOrdersSidebar();
+    window.markUserVoucherOrderSeen?.(payload.order);
+    window.refreshUserTransactionHistory?.();
+    window.setAuthStatus?.("Bukti pembayaran terkirim. Lengkapi data akun di ruang chat jika diperlukan.");
+    resetFileUploadInput(fileInput);
+    refreshVoucherData().catch(() => {});
+  } catch (error) {
+    setVoucherPaymentUploadProgress(progressEl, error.message || "Upload bukti gagal.", 100, "error", "Silakan coba lagi.");
+    throw error;
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+    window.setTimeout(() => hideVoucherPaymentUploadProgress(progressEl), 2800);
   }
-  window.markUserVoucherOrderSeen?.(payload.order);
-  window.refreshUserTransactionHistory?.();
-  window.setAuthStatus?.("Bukti pembayaran terkirim. Lengkapi data akun di ruang chat jika diperlukan.");
-  resetFileUploadInput(fileInput);
 }
 
 function refreshActiveVoucherChatView() {
@@ -1150,7 +1260,7 @@ function handleVoucherLiveEvent(payload) {
   if (index >= 0) voucherState.orders[index] = payload.order;
   else voucherState.orders.unshift(payload.order);
   if (voucherState.activeOrder?.orderCode === payload.order.orderCode) {
-    voucherState.activeOrder = payload.order;
+    voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder, payload.order);
     refreshActiveVoucherChatView();
   }
   renderVoucherOrdersSidebar();

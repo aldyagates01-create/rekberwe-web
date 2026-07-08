@@ -162,12 +162,12 @@ export function registerVoucherRoutes(app, {
       return;
     }
     const stored = await persistUploadFile(file, code, req.session.user.id, { sensitive: true });
-    const updated = await updateVoucherOrderFields(code, {
+    await updateVoucherOrderFields(code, {
       status: "awaiting_confirmation",
       paymentProofUrl: stored.fileUrl,
       paymentProofName: file.originalname,
     });
-    await addVoucherOrderMessage(
+    const latest = await addVoucherOrderMessage(
       code,
       req.session.user.id,
       req.session.user.displayName,
@@ -179,8 +179,8 @@ export function registerVoucherRoutes(app, {
         attachmentType: file.mimetype,
       },
     );
-    await broadcastEvent("voucher_order_updated", code, { order: updated });
-    respondWithVoucherOrder(res, req, updated);
+    await broadcastEvent("voucher_order_updated", code, { order: latest });
+    respondWithVoucherOrder(res, req, latest);
   });
 
   app.post("/api/voucher/orders/:code/accounts", requireAuth, async (req, res) => {

@@ -84,6 +84,60 @@ function resetRoomFileInput(input) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+function roomUploadWithProgress(url, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url, true);
+    xhr.withCredentials = true;
+    xhr.responseType = "text";
+    xhr.upload.addEventListener("progress", (event) => {
+      if (!event.lengthComputable) return;
+      const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      onProgress?.(percent);
+    });
+    xhr.addEventListener("load", () => {
+      let payload = {};
+      try {
+        payload = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+      } catch {
+        payload = {};
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100);
+        resolve(payload);
+        return;
+      }
+      reject(new Error(payload.message || "Upload bukti gagal."));
+    });
+    xhr.addEventListener("error", () => reject(new Error("Koneksi upload terputus.")));
+    xhr.send(formData);
+  });
+}
+
+function setRoomPaymentUploadProgress(container, message, percent = 0, state = "uploading", detail = "Menyiapkan file...") {
+  if (!container) return;
+  const normalized = Math.max(0, Math.min(100, Math.round(percent)));
+  container.classList.remove("hidden", "upload-progress-done", "upload-progress-error");
+  if (state === "done") container.classList.add("upload-progress-done");
+  if (state === "error") container.classList.add("upload-progress-error");
+  const label = container.querySelector(".voucher-payment-upload-label");
+  const value = container.querySelector(".voucher-payment-upload-value");
+  const detailEl = container.querySelector(".voucher-payment-upload-detail");
+  const bar = container.querySelector(".voucher-payment-upload-bar");
+  if (label) label.innerHTML = `<span class="upload-spinner"></span>${escapeHtml(message)}`;
+  if (value) value.textContent = `${normalized}%`;
+  if (detailEl) detailEl.textContent = detail;
+  if (bar) bar.style.width = `${normalized}%`;
+}
+
+function hideRoomPaymentUploadProgress(container) {
+  if (!container) return;
+  container.classList.add("hidden");
+  container.classList.remove("upload-progress-done", "upload-progress-error");
+  const bar = container.querySelector(".voucher-payment-upload-bar");
+  if (bar) bar.style.width = "0%";
+}
+
 async function ensurePaymentSettings() {
   if (roomPaymentSettings?.bankNumber || roomPaymentSettings?.bankName) return;
   const payload = await fetchJson("/api/config");
@@ -94,7 +148,7 @@ function renderMessage(message) {
   const isAdmin = message.senderRole === "admin";
   const attachment = message.attachmentUrl
     ? (String(message.attachmentType || "").startsWith("image/")
-      ? `<a href="${escapeHtml(message.attachmentUrl)}" target="_blank" rel="noreferrer"><img class="voucher-chat-image" src="${escapeHtml(message.attachmentUrl)}" alt="" /></a>`
+      ? `<a href="${escapeHtml(message.attachmentUrl)}" target="_blank" rel="noreferrer"><img class="voucher-chat-image" src="${escapeHtml(message.attachmentUrl)}" alt="" loading="eager" decoding="async" /></a>`
       : `<a href="${escapeHtml(message.attachmentUrl)}" target="_blank" rel="noreferrer">${escapeHtml(message.attachmentName || "Lampiran")}</a>`)
     : "";
   return `
@@ -143,7 +197,17 @@ function buildPaymentSection(order) {
           <input type="file" id="voucher-standalone-payment-input" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
           <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
         </label>
-        <button type="submit" class="primary-btn">Kirim bukti pembayaran</button>
+        <div class="upload-progress hidden voucher-payment-upload-progress" aria-live="polite">
+          <div class="upload-progress-top">
+            <strong class="voucher-payment-upload-label"><span class="upload-spinner"></span>Sedang upload bukti...</strong>
+            <span class="voucher-payment-upload-value">0%</span>
+          </div>
+          <p class="upload-progress-detail voucher-payment-upload-detail">Menyiapkan file...</p>
+          <div class="upload-progress-track">
+            <span class="voucher-payment-upload-bar"></span>
+          </div>
+        </div>
+        <button type="submit" class="primary-btn voucher-payment-submit-btn">Kirim bukti pembayaran</button>
       </form>
     </div>
   `;
@@ -206,19 +270,43 @@ function renderRoom(order) {
 }
 
 async function submitPaymentProof(orderCode) {
+  const form = document.getElementById("voucher-standalone-payment-form");
   const fileInput = document.getElementById("voucher-standalone-payment-input");
+  const submitBtn = form?.querySelector(".voucher-payment-submit-btn, button[type='submit']");
+  const progressEl = form?.querySelector(".voucher-payment-upload-progress");
   const file = fileInput?.files?.[0];
   if (!file) throw new Error("Bukti pembayaran wajib diupload.");
   const formData = new FormData();
   formData.append("paymentProof", file);
-  const response = await fetch(`/api/voucher/orders/${encodeURIComponent(orderCode)}/payment-proof`, {
-    method: "POST",
-    credentials: "same-origin",
-    body: formData,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.message || "Upload bukti gagal.");
-  renderRoom(payload.order);
+
+  if (submitBtn) submitBtn.disabled = true;
+  setRoomPaymentUploadProgress(progressEl, "Mengupload bukti pembayaran...", 0, "uploading", file.name);
+
+  try {
+    const payload = await roomUploadWithProgress(
+      `/api/voucher/orders/${encodeURIComponent(orderCode)}/payment-proof`,
+      formData,
+      (percent) => {
+        setRoomPaymentUploadProgress(
+          progressEl,
+          "Mengupload bukti pembayaran...",
+          percent,
+          "uploading",
+          `${file.name} • ${percent}%`,
+        );
+      },
+    );
+    if (!payload.order) throw new Error("Upload bukti gagal.");
+    setRoomPaymentUploadProgress(progressEl, "Bukti pembayaran terkirim.", 100, "done", "Membuka ruang chat...");
+    resetRoomFileInput(fileInput);
+    renderRoom(payload.order);
+  } catch (error) {
+    setRoomPaymentUploadProgress(progressEl, error.message || "Upload bukti gagal.", 100, "error", "Silakan coba lagi.");
+    throw error;
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+    window.setTimeout(() => hideRoomPaymentUploadProgress(progressEl), 2800);
+  }
 }
 
 async function submitChat(orderCode) {

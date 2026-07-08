@@ -11544,6 +11544,11 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   color: #e0b232;
 }
 
+.voucher-payment-proof-form .upload-progress,
+.voucher-payment-upload-progress {
+  margin-top: 6px;
+}
+
 .voucher-product-price {
   font-size: 0.98rem;
   font-weight: 800;
