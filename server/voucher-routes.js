@@ -233,10 +233,11 @@ export function registerVoucherRoutes(app, {
       return;
     }
     const senderRole = req.session.user.isAdmin ? "admin" : "user";
+    const senderName = senderRole === "admin" ? "Rekberwe.id" : req.session.user.displayName;
     const updated = await addVoucherOrderMessage(
       code,
       req.session.user.id,
-      req.session.user.displayName,
+      senderName,
       senderRole,
       text,
     );
@@ -259,12 +260,13 @@ export function registerVoucherRoutes(app, {
     }
     let updated = order;
     const senderRole = req.session.user.isAdmin ? "admin" : "user";
+    const senderName = senderRole === "admin" ? "Rekberwe.id" : req.session.user.displayName;
     for (const file of files) {
       const stored = await persistUploadFile(file, code, req.session.user.id, { sensitive: true });
       updated = await addVoucherOrderMessage(
         code,
         req.session.user.id,
-        req.session.user.displayName,
+        senderName,
         senderRole,
         file.originalname,
         {
@@ -353,7 +355,7 @@ export function registerVoucherRoutes(app, {
       updated = await addVoucherOrderMessage(
         code,
         req.session.user.id,
-        req.session.user.displayName,
+        req.session.user.isAdmin ? "Rekberwe.id" : req.session.user.displayName,
         req.session.user.isAdmin ? "admin" : "user",
         actionLabel,
       );
@@ -500,7 +502,7 @@ export function registerVoucherRoutes(app, {
         order = await addVoucherOrderMessage(
           order.orderCode,
           req.session.user.id,
-          req.session.user.displayName,
+          "Rekberwe.id",
           "admin",
           "Bukti transfer order manual diunggah admin.",
           {
