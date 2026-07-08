@@ -560,6 +560,23 @@ function openVoucherScreen(screen) {
   voucherElements.checkoutView?.classList.toggle("hidden", screen !== "checkout");
   voucherElements.ordersView?.classList.toggle("hidden", screen !== "orders");
   voucherElements.chatView?.classList.toggle("hidden", screen !== "chat");
+  const panel = document.getElementById("workspace-voucher-panel");
+  if (panel) {
+    panel.dataset.voucherScreen = screen;
+    ["catalog", "detail", "checkout", "orders", "chat"].forEach((name) => {
+      panel.classList.toggle(`is-voucher-screen-${name}`, screen === name);
+    });
+  }
+  if (screen === "detail" || screen === "checkout" || screen === "orders") {
+    window.requestAnimationFrame(() => {
+      const activeView = {
+        detail: voucherElements.detailView,
+        checkout: voucherElements.checkoutView,
+        orders: voucherElements.ordersView,
+      }[screen];
+      activeView?.scrollTo?.({ top: 0, behavior: "auto" });
+    });
+  }
 }
 
 function openVoucherProductDetail(productId) {

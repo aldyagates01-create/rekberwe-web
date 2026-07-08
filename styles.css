@@ -7459,14 +7459,32 @@ textarea.field-invalid {
     flex-direction: column !important;
     flex: 1;
     min-height: 0;
-    padding: 12px 14px 14px !important;
-    max-height: calc(100dvh - 118px);
+    padding: 12px 14px calc(12px + var(--mobile-nav-clearance, 92px)) !important;
+    max-height: calc(100dvh - 118px - var(--mobile-nav-clearance, 92px));
     scroll-margin-top: 0;
     overflow: hidden;
   }
 
-  #workspace-dashboard-view.mobile-create-open #workspace-voucher-panel:not(.hidden),
+  #workspace-dashboard-view.mobile-create-open #workspace-voucher-panel:not(.hidden) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   #workspace-dashboard-view.mobile-create-open #voucher-catalog-view:not(.hidden),
+  #workspace-dashboard-view.mobile-create-open #voucher-detail-view:not(.hidden),
+  #workspace-dashboard-view.mobile-create-open #voucher-checkout-view:not(.hidden),
+  #workspace-dashboard-view.mobile-create-open #voucher-orders-view:not(.hidden),
+  #workspace-dashboard-view.mobile-create-open #voucher-chat-view:not(.hidden) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   #workspace-dashboard-view.mobile-create-open .voucher-catalog-shell {
     flex: 1;
     min-height: 0;
@@ -7508,7 +7526,7 @@ textarea.field-invalid {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding-right: 2px;
-    padding-bottom: 4px;
+    padding-bottom: calc(8px + var(--mobile-nav-clearance, 92px));
   }
 
   #workspace-dashboard-view.mobile-create-open .workspace-service-picker {
@@ -11906,6 +11924,10 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
 }
 
 @media (max-width: 768px) {
+  :root {
+    --mobile-nav-clearance: calc(92px + env(safe-area-inset-bottom));
+  }
+
   .workspace-service-picker {
     grid-template-columns: 1fr;
   }
@@ -12024,12 +12046,95 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
     justify-self: stretch;
   }
 
+  .voucher-catalog-scroll {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(8px + var(--mobile-nav-clearance, 92px));
+  }
+
+  #voucher-detail-view:not(.hidden),
+  #voucher-checkout-view:not(.hidden),
+  #voucher-orders-view:not(.hidden) {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-bottom: calc(12px + var(--mobile-nav-clearance, 92px));
+  }
+
+  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-layout {
+    gap: 12px;
+  }
+
+  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-purchase {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    margin-top: 4px;
+    border-color: rgba(143, 164, 205, 0.24);
+    background: rgba(10, 16, 30, 0.97);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 -14px 30px rgba(2, 8, 23, 0.38);
+  }
+
+  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-purchase .primary-btn {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  #workspace-voucher-panel.is-voucher-screen-checkout .voucher-payment-section {
+    gap: 12px;
+  }
+
+  #workspace-voucher-panel.is-voucher-screen-checkout .voucher-payment-proof-form {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    padding: 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(143, 164, 205, 0.18);
+    background: rgba(10, 16, 30, 0.97);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 -14px 30px rgba(2, 8, 23, 0.38);
+  }
+
+  #workspace-voucher-panel.is-voucher-screen-checkout .voucher-payment-proof-form .primary-btn {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  #workspace-dashboard-view.mobile-create-open #workspace-rekber-panel:not(.hidden) {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(12px + var(--mobile-nav-clearance, 92px));
+  }
+
+  #workspace-dashboard-view.mobile-create-open #workspace-transaction-form .submit-btn {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin-top: 8px;
+  }
+
   #voucher-chat-view:not(.hidden) .voucher-chat-layout {
+    padding-bottom: calc(8px + var(--mobile-nav-clearance, 92px));
+  }
+
+  #voucher-chat-view:not(.hidden) {
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   #voucher-chat-view:not(.hidden) .voucher-chat-box {
@@ -12049,8 +12154,12 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
 
   #voucher-chat-view:not(.hidden) .voucher-chat-compose {
     flex-shrink: 0;
-    padding: 6px 8px;
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     gap: 5px;
+    background: linear-gradient(180deg, rgba(11, 17, 30, 0), rgba(11, 17, 30, 0.96) 28%);
   }
 
   #voucher-chat-view:not(.hidden) .voucher-chat-attach-btn {
