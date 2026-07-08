@@ -11,6 +11,7 @@ import {
   buildTransactionCreatedEmail,
   buildVoucherAccountRevisionEmail,
   buildVoucherOrderCompletedEmail,
+  buildVoucherOrderProcessingEmail,
   buildVoucherVerificationCodeEmail,
 } from "./templates.ts";
 
@@ -310,6 +311,26 @@ export async function sendTestEmail(to: string) {
     subject: message.subject,
     html: message.html,
     event: "test_email",
+  });
+}
+
+export async function sendVoucherOrderProcessingEmail(order: EmailVoucherOrderLike, baseUrl?: string) {
+  const recipient = resolveRecipient(order.user);
+  if (!recipient) {
+    logEmailResult("-", "voucher_order_processing", "skipped", "missing_user_email");
+    return;
+  }
+  const payload = buildVoucherOrderPayload(order);
+  const message = buildVoucherOrderProcessingEmail(
+    recipient.name,
+    payload,
+    buildVoucherOrderUrl(baseUrl || "", payload.code),
+  );
+  await sendEmail({
+    to: recipient.email,
+    subject: message.subject,
+    html: message.html,
+    event: "voucher_order_processing",
   });
 }
 

@@ -890,6 +890,7 @@ function renderVoucherChat() {
 function buildVoucherChatMarkup(order, options = {}) {
   const canChat = ["awaiting_confirmation", "processing", "needs_verification", "dispute"].includes(order.status);
   const canCancel = ["awaiting_payment", "awaiting_confirmation", "processing"].includes(order.status);
+  const canDispute = ["processing", "needs_verification", "completed"].includes(order.status);
   const showAccountForms = shouldShowVoucherAccountForm(order) && canChat;
   const chatBoxId = options.chatBoxId || "voucher-chat-box";
   const formId = options.formId || "voucher-chat-form";
@@ -931,12 +932,19 @@ function buildVoucherChatMarkup(order, options = {}) {
         </form>
         <div class="voucher-chat-actions">
           ${canCancel ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-voucher-cancel="${voucherEscapeHtml(order.orderCode)}">Batalkan</button>` : ""}
-          ${["processing", "needs_verification", "completed"].includes(order.status)
-    ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-voucher-dispute="${voucherEscapeHtml(order.orderCode)}">Sengketa</button>`
-    : ""}
+          ${canDispute ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-voucher-dispute="${voucherEscapeHtml(order.orderCode)}">Ajukan Sengketa</button>` : ""}
         </div>
       </div>
-    ` : `<p class="mini-note voucher-chat-waiting">Chat akan aktif setelah admin memproses pembayaran Anda.</p>`}
+    ` : `
+      <div class="voucher-chat-compose voucher-chat-completed-actions">
+        ${order.status === "completed" ? `
+          <p class="mini-note">Order sudah selesai. Jika ada masalah pada akun, ajukan sengketa untuk membuka kembali chat dengan admin.</p>
+          <div class="voucher-chat-actions">
+            <button type="button" class="primary-btn voucher-chat-action-btn" data-voucher-dispute="${voucherEscapeHtml(order.orderCode)}">Ajukan Sengketa</button>
+          </div>
+        ` : `<p class="mini-note voucher-chat-waiting">Chat akan aktif setelah admin memproses pembayaran Anda.</p>`}
+      </div>
+    `}
     </section>
   `;
 }
@@ -1152,10 +1160,30 @@ async function runVoucherOrderAction(orderCode, action) {
   });
   voucherState.activeOrder = payload.order;
   await refreshVoucherData();
-  refreshActiveVoucherChatView();
+
+  if (action === "dispute") {
+    const historyRoom = document.getElementById("voucher-history-room");
+    const inHistoryRoom = voucherState.historyRoomOrderCode === orderCode
+      && historyRoom
+      && !historyRoom.classList.contains("hidden");
+    if (inHistoryRoom) {
+      renderVoucherHistoryRoom(payload.order);
+      window.syncHistoryVoucherOrder?.(payload.order);
+    } else {
+      renderVoucherChat();
+      openVoucherScreen("chat");
+    }
+  } else {
+    refreshActiveVoucherChatView();
+  }
+
   if (voucherState.screen === "orders") renderVoucherOrdersPage();
   window.refreshUserTransactionHistory?.();
-  window.setAuthStatus?.(`Status order diperbarui: ${payload.statusLabel || payload.order.status}`);
+  window.setAuthStatus?.(
+    action === "dispute"
+      ? "Sengketa diajukan. Chat dengan admin sudah dibuka kembali."
+      : `Status order diperbarui: ${payload.statusLabel || payload.order.status}`,
+  );
 }
 
 function bindVoucherEvents() {

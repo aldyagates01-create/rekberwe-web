@@ -34,6 +34,7 @@ import {
   dispatchEmail,
   sendVoucherAccountRevisionEmail,
   sendVoucherOrderCompletedEmail,
+  sendVoucherOrderProcessingEmail,
   sendVoucherVerificationRequestEmail,
 } from "../lib/email/sendEmail.ts";
 
@@ -321,6 +322,8 @@ export function registerVoucherRoutes(app, {
         }
         nextStatus = "dispute";
         patch.disputeReason = note;
+        // Keluarkan dari laporan profit sampai admin menyelesaikan ulang.
+        patch.completedAt = null;
         break;
       case "cancel":
         if (!note && !req.session.user.isAdmin) {
@@ -356,7 +359,9 @@ export function registerVoucherRoutes(app, {
       );
     }
     const baseUrl = typeof getRequestBaseUrl === "function" ? getRequestBaseUrl(req) : "";
-    if (action === "needs_verification") {
+    if (action === "process" && order.status === "awaiting_confirmation") {
+      dispatchEmail(() => sendVoucherOrderProcessingEmail(updated, baseUrl));
+    } else if (action === "needs_verification") {
       dispatchEmail(() => sendVoucherVerificationRequestEmail(updated, baseUrl));
     } else if (action === "request_account_revision") {
       dispatchEmail(() => sendVoucherAccountRevisionEmail(updated, baseUrl));

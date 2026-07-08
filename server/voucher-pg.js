@@ -451,7 +451,7 @@ export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, get
           fields.accountRevisionRequested !== undefined
             ? Boolean(fields.accountRevisionRequested)
             : Boolean(current.accountRevisionRequested),
-          fields.completedAt !== undefined ? fields.completedAt : (current.completedAt || null),
+          fields.completedAt !== undefined ? (fields.completedAt || null) : (current.completedAt || null),
           now,
         ],
       );

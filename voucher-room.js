@@ -302,6 +302,7 @@ function buildPaymentSection(order) {
 function buildChatSection(order) {
   const canChat = ["processing", "needs_verification", "dispute", "awaiting_confirmation"].includes(order.status);
   const canCancel = ["awaiting_payment", "awaiting_confirmation", "processing"].includes(order.status);
+  const canDispute = ["processing", "needs_verification", "completed"].includes(order.status);
   const showAccountForms = shouldShowAccountForm(order) && canChat;
   return `
     <section class="voucher-chat-layout voucher-standalone-chat-layout">
@@ -322,12 +323,19 @@ function buildChatSection(order) {
           </form>
           <div class="voucher-chat-actions">
             ${canCancel ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-room-order-action="cancel">Batalkan</button>` : ""}
-            ${["processing", "needs_verification", "completed"].includes(order.status)
-    ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-room-order-action="dispute">Sengketa</button>`
-    : ""}
+            ${canDispute ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-room-order-action="dispute">Ajukan Sengketa</button>` : ""}
           </div>
         </div>
-      ` : `<p class="mini-note">Chat akan aktif setelah admin memproses pembayaran Anda.</p>`}
+      ` : `
+        <div class="voucher-chat-compose voucher-chat-completed-actions">
+          ${order.status === "completed" ? `
+            <p class="mini-note">Order sudah selesai. Jika ada masalah pada akun, ajukan sengketa untuk membuka kembali chat dengan admin.</p>
+            <div class="voucher-chat-actions">
+              <button type="button" class="primary-btn voucher-chat-action-btn" data-room-order-action="dispute">Ajukan Sengketa</button>
+            </div>
+          ` : `<p class="mini-note">Chat akan aktif setelah admin memproses pembayaran Anda.</p>`}
+        </div>
+      `}
     </section>
   `;
 }

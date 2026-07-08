@@ -2213,7 +2213,7 @@ export function updateVoucherOrderFields(orderCode, fields = {}) {
     fields.accountRevisionRequested !== undefined
       ? (fields.accountRevisionRequested ? 1 : 0)
       : (current.accountRevisionRequested ? 1 : 0),
-    fields.completedAt !== undefined ? fields.completedAt : (current.completedAt || ""),
+    fields.completedAt !== undefined ? (fields.completedAt || "") : (current.completedAt || ""),
     now,
     orderCode,
   );

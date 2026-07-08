@@ -11712,6 +11712,16 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   align-items: center;
 }
 
+.voucher-chat-completed-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.voucher-chat-completed-actions .mini-note {
+  margin: 0;
+}
+
 .voucher-admin-product-thumb {
   width: 64px;
   height: 64px;
