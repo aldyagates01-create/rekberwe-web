@@ -869,6 +869,14 @@ function renderVoucherMessageItem(message) {
 function renderVoucherChat() {
   const order = voucherState.activeOrder;
   if (!voucherElements.chatView || !order) return;
+
+  const activeElement = document.activeElement;
+  const prevInput = document.getElementById("voucher-chat-input");
+  const hadFocus = activeElement === prevInput;
+  const previousValue = prevInput?.value || "";
+  const selectionStart = hadFocus ? prevInput.selectionStart : null;
+  const selectionEnd = hadFocus ? prevInput.selectionEnd : null;
+
   voucherElements.chatView.innerHTML = buildVoucherChatMarkup(order, {
     backButton: '<button type="button" class="ghost-btn" data-voucher-screen="catalog">← Kembali ke katalog</button>',
     chatBoxId: "voucher-chat-box",
@@ -878,6 +886,16 @@ function renderVoucherChat() {
   });
   const box = document.getElementById("voucher-chat-box");
   if (box) box.scrollTop = box.scrollHeight;
+  const nextInput = document.getElementById("voucher-chat-input");
+  if (nextInput && previousValue && !nextInput.value) {
+    nextInput.value = previousValue;
+    if (hadFocus) {
+      nextInput.focus();
+      if (selectionStart != null && selectionEnd != null) {
+        nextInput.setSelectionRange(selectionStart, selectionEnd);
+      }
+    }
+  }
   if (order.accountRevisionRequested) {
     window.requestAnimationFrame(() => {
       document.querySelector("#voucher-chat-view .voucher-account-forms-card.is-revision")
@@ -968,6 +986,14 @@ function renderVoucherHistoryRoom(order) {
       .catch(renderAwaiting);
     return;
   }
+
+  const activeElement = document.activeElement;
+  const prevInput = document.getElementById("voucher-history-chat-input");
+  const hadFocus = activeElement === prevInput;
+  const previousValue = prevInput?.value || "";
+  const selectionStart = hadFocus ? prevInput.selectionStart : null;
+  const selectionEnd = hadFocus ? prevInput.selectionEnd : null;
+
   container.innerHTML = buildVoucherChatMarkup(order, {
     chatBoxId: "voucher-history-chat-box",
     formId: "voucher-history-chat-form",
@@ -979,6 +1005,16 @@ function renderVoucherHistoryRoom(order) {
   });
   const box = document.getElementById("voucher-history-chat-box");
   if (box) box.scrollTop = box.scrollHeight;
+  const nextInput = document.getElementById("voucher-history-chat-input");
+  if (nextInput && previousValue && !nextInput.value) {
+    nextInput.value = previousValue;
+    if (hadFocus) {
+      nextInput.focus();
+      if (selectionStart != null && selectionEnd != null) {
+        nextInput.setSelectionRange(selectionStart, selectionEnd);
+      }
+    }
+  }
   if (order.accountRevisionRequested) {
     window.requestAnimationFrame(() => {
       document.querySelector("#voucher-history-room .voucher-account-forms-card.is-revision")

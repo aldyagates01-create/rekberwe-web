@@ -345,6 +345,13 @@ function renderRoom(order) {
   roomState.order = order;
   const isAwaitingPayment = order.status === "awaiting_payment";
 
+  const activeElement = document.activeElement;
+  const prevInput = document.getElementById("voucher-standalone-chat-input");
+  const hadFocus = activeElement === prevInput;
+  const previousValue = prevInput?.value || "";
+  const selectionStart = hadFocus ? prevInput.selectionStart : null;
+  const selectionEnd = hadFocus ? prevInput.selectionEnd : null;
+
   roomRoot.innerHTML = `
     <section class="card voucher-standalone-card">
       <div class="voucher-chat-head">
@@ -366,6 +373,16 @@ function renderRoom(order) {
   } else {
     const box = document.getElementById("voucher-standalone-chat-box");
     if (box) box.scrollTop = box.scrollHeight;
+    const nextInput = document.getElementById("voucher-standalone-chat-input");
+    if (nextInput && previousValue && !nextInput.value) {
+      nextInput.value = previousValue;
+      if (hadFocus) {
+        nextInput.focus();
+        if (selectionStart != null && selectionEnd != null) {
+          nextInput.setSelectionRange(selectionStart, selectionEnd);
+        }
+      }
+    }
     if (order.accountRevisionRequested) {
       window.requestAnimationFrame(() => {
         document.querySelector(".voucher-account-forms-card.is-revision")
