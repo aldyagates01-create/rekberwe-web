@@ -33,6 +33,7 @@ import {
   saveUserLocation,
   getTransactionByCode,
   getTransactionsForUser,
+  initDatabase,
   updateUserAdminStatus,
   getUserById,
   getUserByProviderSocial,
@@ -2093,6 +2094,13 @@ app.get("*", (_req, res) => res.sendFile(path.join(webRoot, "index.html")));
 async function startServer() {
   initPushService();
   startPresenceSweeper();
+  try {
+    await initDatabase();
+    console.log("Database siap.");
+  } catch (error) {
+    console.error("Database gagal diinisialisasi:", error.message);
+    throw error;
+  }
   if (useNextFrontend) {
     try {
       const nextModule = await import("next");

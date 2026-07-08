@@ -724,6 +724,10 @@ async function ensureReady() {
   await readyPromise;
 }
 
+export async function initDatabase() {
+  await ensureReady();
+}
+
 async function initializePostgres() {
   await query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -903,20 +907,6 @@ async function initializePostgres() {
     ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS attachment_name TEXT DEFAULT '';
     ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS attachment_url TEXT DEFAULT '';
     ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS attachment_type TEXT DEFAULT '';
-    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS requires_account_login BOOLEAN DEFAULT FALSE;
-    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0;
-    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_currency TEXT DEFAULT 'IDR';
-    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_amount_original DOUBLE PRECISION DEFAULT 0;
-    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_fx_rate DOUBLE PRECISION DEFAULT 1;
-    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_fx_fetched_at TEXT DEFAULT '';
-    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_email TEXT DEFAULT '';
-    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_password TEXT DEFAULT '';
-    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0;
-    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1;
-    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_accounts TEXT DEFAULT '[]';
-    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_revision_requested BOOLEAN DEFAULT FALSE;
-    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS order_source TEXT DEFAULT 'platform';
-    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS buyer_telegram TEXT DEFAULT '';
   `);
 
   await query(`
@@ -967,6 +957,11 @@ async function initializePostgres() {
       stock INTEGER DEFAULT -1,
       sort_order INTEGER DEFAULT 0,
       requires_account_login BOOLEAN DEFAULT FALSE,
+      cost_price INTEGER DEFAULT 0,
+      cost_currency TEXT DEFAULT 'IDR',
+      cost_amount_original DOUBLE PRECISION DEFAULT 0,
+      cost_fx_rate DOUBLE PRECISION DEFAULT 1,
+      cost_fx_fetched_at TEXT DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL
     );
@@ -977,11 +972,17 @@ async function initializePostgres() {
       product_id BIGINT NOT NULL REFERENCES voucher_products(id),
       user_id TEXT NOT NULL REFERENCES users(id),
       price INTEGER NOT NULL,
+      cost_price INTEGER DEFAULT 0,
+      quantity INTEGER DEFAULT 1,
       status TEXT NOT NULL,
       payment_proof_url TEXT DEFAULT '',
       payment_proof_name TEXT DEFAULT '',
       account_email TEXT DEFAULT '',
       account_password TEXT DEFAULT '',
+      account_accounts TEXT DEFAULT '[]',
+      account_revision_requested BOOLEAN DEFAULT FALSE,
+      order_source TEXT DEFAULT 'platform',
+      buyer_telegram TEXT DEFAULT '',
       dispute_reason TEXT DEFAULT '',
       cancel_reason TEXT DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL,
@@ -1006,6 +1007,23 @@ async function initializePostgres() {
     CREATE INDEX IF NOT EXISTS idx_voucher_order_messages_code ON voucher_order_messages(order_code, id);
   `);
 
+  await query(`
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS requires_account_login BOOLEAN DEFAULT FALSE;
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0;
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_currency TEXT DEFAULT 'IDR';
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_amount_original DOUBLE PRECISION DEFAULT 0;
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_fx_rate DOUBLE PRECISION DEFAULT 1;
+    ALTER TABLE voucher_products ADD COLUMN IF NOT EXISTS cost_fx_fetched_at TEXT DEFAULT '';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_email TEXT DEFAULT '';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_password TEXT DEFAULT '';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0;
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1;
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_accounts TEXT DEFAULT '[]';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_revision_requested BOOLEAN DEFAULT FALSE;
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS order_source TEXT DEFAULT 'platform';
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS buyer_telegram TEXT DEFAULT '';
+  `);
+
   if (sqliteImportEnabled) {
     await migrateFromSqliteIfNeeded();
   }
@@ -1026,7 +1044,13 @@ async function initializePostgres() {
       FROM voucher_orders
       WHERE account_email != '' OR account_password != '' OR account_accounts NOT IN ('', '[]')
     `),
-  );
+  ).catch((error) => {
+    console.error("[voucher-crypto] Migrasi enkripsi gagal:", error.message);
+    if (process.env.NODE_ENV === "production") {
+      throw error;
+    }
+    return 0;
+  });
   if (migratedCredentials > 0) {
     console.log(`[voucher-crypto] ${migratedCredentials} order voucher — kredensial dienkripsi.`);
   }
