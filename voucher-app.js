@@ -111,15 +111,72 @@ function resetFileUploadInput(input) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+const VOUCHER_STATUS_RANK = {
+  cancelled: 0,
+  awaiting_payment: 1,
+  awaiting_confirmation: 2,
+  processing: 3,
+  needs_verification: 4,
+  dispute: 4,
+  completed: 5,
+  manual_pending: 1,
+};
+
+function getVoucherStatusRank(status) {
+  return VOUCHER_STATUS_RANK[String(status || "")] ?? 0;
+}
+
 function mergeVoucherOrderPreservingMessages(current, incoming) {
   if (!incoming) return current;
   if (!current || current.orderCode !== incoming.orderCode) return incoming;
   const currentMessages = Array.isArray(current.messages) ? current.messages : [];
   const incomingMessages = Array.isArray(incoming.messages) ? incoming.messages : [];
-  return {
+  const currentRank = getVoucherStatusRank(current.status);
+  const incomingRank = getVoucherStatusRank(incoming.status);
+  const useIncomingStatus = incomingRank >= currentRank;
+  const merged = {
     ...incoming,
+    status: useIncomingStatus ? incoming.status : current.status,
+    statusLabel: useIncomingStatus ? incoming.statusLabel : current.statusLabel,
     messages: incomingMessages.length >= currentMessages.length ? incomingMessages : currentMessages,
   };
+  return merged;
+}
+
+function isVoucherHistoryRoomActive(orderCode = "") {
+  const historyRoom = document.getElementById("voucher-history-room");
+  const normalized = String(orderCode || voucherState.activeOrder?.orderCode || "").trim().toUpperCase();
+  return Boolean(
+    normalized
+    && voucherState.historyRoomOrderCode === normalized
+    && historyRoom
+    && !historyRoom.classList.contains("hidden"),
+  );
+}
+
+async function navigateToVoucherChatAfterPayment(order, options = {}) {
+  if (!order) return;
+  voucherState.activeOrder = order;
+  const index = voucherState.orders.findIndex((item) => item.orderCode === order.orderCode);
+  if (index >= 0) voucherState.orders[index] = order;
+  else voucherState.orders.unshift(order);
+
+  if (options.isReplaceForm) {
+    refreshVoucherActiveOrderView();
+    return;
+  }
+
+  if (isVoucherHistoryRoomActive(order.orderCode)) {
+    renderVoucherHistoryRoom(order);
+    window.syncHistoryVoucherOrder?.(order);
+    return;
+  }
+
+  renderVoucherChat();
+  openVoucherScreen("chat");
+  window.requestAnimationFrame(() => {
+    document.getElementById("voucher-chat-box")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
 }
 
 function voucherUploadWithProgress(url, formData, onProgress) {
@@ -436,7 +493,7 @@ function setWorkspaceService(service) {
   }
 }
 
-async function refreshVoucherData() {
+async function refreshVoucherData(options = {}) {
   const [productsPayload, ordersPayload, configPayload] = await Promise.all([
     voucherFetchJson("/api/voucher/products"),
     voucherFetchJson("/api/voucher/orders"),
@@ -450,7 +507,7 @@ async function refreshVoucherData() {
   if (document.body.classList.contains("workspace-voucher-active")) {
     renderWorkspaceVoucherSidePanel();
   }
-  if (voucherState.activeOrder) {
+  if (!options.skipActiveOrderView && voucherState.activeOrder) {
     const latest = voucherState.orders.find((item) => item.orderCode === voucherState.activeOrder.orderCode);
     if (latest) {
       voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder, latest);
@@ -735,12 +792,9 @@ function isVoucherChatRoomStatus(status) {
 function refreshVoucherActiveOrderView(options = {}) {
   const order = voucherState.activeOrder;
   if (!order) return;
-  const historyRoom = document.getElementById("voucher-history-room");
-  const inHistoryRoom = voucherState.historyRoomOrderCode === order.orderCode
-    && historyRoom
-    && !historyRoom.classList.contains("hidden");
-  if (inHistoryRoom) {
+  if (isVoucherHistoryRoomActive(order.orderCode)) {
     if (order.status === "awaiting_payment") {
+      const historyRoom = document.getElementById("voucher-history-room");
       const renderAwaiting = () => {
         historyRoom.innerHTML = buildVoucherAwaitingPaymentMarkup(order, {
           formId: "voucher-history-payment-proof-form",
@@ -750,7 +804,7 @@ function refreshVoucherActiveOrderView(options = {}) {
         bindFileUploadFields(historyRoom);
       };
       ensureVoucherPaymentSettings().then(renderAwaiting).catch(renderAwaiting);
-    } else {
+    } else if (isVoucherChatRoomStatus(order.status)) {
       renderVoucherHistoryRoom(order);
     }
     window.syncHistoryVoucherOrder?.(order);
@@ -1130,16 +1184,20 @@ async function submitVoucherPaymentProof(event) {
     );
     if (!payload.order) throw new Error("Upload bukti gagal.");
     setVoucherPaymentUploadProgress(progressEl, "Bukti pembayaran terkirim.", 100, "done", "Membuka ruang chat...");
-    voucherState.activeOrder = payload.order;
-    const index = voucherState.orders.findIndex((item) => item.orderCode === payload.order.orderCode);
-    if (index >= 0) voucherState.orders[index] = payload.order;
-    else voucherState.orders.unshift(payload.order);
+
+    let latestOrder = payload.order;
+    try {
+      const fresh = await voucherFetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}`);
+      if (fresh?.order) latestOrder = fresh.order;
+    } catch {
+      // keep upload response order
+    }
 
     const isReplaceForm = form.id === "voucher-replace-proof-form"
       || form.id === "voucher-history-replace-proof-form";
-    refreshVoucherActiveOrderView({ forceChatScreen: !isReplaceForm });
+    await navigateToVoucherChatAfterPayment(latestOrder, { isReplaceForm });
     renderVoucherOrdersSidebar();
-    window.markUserVoucherOrderSeen?.(payload.order);
+    window.markUserVoucherOrderSeen?.(latestOrder);
     window.refreshUserTransactionHistory?.();
     window.setAuthStatus?.(
       isReplaceForm
@@ -1147,7 +1205,7 @@ async function submitVoucherPaymentProof(event) {
         : "Bukti pembayaran terkirim. Anda sudah masuk ke ruang chat.",
     );
     resetFileUploadInput(fileInput);
-    refreshVoucherData().catch(() => {});
+    refreshVoucherData({ skipActiveOrderView: true }).catch(() => {});
   } catch (error) {
     setVoucherPaymentUploadProgress(progressEl, error.message || "Upload bukti gagal.", 100, "error", "Silakan coba lagi.");
     throw error;
@@ -1419,8 +1477,13 @@ function handleVoucherLiveEvent(payload) {
   if (index >= 0) voucherState.orders[index] = payload.order;
   else voucherState.orders.unshift(payload.order);
   if (voucherState.activeOrder?.orderCode === payload.order.orderCode) {
+    const previousStatus = voucherState.activeOrder.status;
     voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder, payload.order);
-    refreshActiveVoucherChatView();
+    if (previousStatus === "awaiting_payment" && payload.order.status === "awaiting_confirmation") {
+      navigateToVoucherChatAfterPayment(voucherState.activeOrder);
+    } else {
+      refreshActiveVoucherChatView();
+    }
   }
   renderVoucherOrdersSidebar();
   if (voucherState.screen === "orders") renderVoucherOrdersPage();

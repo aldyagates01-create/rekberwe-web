@@ -463,7 +463,14 @@ async function submitPaymentProof(orderCode, formId = "voucher-standalone-paymen
     if (!payload.order) throw new Error("Upload bukti gagal.");
     setRoomPaymentUploadProgress(progressEl, "Bukti pembayaran terkirim.", 100, "done", "Membuka ruang chat...");
     resetRoomFileInput(fileInput);
-    renderRoom(payload.order);
+    let latestOrder = payload.order;
+    try {
+      const fresh = await fetchJson(`/api/voucher/orders/${encodeURIComponent(orderCode)}`);
+      if (fresh?.order) latestOrder = fresh.order;
+    } catch {
+      // keep upload response order
+    }
+    renderRoom(latestOrder);
   } catch (error) {
     setRoomPaymentUploadProgress(progressEl, error.message || "Upload bukti gagal.", 100, "error", "Silakan coba lagi.");
     throw error;

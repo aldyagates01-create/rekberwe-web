@@ -424,6 +424,9 @@ async function bootstrap() {
     window.syncHistoryVoucherOrder = (order) => {
       if (state.historyChatType === "voucher" && state.historyVoucherOrder?.orderCode === order?.orderCode) {
         state.historyVoucherOrder = order;
+        if (elements.roomPageSubtitle) {
+          elements.roomPageSubtitle.textContent = `${order.orderCode} • ${order.statusLabel || order.status}`;
+        }
       }
     };
     window.markUserVoucherOrderSeen = markUserVoucherOrderSeen;
