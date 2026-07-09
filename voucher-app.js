@@ -11,7 +11,15 @@ const voucherState = {
   historyRoomOrderCode: "",
   creatingOrder: false,
   highlightAccountFormGuide: false,
+  adminPresence: null,
+  typingByOrder: {},
+  currentUserId: "",
 };
+
+const TYPING_ACTIVE_MS = 5000;
+const PRESENCE_ONLINE_MS = 30000;
+let voucherTypingStopTimer = null;
+let voucherAdminPresenceTimer = null;
 
 const voucherElements = {
   panel: document.getElementById("workspace-voucher-panel"),
@@ -24,6 +32,133 @@ const voucherElements = {
   chatView: document.getElementById("voucher-chat-view"),
   sidebarOrdersList: document.getElementById("voucher-orders-sidebar-list"),
 };
+
+function voucherFormatRelativeLastSeen(value) {
+  const diffSeconds = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+  if (diffSeconds < 60) return `${diffSeconds} detik lalu`;
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} menit lalu`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} jam lalu`;
+  return `${Math.floor(diffHours / 24)} hari lalu`;
+}
+
+function isVoucherAdminOnline(presence) {
+  if (!presence) return false;
+  if (presence.isOnline === true) return true;
+  if (!presence.lastSeenAt) return false;
+  return Date.now() - new Date(presence.lastSeenAt).getTime() <= PRESENCE_ONLINE_MS;
+}
+
+function formatVoucherAdminPresenceLabel(presence) {
+  if (isVoucherAdminOnline(presence)) return "Admin aktif";
+  if (!presence?.lastSeenAt) return "Admin offline";
+  return `Offline ${voucherFormatRelativeLastSeen(presence.lastSeenAt)}`;
+}
+
+function getVoucherAdminPresenceClass(presence) {
+  return isVoucherAdminOnline(presence) ? "is-online" : "is-offline";
+}
+
+function getActiveVoucherTyping(orderCode) {
+  const typing = voucherState.typingByOrder[String(orderCode || "").toUpperCase()] || {};
+  const now = Date.now();
+  return Object.fromEntries(
+    Object.entries(typing).filter(([, value]) => now - new Date(value).getTime() <= TYPING_ACTIVE_MS),
+  );
+}
+
+function buildVoucherTypingIndicatorText(order, excludeUserId) {
+  if (!order?.orderCode) return "";
+  const typing = getActiveVoucherTyping(order.orderCode);
+  const labels = Object.keys(typing)
+    .filter((userId) => userId !== excludeUserId)
+    .map((userId) => {
+      if (userId === order.userId || userId === order.user?.id) {
+        return order.user?.displayName || "Pembeli";
+      }
+      return "Admin";
+    });
+  if (!labels.length) return "";
+  if (labels.length === 1) return `${labels[0]} sedang mengetik...`;
+  if (labels.length === 2) return `${labels[0]} & ${labels[1]} sedang mengetik...`;
+  return `${labels.slice(0, -1).join(", ")} & ${labels[labels.length - 1]} sedang mengetik...`;
+}
+
+function updateVoucherCatalogAdminStatus() {
+  const el = document.getElementById("voucher-catalog-admin-status");
+  if (!el) return;
+  const presence = voucherState.adminPresence || {};
+  el.textContent = formatVoucherAdminPresenceLabel(presence);
+  el.className = `voucher-catalog-admin-status ${getVoucherAdminPresenceClass(presence)}`;
+}
+
+function updateVoucherChatAdminPresence() {
+  const badge = document.querySelector("#voucher-chat-view .voucher-room-online-badge, #voucher-history-room .voucher-room-online-badge");
+  if (!badge) return;
+  const presence = voucherState.adminPresence || {};
+  badge.textContent = isVoucherAdminOnline(presence) ? "ONLINE" : formatVoucherAdminPresenceLabel(presence).replace(/^Admin /, "");
+  badge.className = `voucher-room-online-badge ${getVoucherAdminPresenceClass(presence)}`;
+}
+
+function updateVoucherTypingIndicator(order = voucherState.activeOrder) {
+  if (!order) return;
+  const typingText = buildVoucherTypingIndicatorText(order, voucherState.currentUserId);
+  document.querySelectorAll("#voucher-chat-view .voucher-room-typing, #voucher-history-room .voucher-room-typing").forEach((el) => {
+    el.hidden = !typingText;
+    el.textContent = typingText;
+  });
+}
+
+async function refreshVoucherAdminPresence() {
+  try {
+    const payload = await voucherFetchJson("/api/voucher/admin-status");
+    voucherState.adminPresence = payload.presence || null;
+  } catch {
+    // Keep the last known presence when polling fails.
+  }
+  updateVoucherCatalogAdminStatus();
+  updateVoucherChatAdminPresence();
+}
+
+function startVoucherAdminPresencePolling() {
+  refreshVoucherAdminPresence().catch(() => {});
+  if (voucherAdminPresenceTimer) return;
+  voucherAdminPresenceTimer = window.setInterval(() => {
+    if (voucherState.screen === "catalog" || voucherState.screen === "chat") {
+      refreshVoucherAdminPresence().catch(() => {});
+    } else {
+      updateVoucherCatalogAdminStatus();
+      updateVoucherChatAdminPresence();
+    }
+  }, 15000);
+}
+
+function sendVoucherTypingState(orderCode, isTyping) {
+  const code = String(orderCode || "").trim().toUpperCase();
+  if (!code) return;
+  voucherFetchJson(`/api/voucher/orders/${encodeURIComponent(code)}/typing`, {
+    method: "POST",
+    body: JSON.stringify({ isTyping }),
+  }).catch(() => {});
+}
+
+function handleVoucherChatInputTyping(inputId = "voucher-chat-input") {
+  const order = voucherState.activeOrder;
+  if (!order?.orderCode) return;
+  if (voucherTypingStopTimer) window.clearTimeout(voucherTypingStopTimer);
+  const value = String(document.getElementById(inputId)?.value || "").trim();
+  if (!value) {
+    sendVoucherTypingState(order.orderCode, false);
+    return;
+  }
+  sendVoucherTypingState(order.orderCode, true);
+  voucherTypingStopTimer = window.setTimeout(() => {
+    if (voucherState.activeOrder?.orderCode) {
+      sendVoucherTypingState(voucherState.activeOrder.orderCode, false);
+    }
+  }, 1600);
+}
 
 function voucherFetchJson(url, options = {}) {
   return window.fetchJson ? window.fetchJson(url, options) : fetch(url, {
@@ -670,7 +805,10 @@ function renderVoucherCatalog(options = {}) {
       <div class="voucher-catalog-head">
         <div class="section-head">
           <p class="eyebrow">${voucherEscapeHtml(window.t?.("voucher.catalog_eyebrow") || "Marketplace")}</p>
-          <h3>${voucherEscapeHtml(window.t?.("voucher.catalog_title") || "Beli Voucher / Gametime")}</h3>
+          <div class="voucher-catalog-title-row">
+            <h3>${voucherEscapeHtml(window.t?.("voucher.catalog_title") || "Beli Voucher / Gametime")}</h3>
+            <span id="voucher-catalog-admin-status" class="voucher-catalog-admin-status is-offline">Admin offline</span>
+          </div>
           <p class="mini-note">${voucherEscapeHtml(window.t?.("voucher.catalog_note") || "Pilih produk digital, transfer ke rekening admin, lalu upload bukti pembayaran.")}</p>
         </div>
         <div class="voucher-catalog-toolbar">
@@ -699,6 +837,8 @@ function renderVoucherCatalog(options = {}) {
   }
 
   startVoucherCatalogCountdowns();
+  updateVoucherCatalogAdminStatus();
+  startVoucherAdminPresencePolling();
 }
 
 function renderVoucherOrdersSidebar() {
@@ -1310,6 +1450,7 @@ function buildVoucherChatMarkup(order, options = {}) {
   });
 
   if (window.VoucherChatUI?.buildRoomMarkup) {
+    const presence = voucherState.adminPresence || {};
     return window.VoucherChatUI.buildRoomMarkup(order, {
       viewerRole,
       layoutMode,
@@ -1331,6 +1472,11 @@ function buildVoucherChatMarkup(order, options = {}) {
       sidebarExtra: options.sidebarExtra || "",
       adminActionsHtml: options.adminActionsHtml || "",
       buyerLabel: options.buyerLabel || `${order.user?.displayName || "Pembeli"} - Pembeli`,
+      showTyping: true,
+      typingId: options.typingId || "voucher-room-typing",
+      typingLabel: buildVoucherTypingIndicatorText(order, voucherState.currentUserId),
+      adminPresenceLabel: isVoucherAdminOnline(presence) ? "ONLINE" : formatVoucherAdminPresenceLabel(presence).replace(/^Admin /, ""),
+      adminPresenceClass: getVoucherAdminPresenceClass(presence),
     });
   }
 
@@ -1393,6 +1539,8 @@ function renderVoucherChat() {
   }
   bindFileUploadFields(voucherElements.chatView);
   bindVoucherRoomSidebar(voucherElements.chatView);
+  updateVoucherTypingIndicator(order);
+  updateVoucherChatAdminPresence();
 }
 
 function renderVoucherHistoryRoom(order) {
@@ -1435,6 +1583,7 @@ function renderVoucherHistoryRoom(order) {
     accountsFormId: "voucher-history-accounts-form",
     replaceProofFormId: "voucher-history-replace-proof-form",
     replaceProofInputId: "voucher-history-replace-proof-input",
+    typingId: "voucher-history-typing",
   });
   const box = document.getElementById("voucher-history-chat-box");
   if (box) box.scrollTop = box.scrollHeight;
@@ -1456,6 +1605,8 @@ function renderVoucherHistoryRoom(order) {
   }
   bindFileUploadFields(container);
   bindVoucherRoomSidebar(container);
+  updateVoucherTypingIndicator(order);
+  updateVoucherChatAdminPresence();
   if (voucherState.highlightAccountFormGuide && shouldShowVoucherAccountForm(order)) {
     voucherState.highlightAccountFormGuide = false;
     window.requestAnimationFrame(() => highlightVoucherAccountFormGuide(container));
@@ -1599,6 +1750,7 @@ async function submitVoucherChatMessage(event, options = {}) {
   const text = String(textInput?.value || "").trim();
   const files = Array.from(uploadInput?.files || []);
   if (!text && !files.length) return;
+  sendVoucherTypingState(order.orderCode, false);
   if (text) {
     await voucherFetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/messages`, {
       method: "POST",
@@ -1685,6 +1837,9 @@ function bindVoucherEvents() {
         renderVoucherCatalog({ preserveSearchFocus: true });
       }, 150);
       return;
+    }
+    if (event.target?.id === "voucher-chat-input" || event.target?.id === "voucher-history-chat-input") {
+      handleVoucherChatInputTyping(event.target.id);
     }
   });
 
@@ -1859,6 +2014,26 @@ function refreshLocalizedVoucherUI() {
 }
 
 function handleVoucherLiveEvent(payload) {
+  if (payload?.type === "voucher_typing_updated") {
+    const code = String(payload.orderCode || payload.code || "").toUpperCase();
+    if (!code) return;
+    voucherState.typingByOrder[code] = payload.typing || {};
+    if (voucherState.activeOrder?.orderCode === code) {
+      updateVoucherTypingIndicator(voucherState.activeOrder);
+    }
+    if (voucherState.historyRoomOrderCode === code && voucherState.activeOrder) {
+      updateVoucherTypingIndicator(voucherState.activeOrder);
+    }
+    return;
+  }
+
+  if (payload?.type === "presence_updated" && payload.adminPresence) {
+    voucherState.adminPresence = payload.adminPresence;
+    updateVoucherCatalogAdminStatus();
+    updateVoucherChatAdminPresence();
+    return;
+  }
+
   if (payload?.type !== "voucher_order_updated") return;
 
   if (payload.deleted) {
@@ -1901,8 +2076,10 @@ function handleVoucherLiveEvent(payload) {
 window.RekberVoucher = {
   init(currentUser) {
     if (!currentUser) return;
+    voucherState.currentUserId = currentUser.id || "";
     bindVoucherEvents();
     setWorkspaceService("voucher");
+    startVoucherAdminPresencePolling();
     if (!currentUser.banned) {
       refreshVoucherData().catch(() => {});
     }

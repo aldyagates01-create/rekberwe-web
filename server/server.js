@@ -2149,6 +2149,10 @@ registerVoucherRoutes(app, {
   persistUploadFile,
   broadcastEvent,
   getRequestBaseUrl,
+  getAdminPresence,
+  setUserPresence,
+  setTypingState,
+  buildTypingPayload,
 });
 
 app.get("*", (_req, res) => res.sendFile(path.join(webRoot, "index.html")));
@@ -2706,8 +2710,13 @@ async function broadcastEvent(type, code, payload = {}) {
       const order = payload.order;
       const voucherVisible = client.audience === "admin" || client.userId === order?.userId;
       if (!voucherVisible) continue;
+    } else if (type === "voucher_typing_updated") {
+      const voucherVisible = client.audience === "admin" || client.userId === payload.orderUserId;
+      if (!voucherVisible) continue;
     } else if (type === "presence_updated") {
-      const visiblePresence = client.audience === "admin"
+      const isAdminPresenceBroadcast = payload.presence?.role === "admin";
+      const visiblePresence = isAdminPresenceBroadcast
+        || client.audience === "admin"
         || client.userId === payload.userId
         || (transaction && (transaction.buyer?.id === client.userId || transaction.seller?.id === client.userId));
       if (!visiblePresence) continue;

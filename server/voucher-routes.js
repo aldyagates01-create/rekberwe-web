@@ -104,10 +104,18 @@ export function registerVoucherRoutes(app, {
   persistUploadFile,
   broadcastEvent,
   getRequestBaseUrl,
+  getAdminPresence,
+  setUserPresence,
+  setTypingState,
+  buildTypingPayload,
 }) {
   app.get("/api/voucher/products", requireAuth, async (_req, res) => {
     const products = stripPublicVoucherProducts(await getActiveVoucherProducts());
     res.json({ products });
+  });
+
+  app.get("/api/voucher/admin-status", requireAuth, (_req, res) => {
+    res.json({ presence: getAdminPresence() });
   });
 
   app.get("/api/voucher/products/:id", requireAuth, async (req, res) => {
@@ -137,6 +145,26 @@ export function registerVoucherRoutes(app, {
     const order = await getVoucherOrderByCode(code);
     if (!assertVoucherOrderAccess(req, res, order)) return;
     respondWithVoucherOrder(res, req, order);
+  });
+
+  app.post("/api/voucher/orders/:code/typing", requireAuth, async (req, res) => {
+    const code = String(req.params.code || "").toUpperCase();
+    const order = await getVoucherOrderByCode(code);
+    if (!assertVoucherOrderAccess(req, res, order)) return;
+    const isTyping = req.body.isTyping !== false;
+    setUserPresence(
+      req.session.user.id,
+      req.session.user.isAdmin ? "admin" : "user",
+      code,
+    );
+    setTypingState(code, req.session.user.id, isTyping);
+    await broadcastEvent("voucher_typing_updated", code, {
+      orderCode: code,
+      orderUserId: order.userId,
+      typing: buildTypingPayload(code),
+      userId: req.session.user.id,
+    });
+    res.json({ ok: true });
   });
 
   app.post("/api/voucher/orders", requireAuth, voucherOrderCreateLimiter, async (req, res) => {

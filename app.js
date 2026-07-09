@@ -5321,6 +5321,14 @@ function setupLiveEvents() {
         window.RekberVoucher?.handleLiveEvent?.(payload);
       }
 
+      if (payload.type === "voucher_typing_updated") {
+        window.RekberVoucher?.handleLiveEvent?.(payload);
+      }
+
+      if (payload.type === "presence_updated" && payload.adminPresence) {
+        window.RekberVoucher?.handleLiveEvent?.(payload);
+      }
+
       if (payload.type === "verification_updated" && payload.user && payload.user.id === state.currentUser?.id) {
         const previousStatus = state.currentUser?.verificationStatus;
         const previousBanned = Boolean(state.currentUser?.banned);

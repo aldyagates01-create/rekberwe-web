@@ -4,7 +4,81 @@ const adminVoucherState = {
   activeOrder: null,
   editingProductId: null,
   report: null,
+  typingByOrder: {},
 };
+
+const ADMIN_VOUCHER_TYPING_ACTIVE_MS = 5000;
+let adminVoucherTypingStopTimer = null;
+
+function getActiveAdminVoucherTyping(orderCode) {
+  const typing = adminVoucherState.typingByOrder[String(orderCode || "").toUpperCase()] || {};
+  const now = Date.now();
+  return Object.fromEntries(
+    Object.entries(typing).filter(([, value]) => now - new Date(value).getTime() <= ADMIN_VOUCHER_TYPING_ACTIVE_MS),
+  );
+}
+
+function buildAdminVoucherTypingIndicatorText(order) {
+  if (!order?.orderCode) return "";
+  const typing = getActiveAdminVoucherTyping(order.orderCode);
+  const labels = Object.keys(typing)
+    .filter((userId) => userId !== window.state?.currentUser?.id)
+    .map((userId) => {
+      if (userId === order.userId || userId === order.user?.id) {
+        return order.user?.displayName || "Pembeli";
+      }
+      return "Admin";
+    });
+  if (!labels.length) return "";
+  if (labels.length === 1) return `${labels[0]} sedang mengetik...`;
+  if (labels.length === 2) return `${labels[0]} & ${labels[1]} sedang mengetik...`;
+  return `${labels.slice(0, -1).join(", ")} & ${labels[labels.length - 1]} sedang mengetik...`;
+}
+
+function updateAdminVoucherTypingIndicator() {
+  const order = adminVoucherState.activeOrder;
+  if (!order) return;
+  const typingText = buildAdminVoucherTypingIndicatorText(order);
+  const typingEl = document.getElementById("admin-voucher-room-typing");
+  if (!typingEl) return;
+  typingEl.hidden = !typingText;
+  typingEl.textContent = typingText;
+}
+
+function sendAdminVoucherTypingState(orderCode, isTyping) {
+  const code = String(orderCode || "").trim().toUpperCase();
+  if (!code) return;
+  fetchJson(`/api/voucher/orders/${encodeURIComponent(code)}/typing`, {
+    method: "POST",
+    body: JSON.stringify({ isTyping }),
+  }).catch(() => {});
+}
+
+function handleAdminVoucherChatInputTyping() {
+  const order = adminVoucherState.activeOrder;
+  if (!order?.orderCode) return;
+  if (adminVoucherTypingStopTimer) window.clearTimeout(adminVoucherTypingStopTimer);
+  const value = String(document.getElementById("admin-voucher-chat-input")?.value || "").trim();
+  if (!value) {
+    sendAdminVoucherTypingState(order.orderCode, false);
+    return;
+  }
+  sendAdminVoucherTypingState(order.orderCode, true);
+  adminVoucherTypingStopTimer = window.setTimeout(() => {
+    if (adminVoucherState.activeOrder?.orderCode) {
+      sendAdminVoucherTypingState(adminVoucherState.activeOrder.orderCode, false);
+    }
+  }, 1600);
+}
+
+function handleAdminVoucherTypingEvent(payload) {
+  const code = String(payload.orderCode || payload.code || "").toUpperCase();
+  if (!code) return;
+  adminVoucherState.typingByOrder[code] = payload.typing || {};
+  if (adminVoucherState.activeOrder?.orderCode === code) {
+    updateAdminVoucherTypingIndicator();
+  }
+}
 
 const adminVoucherElements = {
   catalogPage: document.querySelector('[data-admin-page-content="voucher-catalog"]'),
@@ -822,6 +896,11 @@ function renderAdminVoucherOrderRoom() {
       toolbarActionsHtml: "",
       adminAvatarUrl: "/assets/rekberwe-logo-shield.png?v=7",
       userAvatarUrl: order.user?.avatar || "",
+      showTyping: true,
+      typingId: "admin-voucher-room-typing",
+      typingLabel: buildAdminVoucherTypingIndicatorText(order),
+      adminPresenceLabel: "ONLINE",
+      adminPresenceClass: "is-online",
     });
   } else {
   const canProcess = ["awaiting_confirmation", "needs_verification"].includes(order.status);
@@ -881,6 +960,7 @@ function renderAdminVoucherOrderRoom() {
   }
   bindAdminFileUploadFields(adminVoucherElements.orderRoom || document.getElementById("admin-voucher-order-room"));
   window.VoucherChatUI?.bindSidebarEvents?.(adminVoucherElements.orderRoom || document);
+  updateAdminVoucherTypingIndicator();
 }
 
 async function openAdminVoucherOrder(orderCode) {
@@ -929,6 +1009,7 @@ async function submitAdminVoucherChat(event) {
   const chatUpload = document.getElementById("admin-voucher-chat-upload");
   const files = Array.from(chatUpload?.files || []);
   if (!text && !files.length) return;
+  sendAdminVoucherTypingState(order.orderCode, false);
   if (text) {
     await fetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/messages`, {
       method: "POST",
@@ -1002,6 +1083,11 @@ function bindAdminVoucherEvents() {
   adminVoucherElements.productForm?.costCurrency?.addEventListener("change", scheduleCatalogCostPreview);
   adminVoucherElements.productForm?.price?.addEventListener("input", scheduleCatalogCostPreview);
   document.getElementById("admin-voucher-product-reset")?.addEventListener("click", () => fillAdminVoucherProductForm());
+  document.addEventListener("input", (event) => {
+    if (event.target?.id === "admin-voucher-chat-input") {
+      handleAdminVoucherChatInputTyping();
+    }
+  });
   document.addEventListener("click", async (event) => {
     const editButton = event.target.closest("[data-admin-voucher-edit]");
     if (editButton) {
@@ -1114,6 +1200,10 @@ window.RekberAdminVoucher = {
   refreshReport: loadAdminVoucherReport,
   renderPaymentSettings: renderAdminVoucherPaymentSettings,
   handleLiveEvent: handleAdminVoucherLiveEvent,
+  handleTypingEvent: handleAdminVoucherTypingEvent,
+  getActiveOrderCode() {
+    return adminVoucherState.activeOrder?.orderCode || "";
+  },
   openOrder: openAdminVoucherOrder,
   getOrders() {
     return Array.isArray(adminVoucherState.orders) ? [...adminVoucherState.orders] : [];

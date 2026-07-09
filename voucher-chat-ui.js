@@ -177,7 +177,7 @@
             <img class="voucher-room-agent-avatar" src="${escapeHtml(adminAvatarUrl)}" alt="RekberWe Admin" loading="lazy" decoding="async" />
             <div>
               <strong>RekberWe.id</strong>
-              <span class="voucher-room-online-badge">ONLINE</span>
+              <span class="voucher-room-online-badge ${escapeHtml(options.adminPresenceClass || "is-online")}">${escapeHtml(options.adminPresenceLabel || "ONLINE")}</span>
             </div>
           </div>
           <p class="mini-note">Admin RekberWE siap membantu proses order voucher/gametime Anda.</p>
@@ -197,8 +197,8 @@
     const buyerName = options.buyerLabel || order.user?.displayName || "Pembeli";
     const toolbarActions = options.toolbarActionsHtml || "";
     const bottomHtml = options.bottomHtml || "";
-    const typingHtml = options.showTyping
-      ? `<p class="voucher-room-typing mini-note">Admin sedang mengetik...</p>`
+    const typingHtml = options.showTyping !== false
+      ? `<p class="voucher-room-typing mini-note" id="${escapeHtml(options.typingId || "voucher-room-typing")}" hidden>${escapeHtml(options.typingLabel || "")}</p>`
       : "";
 
     return `

@@ -885,12 +885,12 @@ function unlockAdminNotificationAudio() {
   window.removeEventListener("keydown", unlockAdminNotificationAudio);
 }
 
-function playAdminNotificationSound(kind = "chat") {
+function playAdminNotificationSound(kind = "chat", meta = {}) {
   window.RekberDesktop?.notify?.({
-    title: kind === "transaction" ? "Aktivitas baru — RekberWE Admin" : "Pesan baru — RekberWE Admin",
-    body: kind === "transaction"
+    title: String(meta.title || (kind === "transaction" ? "Aktivitas baru — RekberWE Admin" : "Pesan baru — RekberWE Admin")),
+    body: String(meta.body || (kind === "transaction"
       ? "Ada order, transaksi, atau aktivitas admin yang perlu dicek."
-      : "Ada pesan chat baru masuk.",
+      : "Ada pesan chat baru masuk.")),
   });
   if (!adminNotificationState.audioUnlocked) return;
   const now = Date.now();
@@ -3081,8 +3081,9 @@ function renderAdminSupportPresence(thread = getActiveSupportThread()) {
 }
 
 function getAdminHeartbeatBody() {
+  const activeVoucherOrderCode = window.RekberAdminVoucher?.getActiveOrderCode?.() || "";
   return {
-    activeTransactionCode: state.activeTransaction?.code || "",
+    activeTransactionCode: state.activeTransaction?.code || activeVoucherOrderCode || "",
     activeSupportThreadId: state.currentPage === "support" && state.activeSupportThreadId ? state.activeSupportThreadId : null,
   };
 }
@@ -3528,6 +3529,8 @@ function setupAdminLiveEvents() {
       const previousTransaction = previousTransactions.find((item) => item.code === payload.code);
       let shouldPlayChatSound = false;
       let shouldPlayTransactionSound = false;
+      let chatNotificationMeta = null;
+      let transactionNotificationMeta = null;
 
       if (payload.type === "typing_updated" && payload.code) {
         state.transactions = state.transactions.map((item) => (
@@ -3558,6 +3561,10 @@ function setupAdminLiveEvents() {
         if (state.currentPage === "support") renderAdminSupportPresence();
       }
 
+      if (payload.type === "voucher_typing_updated") {
+        window.RekberAdminVoucher?.handleTypingEvent?.(payload);
+      }
+
       if (payload.type === "voucher_order_updated") {
         const previousOrders = getAdminVoucherOrders();
         const orderCode = String(payload.order?.orderCode || payload.orderCode || payload.code || "").toUpperCase();
@@ -3565,15 +3572,27 @@ function setupAdminLiveEvents() {
         if (!payload.deleted && payload.order) {
           if (!previous) {
             shouldPlayTransactionSound = true;
+            transactionNotificationMeta = {
+              title: "Order Voucher/GT baru",
+              body: `${payload.order.product?.name || "Produk"} — ${orderCode}`,
+            };
           } else {
             const previousMessageCount = previous.messages?.length || 0;
             const nextMessageCount = payload.order.messages?.length || 0;
             const lastMessage = payload.order.messages?.[nextMessageCount - 1];
             if (nextMessageCount > previousMessageCount && lastMessage?.senderRole !== "admin") {
               shouldPlayChatSound = true;
+              chatNotificationMeta = {
+                title: `Chat Voucher — ${orderCode}`,
+                body: lastMessage?.text || "Pesan baru dari pembeli.",
+              };
             }
             if (previous.status !== payload.order.status && payload.order.status === "awaiting_confirmation") {
               shouldPlayTransactionSound = true;
+              transactionNotificationMeta = {
+                title: "Bukti TF Voucher baru",
+                body: `${payload.order.product?.name || "Produk"} — ${orderCode}`,
+              };
             }
           }
         }
@@ -3646,9 +3665,9 @@ function setupAdminLiveEvents() {
       await refreshDashboardData();
       updateAdminNotificationBadges();
       if (shouldPlayTransactionSound) {
-        playAdminNotificationSound("transaction");
+        playAdminNotificationSound("transaction", transactionNotificationMeta || undefined);
       } else if (shouldPlayChatSound) {
-        playAdminNotificationSound("chat");
+        playAdminNotificationSound("chat", chatNotificationMeta || undefined);
       }
     } catch (error) {
       console.error("Event stream admin gagal:", error);
