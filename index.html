@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css?v=20260709h" />
+  <link rel="stylesheet" href="/styles.css?v=20260709i" />
 </head>
 <body>
   <div class="bg-orb bg-orb-a"></div>
@@ -267,14 +267,6 @@
             </button>
             <div class="workspace-sidebar-menu">
               <p class="workspace-sidebar-label" data-i18n="menu.label">Menu</p>
-              <label class="workspace-language-field">
-                <span data-i18n="lang.label">Bahasa</span>
-                <select class="language-switcher" aria-label="Language">
-                  <option value="id">Indonesia</option>
-                  <option value="en">English</option>
-                  <option value="zh">中文</option>
-                </select>
-              </label>
               <button type="button" class="workspace-menu-btn" id="sidebar-home-button"><span class="workspace-menu-icon">⌂</span><span data-i18n="menu.dashboard">Dashboard</span></button>
               <button type="button" class="workspace-menu-btn is-active" id="sidebar-transactions-button"><span class="workspace-menu-icon">▣</span><span data-i18n="menu.transactions">Riwayat Transaksi</span></button>
               <button type="button" class="workspace-menu-btn" id="sidebar-profile-button"><span class="workspace-menu-icon">◉</span><span data-i18n="menu.profile">Akun Saya</span></button>
@@ -331,10 +323,14 @@
                   <p class="mini-note" id="room-page-subtitle">Klik judul transaksi di panel kiri untuk membuka ruang chat.</p>
                 </div>
                 <div class="room-page-meta">
-                  <div class="room-protection-badge">
-                    <strong>RekberWE Protection</strong>
-                    <span>Aman, cepat, terpercaya</span>
-                  </div>
+                  <label class="room-language-field">
+                    <span data-i18n="lang.label">Bahasa</span>
+                    <select class="language-switcher room-language-switcher" aria-label="Language">
+                      <option value="id" data-i18n="lang.id">Indonesia</option>
+                      <option value="en" data-i18n="lang.en">English</option>
+                      <option value="zh" data-i18n="lang.zh">中文</option>
+                    </select>
+                  </label>
                 </div>
               </div>
             </div>
@@ -1159,11 +1155,11 @@
   </div>
   <script src="/analytics-client.js?v=1"></script>
   <script src="/push-client.js?v=1"></script>
-  <script src="/i18n.js?v=20260709h"></script>
-  <script src="/voucher-upload-bridge.js?v=20260709h"></script>
-  <script src="/voucher-chat-ui.js?v=20260709h"></script>
-  <script src="/voucher-app.js?v=20260709h"></script>
-  <script src="/app.js?v=20260709h"></script>
+  <script src="/i18n.js?v=20260709i"></script>
+  <script src="/voucher-upload-bridge.js?v=20260709i"></script>
+  <script src="/voucher-chat-ui.js?v=20260709i"></script>
+  <script src="/voucher-app.js?v=20260709i"></script>
+  <script src="/app.js?v=20260709i"></script>
 </body>
 </html>
 

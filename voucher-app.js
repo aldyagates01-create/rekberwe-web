@@ -580,6 +580,9 @@ function renderVoucherCatalog(options = {}) {
   const selectionStart = searchHadFocus ? activeElement.selectionStart : null;
   const selectionEnd = searchHadFocus ? activeElement.selectionEnd : null;
   const filteredProducts = getVoucherCatalogProducts();
+  const buyNowLabel = window.t?.("voucher.buy_now") || "Beli Sekarang";
+  const noMatchLabel = window.t?.("voucher.no_match") || "Tidak ada produk yang cocok dengan pencarian.";
+  const noActiveLabel = window.t?.("voucher.no_active") || "Belum ada produk aktif.";
   const cards = filteredProducts.map((product) => {
     const ready = product.readyState || {};
     const disabled = !ready.canPurchase;
@@ -600,7 +603,7 @@ function renderVoucherCatalog(options = {}) {
           </div>
           <p class="voucher-product-price">${voucherFormatCurrency(product.price)}</p>
           <button type="button" class="primary-btn voucher-product-buy-btn" data-voucher-buy="${product.id}" ${disabled ? "disabled" : ""}>
-            ${disabled ? voucherEscapeHtml(ready.label || "Belum Ready") : "Beli Sekarang"}
+            ${disabled ? voucherEscapeHtml(ready.label || "Belum Ready") : voucherEscapeHtml(buyNowLabel)}
           </button>
         </div>
       </article>
@@ -611,16 +614,16 @@ function renderVoucherCatalog(options = {}) {
     <div class="voucher-catalog-shell">
       <div class="voucher-catalog-head">
         <div class="section-head">
-          <p class="eyebrow">Marketplace</p>
-          <h3>Beli Voucher / Gametime</h3>
-          <p class="mini-note">Pilih produk digital, transfer ke rekening admin, lalu upload bukti pembayaran.</p>
+          <p class="eyebrow">${voucherEscapeHtml(window.t?.("voucher.catalog_eyebrow") || "Marketplace")}</p>
+          <h3>${voucherEscapeHtml(window.t?.("voucher.catalog_title") || "Beli Voucher / Gametime")}</h3>
+          <p class="mini-note">${voucherEscapeHtml(window.t?.("voucher.catalog_note") || "Pilih produk digital, transfer ke rekening admin, lalu upload bukti pembayaran.")}</p>
         </div>
         <div class="voucher-catalog-toolbar">
-          <input type="search" id="voucher-catalog-search" placeholder="Cari produk voucher / gametime..." value="${voucherEscapeHtml(voucherState.catalogSearchQuery)}" autocomplete="off" enterkeyhint="search" />
+          <input type="search" id="voucher-catalog-search" placeholder="${voucherEscapeHtml(window.t?.("voucher.catalog_search") || "Cari produk voucher / gametime...")}" value="${voucherEscapeHtml(voucherState.catalogSearchQuery)}" autocomplete="off" enterkeyhint="search" />
         </div>
       </div>
       <div class="voucher-catalog-scroll">
-        <div class="voucher-product-grid ${gridClass}">${cards || `<p class='mini-note'>${voucherState.products.length ? "Tidak ada produk yang cocok dengan pencarian." : "Belum ada produk aktif."}</p>`}</div>
+        <div class="voucher-product-grid ${gridClass}">${cards || `<p class='mini-note'>${voucherEscapeHtml(voucherState.products.length ? noMatchLabel : noActiveLabel)}</p>`}</div>
       </div>
     </div>
   `;
@@ -1735,6 +1738,18 @@ function bindVoucherEvents() {
 
   window.addEventListener("rekber:locale-changed", () => {
     window.RekberI18n?.applyTranslations?.(document);
+    if (voucherState.screen === "catalog") {
+      renderVoucherCatalog({ preserveSearchFocus: true });
+      return;
+    }
+    if (voucherState.screen === "detail") {
+      renderVoucherProductDetail();
+      return;
+    }
+    if (voucherState.screen === "orders") {
+      renderVoucherOrdersPage();
+      return;
+    }
     const order = voucherState.activeOrder;
     if (!order) return;
     if (order.status === "awaiting_payment" && voucherState.screen === "checkout") {
