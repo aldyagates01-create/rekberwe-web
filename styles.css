@@ -6323,11 +6323,36 @@ textarea.field-invalid {
 
 .room-language-switcher {
   min-width: 128px;
+  min-height: 36px;
   border-radius: 10px;
-  border: 1px solid rgba(143, 164, 205, 0.3);
-  background: rgba(8, 14, 28, 0.92);
-  color: #e5eefc;
-  padding: 8px 28px 8px 10px;
+  border: 1px solid rgba(143, 164, 205, 0.28);
+  background: rgba(10, 18, 32, 0.94) !important;
+  color: #e6edf8;
+  padding: 0 10px;
+  box-shadow: none;
+}
+
+.room-language-switcher option,
+.language-switcher option {
+  background: #0d1626;
+  color: #e6edf8;
+}
+
+.mobile-language-field {
+  display: inline-flex;
+  align-items: center;
+}
+
+.mobile-language-switcher {
+  min-width: 92px;
+  max-width: 108px;
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(143, 164, 205, 0.28);
+  background: rgba(10, 18, 32, 0.94) !important;
+  color: #e6edf8;
+  padding: 0 8px;
+  font-size: 0.74rem;
 }
 
 .room-language-field-placeholder {
@@ -11218,6 +11243,34 @@ body.admin-locked .admin-notif-floating {
   cursor: pointer;
 }
 
+.voucher-catalog-terms {
+  margin-top: 16px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(143, 164, 205, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.voucher-catalog-terms h4 {
+  margin: 0 0 12px;
+  font-size: 0.98rem;
+  color: #edf3ff;
+}
+
+.voucher-catalog-terms-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.voucher-catalog-terms-list li::marker {
+  color: #818cf8;
+}
+
 .voucher-detail-layout {
   display: grid;
   gap: 18px;
@@ -13258,8 +13311,8 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   width: 100%;
   min-height: 38px;
   border-radius: 10px;
-  border: 1px solid rgba(143, 164, 205, 0.18);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(143, 164, 205, 0.28);
+  background: rgba(10, 18, 32, 0.94) !important;
   color: #e6edf8;
   padding: 0 10px;
 }

@@ -287,16 +287,30 @@ function buildVoucherPaymentUploadProgressMarkup() {
 
 function renderWorkspaceVoucherSidePanel() {
   document.body.classList.add("workspace-voucher-active");
-  const termsHead = document.querySelector("#workspace-side-terms-box h4");
-  const termsList = document.getElementById("workspace-terms-list");
-  if (termsHead) termsHead.textContent = "Syarat dan ketentuan voucher / gametime";
-  const raw = String(voucherState.paymentSettings?.termsAndConditions || "").trim();
+}
+
+function buildVoucherCatalogTermsMarkup() {
+  const payment = voucherState.paymentSettings || {};
+  const raw = String(payment.termsAndConditions || "").trim();
   const items = raw.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
-  if (termsList) {
-    termsList.innerHTML = items.length
-      ? items.map((item) => `<li>${voucherLinkifyText(item)}</li>`).join("")
-      : "<li>Syarat voucher belum diatur admin.</li>";
+  const title = window.t?.("voucher.terms_title") || "Syarat dan ketentuan pembelian voucher / gametime";
+  const empty = window.t?.("voucher.terms_empty") || "Syarat voucher belum diatur admin.";
+  if (!items.length) {
+    return `
+      <section class="voucher-catalog-terms">
+        <h4>${voucherEscapeHtml(title)}</h4>
+        <p class="mini-note">${voucherEscapeHtml(empty)}</p>
+      </section>
+    `;
   }
+  return `
+    <section class="voucher-catalog-terms">
+      <h4>${voucherEscapeHtml(title)}</h4>
+      <ol class="voucher-catalog-terms-list">
+        ${items.map((item) => `<li>${voucherLinkifyText(item)}</li>`).join("")}
+      </ol>
+    </section>
+  `;
 }
 
 function renderWorkspaceRekberSidePanel() {
@@ -625,6 +639,7 @@ function renderVoucherCatalog(options = {}) {
       <div class="voucher-catalog-scroll">
         <div class="voucher-product-grid ${gridClass}">${cards || `<p class='mini-note'>${voucherEscapeHtml(voucherState.products.length ? noMatchLabel : noActiveLabel)}</p>`}</div>
       </div>
+      ${buildVoucherCatalogTermsMarkup()}
     </div>
   `;
 

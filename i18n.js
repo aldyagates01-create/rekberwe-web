@@ -27,6 +27,8 @@
       "voucher.buy_now": "Beli Sekarang",
       "voucher.no_match": "Tidak ada produk yang cocok dengan pencarian.",
       "voucher.no_active": "Belum ada produk aktif.",
+      "voucher.terms_title": "Syarat dan ketentuan pembelian voucher / gametime",
+      "voucher.terms_empty": "Syarat voucher belum diatur admin.",
       "room.back_history": "Kembali ke Riwayat Transaksi",
       "room.dispute": "Laporkan Masalah / Ajukan Sengketa",
       "voucher.transfer_to": "Transfer ke rekening admin",
@@ -64,6 +66,8 @@
       "voucher.buy_now": "Buy Now",
       "voucher.no_match": "No products match your search.",
       "voucher.no_active": "No active products yet.",
+      "voucher.terms_title": "Voucher / gametime purchase terms",
+      "voucher.terms_empty": "Voucher terms have not been configured by admin.",
       "room.back_history": "Back to Transaction History",
       "room.dispute": "Report Issue / Open Dispute",
       "voucher.transfer_to": "Transfer to admin account",
@@ -101,6 +105,8 @@
       "voucher.buy_now": "立即购买",
       "voucher.no_match": "没有符合搜索条件的商品。",
       "voucher.no_active": "暂无上架商品。",
+      "voucher.terms_title": "点券 / 游戏时长购买条款",
+      "voucher.terms_empty": "管理员尚未设置点券条款。",
       "room.back_history": "返回交易记录",
       "room.dispute": "报告问题 / 申请争议",
       "voucher.transfer_to": "转账至管理员账户",
@@ -173,6 +179,18 @@
     });
   }
 
+  let languageSwitchBound = false;
+
+  function bindLanguageSwitchers() {
+    if (languageSwitchBound) return;
+    languageSwitchBound = true;
+    document.addEventListener("change", (event) => {
+      const select = event.target.closest(".language-switcher");
+      if (!select) return;
+      setLocale(select.value);
+    });
+  }
+
   function initI18n() {
     let saved = DEFAULT_LOCALE;
     try {
@@ -180,10 +198,8 @@
     } catch {
       saved = DEFAULT_LOCALE;
     }
+    bindLanguageSwitchers();
     setLocale(saved, { silent: true });
-    document.querySelectorAll(".language-switcher").forEach((select) => {
-      select.addEventListener("change", () => setLocale(select.value));
-    });
   }
 
   global.RekberI18n = {

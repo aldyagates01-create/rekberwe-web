@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css?v=20260709j" />
+  <link rel="stylesheet" href="/styles.css?v=20260709k" />
 </head>
 <body>
   <div class="bg-orb bg-orb-a"></div>
@@ -331,7 +331,14 @@
                   <p class="mini-note" id="room-page-subtitle">Klik judul transaksi di panel kiri untuk membuka ruang chat.</p>
                 </div>
                 <div class="room-page-meta">
-                  <div class="room-language-field-placeholder" aria-hidden="true"></div>
+                  <label class="room-language-field">
+                    <span data-i18n="lang.label">Bahasa</span>
+                    <select class="language-switcher room-language-switcher" aria-label="Language">
+                      <option value="id" data-i18n="lang.id">Indonesia</option>
+                      <option value="en" data-i18n="lang.en">English</option>
+                      <option value="zh" data-i18n="lang.zh">中文</option>
+                    </select>
+                  </label>
                 </div>
               </div>
             </div>
@@ -347,6 +354,14 @@
                 </div>
               </div>
               <div class="mobile-workspace-actions">
+                <label class="mobile-language-field">
+                  <span class="sr-only" data-i18n="lang.label">Bahasa</span>
+                  <select class="language-switcher mobile-language-switcher" aria-label="Language">
+                    <option value="id" data-i18n="lang.id">Indonesia</option>
+                    <option value="en" data-i18n="lang.en">English</option>
+                    <option value="zh" data-i18n="lang.zh">中文</option>
+                  </select>
+                </label>
                 <button type="button" class="mobile-header-icon-btn" id="mobile-header-notifications" aria-label="Buka notifikasi">
                   <span aria-hidden="true">🔔</span>
                   <span class="notif-badge hidden" id="mobile-header-notifications-badge">0</span>
@@ -460,7 +475,7 @@
                   <section class="workspace-content-card" id="workspace-inline-transaction-panel">
                     <div class="workspace-service-picker">
                       <button type="button" class="workspace-service-btn is-active" data-workspace-service="rekber">Rekber</button>
-                      <button type="button" class="workspace-service-btn" data-workspace-service="voucher">Beli Voucher / Gametime</button>
+                      <button type="button" class="workspace-service-btn" data-workspace-service="voucher" data-i18n="voucher.catalog_title">Beli Voucher / Gametime</button>
                     </div>
                     <div id="workspace-rekber-panel">
                     <div class="section-head">
@@ -1156,11 +1171,11 @@
   </div>
   <script src="/analytics-client.js?v=1"></script>
   <script src="/push-client.js?v=1"></script>
-  <script src="/i18n.js?v=20260709i"></script>
-  <script src="/voucher-upload-bridge.js?v=20260709i"></script>
-  <script src="/voucher-chat-ui.js?v=20260709i"></script>
-  <script src="/voucher-app.js?v=20260709i"></script>
-  <script src="/app.js?v=20260709i"></script>
+  <script src="/i18n.js?v=20260709k"></script>
+  <script src="/voucher-upload-bridge.js?v=20260709k"></script>
+  <script src="/voucher-chat-ui.js?v=20260709k"></script>
+  <script src="/voucher-app.js?v=20260709k"></script>
+  <script src="/app.js?v=20260709k"></script>
 </body>
 </html>
 
