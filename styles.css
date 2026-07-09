@@ -6278,6 +6278,37 @@ textarea.field-invalid {
   justify-content: flex-end;
 }
 
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.topbar-language-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #8ea2c3;
+  font-size: 0.78rem;
+}
+
+.topbar-language-switcher {
+  min-width: 132px;
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(143, 164, 205, 0.28);
+  background: rgba(10, 18, 32, 0.94) !important;
+  color: #e6edf8;
+  padding: 0 10px;
+  box-shadow: none;
+}
+
+.topbar-language-switcher option {
+  background: #0d1626;
+  color: #e6edf8;
+}
+
 .room-language-field {
   display: inline-flex;
   align-items: center;
@@ -6297,6 +6328,11 @@ textarea.field-invalid {
   background: rgba(8, 14, 28, 0.92);
   color: #e5eefc;
   padding: 8px 28px 8px 10px;
+}
+
+.room-language-field-placeholder {
+  width: 1px;
+  height: 1px;
 }
 
 .room-protection-badge {
@@ -12863,6 +12899,8 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.84fr);
   gap: 16px;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
 }
 
 .voucher-pay-main {
@@ -13169,6 +13207,16 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   }
 }
 
+@media (max-width: 1320px) {
+  .voucher-pay-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .voucher-pay-sidebar {
+    order: -1;
+  }
+}
+
 @media (max-width: 768px) {
   .voucher-pay-step {
     min-width: 0;
@@ -13214,6 +13262,14 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   background: rgba(255, 255, 255, 0.03);
   color: #e6edf8;
   padding: 0 10px;
+}
+
+.workspace-dashboard-shell:has(#workspace-voucher-panel:not(.hidden)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-dashboard-shell:has(#workspace-voucher-panel:not(.hidden)) .workspace-dashboard-side {
+  display: none;
 }
 
 /* ── Voucher chat room (shared layout) ── */

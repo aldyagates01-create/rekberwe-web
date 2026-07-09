@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css?v=20260709i" />
+  <link rel="stylesheet" href="/styles.css?v=20260709j" />
 </head>
 <body>
   <div class="bg-orb bg-orb-a"></div>
@@ -25,6 +25,14 @@
         <span class="brand-byline">By: Qhead Gold</span>
       </div>
     </div>
+    <label class="topbar-language-field">
+      <span data-i18n="lang.label">Bahasa</span>
+      <select class="language-switcher topbar-language-switcher" aria-label="Language">
+        <option value="id" data-i18n="lang.id">Indonesia</option>
+        <option value="en" data-i18n="lang.en">English</option>
+        <option value="zh" data-i18n="lang.zh">中文</option>
+      </select>
+    </label>
   </header>
 
   <main class="page-shell">
@@ -323,14 +331,7 @@
                   <p class="mini-note" id="room-page-subtitle">Klik judul transaksi di panel kiri untuk membuka ruang chat.</p>
                 </div>
                 <div class="room-page-meta">
-                  <label class="room-language-field">
-                    <span data-i18n="lang.label">Bahasa</span>
-                    <select class="language-switcher room-language-switcher" aria-label="Language">
-                      <option value="id" data-i18n="lang.id">Indonesia</option>
-                      <option value="en" data-i18n="lang.en">English</option>
-                      <option value="zh" data-i18n="lang.zh">中文</option>
-                    </select>
-                  </label>
+                  <div class="room-language-field-placeholder" aria-hidden="true"></div>
                 </div>
               </div>
             </div>
