@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css?v=20260709f" />
+  <link rel="stylesheet" href="/styles.css?v=20260709h" />
 </head>
 <body>
   <div class="bg-orb bg-orb-a"></div>
@@ -266,19 +266,27 @@
               <span>Buat Transaksi</span>
             </button>
             <div class="workspace-sidebar-menu">
-              <p class="workspace-sidebar-label">Menu</p>
-              <button type="button" class="workspace-menu-btn" id="sidebar-home-button"><span class="workspace-menu-icon">⌂</span><span>Dashboard</span></button>
-              <button type="button" class="workspace-menu-btn is-active" id="sidebar-transactions-button"><span class="workspace-menu-icon">▣</span><span>Riwayat Transaksi</span></button>
-              <button type="button" class="workspace-menu-btn" id="sidebar-profile-button"><span class="workspace-menu-icon">◉</span><span>Akun Saya</span></button>
-              <button type="button" class="workspace-menu-btn" id="sidebar-notifications-button"><span class="workspace-menu-icon">◎</span><span>Notifikasi</span></button>
-              <button type="button" class="workspace-menu-btn" id="sidebar-verification-button"><span class="workspace-menu-icon">✓</span><span>Verifikasi</span></button>
+              <p class="workspace-sidebar-label" data-i18n="menu.label">Menu</p>
+              <label class="workspace-language-field">
+                <span data-i18n="lang.label">Bahasa</span>
+                <select class="language-switcher" aria-label="Language">
+                  <option value="id">Indonesia</option>
+                  <option value="en">English</option>
+                  <option value="zh">中文</option>
+                </select>
+              </label>
+              <button type="button" class="workspace-menu-btn" id="sidebar-home-button"><span class="workspace-menu-icon">⌂</span><span data-i18n="menu.dashboard">Dashboard</span></button>
+              <button type="button" class="workspace-menu-btn is-active" id="sidebar-transactions-button"><span class="workspace-menu-icon">▣</span><span data-i18n="menu.transactions">Riwayat Transaksi</span></button>
+              <button type="button" class="workspace-menu-btn" id="sidebar-profile-button"><span class="workspace-menu-icon">◉</span><span data-i18n="menu.profile">Akun Saya</span></button>
+              <button type="button" class="workspace-menu-btn" id="sidebar-notifications-button"><span class="workspace-menu-icon">◎</span><span data-i18n="menu.notifications">Notifikasi</span></button>
+              <button type="button" class="workspace-menu-btn" id="sidebar-verification-button"><span class="workspace-menu-icon">✓</span><span data-i18n="menu.verification">Verifikasi</span></button>
             </div>
             <div class="toolbar telegram-join-toolbar">
               <label class="join-label">
-                Masukkan kode transaksi
+                <span data-i18n="menu.join_code">Masukkan kode transaksi</span>
                 <input type="text" id="join-code" placeholder="RW-2026-000128" />
               </label>
-              <button class="primary-btn" id="join-transaction">Masuk transaksi</button>
+              <button class="primary-btn" id="join-transaction" data-i18n="menu.join_button">Masuk transaksi</button>
             </div>
             <div class="sidebar-section" id="active-rekber-section">
               <div class="section-head sidebar-head">
@@ -302,10 +310,10 @@
               <div class="activity-list telegram-list" id="history-rekber-list"></div>
             </div>
             <div class="workspace-sidebar-support">
-              <p class="workspace-sidebar-label">Butuh bantuan?</p>
+              <p class="workspace-sidebar-label" data-i18n="menu.help">Butuh bantuan?</p>
               <h4>Tim support kami siap membantu 24/7</h4>
-              <button type="button" class="primary-btn sidebar-support-btn" id="sidebar-live-chat-button">Live Chat Support</button>
-              <button type="button" class="ghost-btn sidebar-guide-btn" id="sidebar-security-guide-button">Panduan Penggunaan</button>
+              <button type="button" class="primary-btn sidebar-support-btn" id="sidebar-live-chat-button" data-i18n="menu.live_chat">Live Chat Support</button>
+              <button type="button" class="ghost-btn sidebar-guide-btn" id="sidebar-security-guide-button" data-i18n="menu.user_guide">Panduan Penggunaan</button>
             </div>
             <div class="workspace-sidebar-user" id="workspace-user-card">
               <p class="mini-label">Memuat akun...</p>
@@ -679,10 +687,10 @@
             <div class="history-room-toolbar hidden" id="history-room-toolbar">
               <button type="button" class="workspace-back-btn" id="back-to-transaction-list">
                 <span aria-hidden="true">←</span>
-                <span>Kembali ke Riwayat Transaksi</span>
+                <span data-i18n="room.back_history">Kembali ke Riwayat Transaksi</span>
               </button>
               <div class="history-room-toolbar-actions">
-                <button type="button" class="danger-btn voucher-room-dispute-btn hidden" id="history-voucher-dispute-btn" data-voucher-dispute="">Laporkan Masalah / Ajukan Sengketa</button>
+                <button type="button" class="danger-btn voucher-room-dispute-btn hidden" id="history-voucher-dispute-btn" data-voucher-dispute="" data-i18n="room.dispute">Laporkan Masalah / Ajukan Sengketa</button>
               </div>
             </div>
 
@@ -1151,10 +1159,11 @@
   </div>
   <script src="/analytics-client.js?v=1"></script>
   <script src="/push-client.js?v=1"></script>
-  <script src="/voucher-upload-bridge.js?v=20260709f"></script>
-  <script src="/voucher-chat-ui.js?v=20260709f"></script>
-  <script src="/voucher-app.js?v=20260709f"></script>
-  <script src="/app.js?v=20260709f"></script>
+  <script src="/i18n.js?v=20260709h"></script>
+  <script src="/voucher-upload-bridge.js?v=20260709h"></script>
+  <script src="/voucher-chat-ui.js?v=20260709h"></script>
+  <script src="/voucher-app.js?v=20260709h"></script>
+  <script src="/app.js?v=20260709h"></script>
 </body>
 </html>
 

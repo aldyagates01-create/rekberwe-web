@@ -84,8 +84,8 @@ import {
   verifyWhatsappOtp,
 } from "./whatsapp-otp-service.js";
 import { registerVoucherRoutes } from "./voucher-routes.js";
-import { voucherOrderForViewer } from "./voucher-utils.js";
-import { resolveVoucherOrderMediaUrls } from "./upload-url.js";
+import { voucherOrderForViewer, normalizeVoucherPaymentSettings } from "./voucher-utils.js";
+import { resolveVoucherOrderMediaUrls, resolveVoucherPaymentSettingsUrls } from "./upload-url.js";
 import { createSqliteSessionStore } from "./sqlite-session-store.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
@@ -602,7 +602,9 @@ app.get("/api/config", async (_req, res) => {
     termsAndConditions: String(feeSettings.termsAndConditions || "").trim(),
     accountSecurityGuide: String(feeSettings.accountSecurityGuide || "").trim(),
     notificationSounds: feeSettings.notificationSounds || {},
-    voucherPayment: feeSettings.voucherPayment || {},
+    voucherPayment: resolveVoucherPaymentSettingsUrls(
+      normalizeVoucherPaymentSettings(feeSettings.voucherPayment || {}),
+    ),
   });
 });
 
@@ -1467,9 +1469,13 @@ app.get("/api/admin/transactions", requireAdmin, async (_req, res) => {
 });
 
 app.get("/api/admin/settings", requireAdmin, async (_req, res) => {
+  const settings = await getAdminFeeSettings();
   res.json({
     settings: {
-      ...(await getAdminFeeSettings()),
+      ...settings,
+      voucherPayment: resolveVoucherPaymentSettingsUrls(
+        normalizeVoucherPaymentSettings(settings.voucherPayment || {}),
+      ),
       storageInfo: await buildStorageInfo(),
     },
   });
@@ -1478,7 +1484,14 @@ app.get("/api/admin/settings", requireAdmin, async (_req, res) => {
 app.post("/api/admin/settings", requireAdmin, async (req, res) => {
   const settings = await saveAdminFeeSettings(req.body || {});
   invalidateMaintenanceCache();
-  res.json({ settings });
+  res.json({
+    settings: {
+      ...settings,
+      voucherPayment: resolveVoucherPaymentSettingsUrls(
+        normalizeVoucherPaymentSettings(settings.voucherPayment || {}),
+      ),
+    },
+  });
 });
 
 app.post("/api/admin/email/test", requireAdmin, async (req, res) => {
@@ -1536,6 +1549,16 @@ app.post("/api/admin/settings/notification-sounds", requireAdmin, audioUpload.fi
   });
   invalidateMaintenanceCache();
   res.json({ settings });
+});
+
+app.post("/api/admin/settings/voucher-bank-logo", requireAdmin, uploadPostLimiter, avatarUpload.single("logo"), async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ message: "Logo bank wajib dipilih." });
+    return;
+  }
+  const stored = await persistUploadFile(file, "SETTINGS", "voucher-bank-logo");
+  res.json({ logoUrl: stored.fileUrl });
 });
 
 app.get("/api/admin/analytics", requireAdmin, async (req, res) => {

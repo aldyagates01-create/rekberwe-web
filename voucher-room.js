@@ -75,7 +75,7 @@ function bindRoomFileUploadFields(root = document) {
       }
       hint.textContent = files.length
         ? (files.length === 1 ? files[0].name : `${files.length} file dipilih`)
-        : "Belum ada file dipilih";
+        : (input.dataset.emptyHint || "Belum ada file dipilih");
       label.classList.toggle("has-file", files.length > 0);
     };
     input.addEventListener("change", syncHint);
@@ -239,54 +239,174 @@ function renderMessage(message) {
   `;
 }
 
+function getPaymentBanks(payment = {}) {
+  if (Array.isArray(payment.banks) && payment.banks.length) {
+    return payment.banks.map((bank) => ({
+      name: String(bank?.name || "").trim(),
+      number: String(bank?.number || "").trim(),
+      holder: String(bank?.holder || "").trim(),
+      logoUrl: String(bank?.logoUrl || "").trim(),
+    })).filter((bank) => bank.name || bank.number);
+  }
+  const legacyName = String(payment.bankName || "").trim();
+  const legacyNumber = String(payment.bankNumber || "").trim();
+  if (!legacyName && !legacyNumber) return [];
+  return [{
+    name: legacyName,
+    number: legacyNumber,
+    holder: String(payment.bankHolder || "").trim(),
+    logoUrl: "",
+  }];
+}
+
+function extractProductRegion(product) {
+  const name = String(product?.name || "");
+  const regionMatch = name.match(/REGION\s+([A-Za-z0-9][A-Za-z0-9\s-]*)/i);
+  if (regionMatch) return regionMatch[1].trim();
+  const descLine = String(product?.description || "").trim().split(/\r?\n/).find(Boolean);
+  return descLine || "-";
+}
+
+function buildPaymentBankCards(payment = {}) {
+  const banks = getPaymentBanks(payment);
+  const holderLabel = window.t?.("voucher.account_holder") || "a.n";
+  if (!banks.length) return `<p class="mini-note">Rekening pembayaran belum dikonfigurasi admin.</p>`;
+  return banks.map((bank) => `
+    <article class="voucher-pay-bank-card">
+      <div class="voucher-pay-bank-card-top">
+        ${bank.logoUrl
+    ? `<img class="voucher-pay-bank-logo" src="${escapeHtml(bank.logoUrl)}" alt="${escapeHtml(bank.name || "Bank")}" loading="lazy" decoding="async" />`
+    : `<span class="voucher-pay-bank-logo-fallback">${escapeHtml(String(bank.name || "B").slice(0, 3).toUpperCase())}</span>`}
+        <div class="voucher-pay-bank-meta">
+          <strong>${escapeHtml(bank.name || "Bank")}</strong>
+          <div class="voucher-pay-bank-number-row">
+            <span class="voucher-pay-bank-number">${escapeHtml(bank.number || "-")}</span>
+            ${bank.number ? `<button type="button" class="voucher-copy-btn voucher-bank-copy-btn" data-voucher-copy-bank="${escapeHtml(bank.number)}">Salin</button>` : ""}
+          </div>
+          <p class="voucher-pay-bank-holder">${escapeHtml(holderLabel)} ${escapeHtml(bank.holder || "-")}</p>
+        </div>
+      </div>
+    </article>
+  `).join("");
+}
+
+function buildPaymentStepper(order) {
+  const steps = [
+    { id: 1, label: "Order Dibuat" },
+    { id: 2, label: "Menunggu Pembayaran" },
+    { id: 3, label: "Menunggu Konfirmasi" },
+    { id: 4, label: "Sedang Diproses" },
+    { id: 5, label: "Selesai" },
+  ];
+  const activeStep = order.status === "awaiting_payment" ? 2 : 1;
+  return `
+    <nav class="voucher-pay-stepper" aria-label="Progress order">
+      ${steps.map((step) => {
+    const state = step.id < activeStep ? "is-done" : step.id === activeStep ? "is-active" : "";
+    return `
+          <div class="voucher-pay-step ${state}">
+            <span class="voucher-pay-step-dot" aria-hidden="true">${step.id < activeStep ? "✓" : step.id}</span>
+            <span class="voucher-pay-step-label">${escapeHtml(step.label)}</span>
+          </div>
+        `;
+  }).join("")}
+    </nav>
+  `;
+}
+
 function buildPaymentSection(order) {
+  if (window.RekberVoucher?.buildPaymentCheckoutMarkup) {
+    return window.RekberVoucher.buildPaymentCheckoutMarkup(order, {
+      layoutMode: "standalone",
+      formId: "voucher-standalone-payment-form",
+      inputId: "voucher-standalone-payment-input",
+      showBackToCatalog: false,
+      showMessages: false,
+    });
+  }
   const payment = roomPaymentSettings || {};
   const quantity = Math.max(1, Number(order.quantity || 1));
-  const unitPrice = quantity ? Math.round(Number(order.price || 0) / quantity) : Number(order.price || 0);
+  const productImage = order.product?.imageUrl || order.product?.displayImage || "/assets/rekberwe-logo-shield.png?v=7";
+  const region = extractProductRegion(order.product);
+  const infoLines = String(payment.instructions || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   return `
-    <div class="voucher-chat-box voucher-awaiting-payment-messages">
-      ${(order.messages || []).map(renderMessage).join("")}
-    </div>
-    <div class="voucher-awaiting-payment-actions">
-      <button type="button" class="primary-btn" data-voucher-scroll-payment>Lanjutkan pembayaran</button>
-      <button type="button" class="ghost-btn voucher-chat-action-btn" data-room-order-action="cancel">Batalkan transaksi</button>
-    </div>
-    <div class="voucher-payment-section" id="voucher-payment-section">
-      <div class="voucher-checkout-grid">
-        <article class="voucher-checkout-card">
-          <h4>Detail order</h4>
-          <p><strong>${escapeHtml(order.product?.name || "-")}</strong></p>
-          <p class="mini-note">${quantity} pcs × ${escapeHtml(formatCurrency(unitPrice))}</p>
-          <p class="voucher-product-price">Total: ${escapeHtml(formatCurrency(order.price))}</p>
-        </article>
-        <article class="voucher-checkout-card">
-          <h4>Transfer ke rekening admin</h4>
-          <p><strong>${escapeHtml(payment.bankName || "-")}</strong></p>
-          <p class="voucher-bank-number">${escapeHtml(payment.bankNumber || "-")}</p>
-          <p>a.n ${escapeHtml(payment.bankHolder || "-")}</p>
-          ${payment.qrisUrl ? `<p><a href="${escapeHtml(payment.qrisUrl)}" target="_blank" rel="noreferrer">Buka QRIS</a></p>` : ""}
-          <pre class="voucher-payment-instructions">${escapeHtml(payment.instructions || "")}</pre>
-        </article>
-      </div>
-      <form id="voucher-standalone-payment-form" class="profile-form voucher-payment-proof-form">
-        <label class="file-upload-field">
-          Upload bukti pembayaran
-          <input type="file" id="voucher-standalone-payment-input" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
-          <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
-        </label>
-        <div class="upload-progress hidden voucher-payment-upload-progress" aria-live="polite">
-          <div class="upload-progress-top">
-            <strong class="voucher-payment-upload-label"><span class="upload-spinner"></span>Sedang upload bukti...</strong>
-            <span class="voucher-payment-upload-value">0%</span>
-          </div>
-          <p class="upload-progress-detail voucher-payment-upload-detail">Menyiapkan file...</p>
-          <div class="upload-progress-track">
-            <span class="voucher-payment-upload-bar"></span>
-          </div>
+    <section class="voucher-pay-checkout voucher-awaiting-payment-layout">
+      <header class="voucher-pay-topbar">
+        <a class="ghost-btn voucher-pay-back-btn" href="/"><span aria-hidden="true">←</span><span>Kembali ke Dashboard</span></a>
+        <div class="voucher-pay-topbar-actions">
+          <button type="button" class="ghost-btn voucher-pay-dispute-link" data-room-order-action="cancel">Batalkan Order</button>
         </div>
-        <button type="submit" class="primary-btn voucher-payment-submit-btn">Kirim bukti pembayaran</button>
-      </form>
-    </div>
+      </header>
+      ${buildPaymentStepper(order)}
+      <div class="voucher-pay-layout">
+        <div class="voucher-pay-main">
+          <section class="voucher-pay-card voucher-pay-order-card">
+            <h4>Detail Pesanan</h4>
+            <div class="voucher-pay-order-row">
+              <div class="voucher-pay-product">
+                <img class="voucher-pay-product-image" src="${escapeHtml(productImage)}" alt="${escapeHtml(order.product?.name || "Produk")}" loading="lazy" decoding="async" />
+                <div class="voucher-pay-product-copy">
+                  <strong>${escapeHtml(order.product?.name || "-")}</strong>
+                  <p class="mini-note">${quantity} pcs${region && region !== "-" ? ` • ${escapeHtml(region)}` : ""}</p>
+                </div>
+              </div>
+              <p class="voucher-pay-order-price">${escapeHtml(formatCurrency(order.price))}</p>
+            </div>
+          </section>
+          <section class="voucher-pay-card voucher-pay-transfer-card">
+            <h4>Lakukan Pembayaran</h4>
+            <p class="mini-note voucher-pay-transfer-note">Transfer sesuai nominal ke rekening admin berikut</p>
+            <div class="voucher-pay-bank-list">${buildPaymentBankCards(payment)}</div>
+            <div class="voucher-pay-total-box">
+              <p class="mini-note">Total yang harus ditransfer</p>
+              <strong>${escapeHtml(formatCurrency(order.price))}</strong>
+              <p class="mini-note">Pastikan nominal transfer sama persis</p>
+            </div>
+          </section>
+          <section class="voucher-pay-card voucher-pay-upload-card">
+            <h4>Upload Bukti Pembayaran</h4>
+            <form id="voucher-standalone-payment-form" class="voucher-payment-proof-form">
+              <label class="file-upload-field voucher-payment-dropzone">
+                <input type="file" id="voucher-standalone-payment-input" name="paymentProof" accept="image/jpeg,image/png,image/webp" required data-empty-hint="Klik atau drag file ke sini (PNG, JPG, JPEG, Max 5MB)" />
+                <span class="voucher-payment-dropzone-icon" aria-hidden="true">⬆</span>
+                <span class="voucher-payment-dropzone-title">Klik atau drag file ke sini</span>
+                <span class="file-upload-hint mini-note">PNG, JPG, JPEG, Max 5MB</span>
+              </label>
+              <div class="upload-progress hidden voucher-payment-upload-progress" aria-live="polite">
+                <div class="upload-progress-top">
+                  <strong class="voucher-payment-upload-label"><span class="upload-spinner"></span>Sedang upload bukti...</strong>
+                  <span class="voucher-payment-upload-value">0%</span>
+                </div>
+                <p class="upload-progress-detail voucher-payment-upload-detail">Menyiapkan file...</p>
+                <div class="upload-progress-track"><span class="voucher-payment-upload-bar"></span></div>
+              </div>
+              <p class="voucher-pay-privacy-note"><span aria-hidden="true">🔒</span> Bukti pembayaran hanya dapat dilihat oleh admin.</p>
+              <button type="submit" class="primary-btn voucher-payment-submit-btn">Upload & Kirim Bukti</button>
+            </form>
+          </section>
+        </div>
+        <aside class="voucher-pay-sidebar">
+          <section class="voucher-pay-side-card">
+            <h4>Informasi Order</h4>
+            <dl class="voucher-pay-info-list">
+              <div><dt>Kode Transaksi</dt><dd>${escapeHtml(order.orderCode)}</dd></div>
+              <div><dt>Tanggal dibuat</dt><dd>${escapeHtml(formatDateTime(order.createdAt))}</dd></div>
+              <div><dt>Produk</dt><dd>${escapeHtml(order.product?.name || "-")}</dd></div>
+              <div><dt>Total harga</dt><dd>${escapeHtml(formatCurrency(order.price))}</dd></div>
+              <div><dt>Status</dt><dd><span class="${statusClass(order.status)}">${escapeHtml(order.statusLabel || order.status)}</span></dd></div>
+            </dl>
+          </section>
+          <section class="voucher-pay-side-card">
+            <h4>Informasi Penting</h4>
+            <ul class="voucher-pay-info-bullets">
+              ${infoLines.length
+    ? infoLines.map((line) => `<li><span aria-hidden="true">✓</span><span>${escapeHtml(line)}</span></li>`).join("")
+    : `<li><span aria-hidden="true">✓</span><span>Transfer sesuai nominal order.</span></li><li><span aria-hidden="true">✓</span><span>Upload bukti setelah transfer.</span></li>`}
+            </ul>
+          </section>
+        </aside>
+      </div>
+    </section>
   `;
 }
 
@@ -400,26 +520,10 @@ function renderRoom(order) {
   const selectionEnd = hadFocus ? prevInput.selectionEnd : null;
 
   roomRoot.innerHTML = isAwaitingPayment
-    ? `
-    <section class="card voucher-standalone-card">
-      <div class="voucher-chat-head">
-        <a class="ghost-btn" href="/">← Kembali ke dashboard</a>
-        <div>
-          <p class="eyebrow">Order ${escapeHtml(order.orderCode)}</p>
-          <h3>${escapeHtml(order.product?.name || "Voucher")}</h3>
-          <span class="${statusClass(order.status)}">${escapeHtml(order.statusLabel || order.status)}</span>
-        </div>
-      </div>
-      ${buildPaymentSection(order)}
-    </section>
-  `
+    ? `<div class="card voucher-standalone-card voucher-standalone-payment-card">${buildPaymentSection(order)}</div>`
     : buildChatSection(order);
 
-  if (isAwaitingPayment) {
-    document.querySelector("[data-voucher-scroll-payment]")?.addEventListener("click", () => {
-      document.getElementById("voucher-payment-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  } else {
+  if (!isAwaitingPayment) {
     const box = document.getElementById("voucher-standalone-chat-box");
     if (box) box.scrollTop = box.scrollHeight;
     const nextInput = document.getElementById("voucher-standalone-chat-input");
@@ -650,6 +754,29 @@ function bindRoomEvents(orderCode) {
   });
 
   document.addEventListener("click", async (event) => {
+    const bankCopyButton = event.target.closest("[data-voucher-copy-bank]");
+    if (bankCopyButton) {
+      const text = String(bankCopyButton.dataset.voucherCopyBank || "").trim();
+      if (text) {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.setAttribute("readonly", "");
+          textarea.style.position = "fixed";
+          textarea.style.left = "-9999px";
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+        const original = bankCopyButton.textContent;
+        bankCopyButton.textContent = "Tersalin";
+        window.setTimeout(() => { bankCopyButton.textContent = original; }, 1600);
+      }
+      return;
+    }
     const actionButton = event.target.closest("[data-room-order-action]");
     if (!actionButton) return;
     try {

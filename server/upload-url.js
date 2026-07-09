@@ -43,6 +43,17 @@ export function resolveUploadAccessUrl(url, { expiresInSeconds = 3600 } = {}) {
   return value;
 }
 
+export function resolveVoucherPaymentSettingsUrls(payment = {}) {
+  const banks = Array.isArray(payment.banks) ? payment.banks : [];
+  return {
+    ...payment,
+    banks: banks.map((bank) => ({
+      ...bank,
+      logoUrl: bank.logoUrl ? resolveUploadAccessUrl(bank.logoUrl) : "",
+    })),
+  };
+}
+
 export function resolveVoucherOrderMediaUrls(order) {
   if (!order) return order;
   const paymentProofUrl = resolveUploadAccessUrl(order.paymentProofUrl);

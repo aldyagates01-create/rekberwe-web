@@ -115,13 +115,15 @@ export function registerVoucherRoutes(app, {
   });
 
   app.get("/api/voucher/orders", requireAuth, async (req, res) => {
+    const viewer = getVoucherViewer(req);
     const orders = req.session.user.isAdmin
       ? await getAllVoucherOrders()
       : stripVoucherOrderSummaries(await getVoucherOrdersByUserId(req.session.user.id));
     res.json({
-      orders: req.session.user.isAdmin
-        ? orders.map((order) => resolveVoucherOrderMediaUrls(order))
-        : orders,
+      orders: orders.map((order) => voucherOrderForViewer(
+        resolveVoucherOrderMediaUrls(order),
+        viewer,
+      )),
     });
   });
 

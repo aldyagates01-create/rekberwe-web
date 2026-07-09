@@ -321,11 +321,11 @@
             </label>
             <button type="button" class="primary-btn" id="save-maintenance-settings-btn">Simpan Mode Maintenance</button>
           </div>
-          <div class="settings-section-card">
+          <div class="settings-section-card" id="voucher-payment-banks-section">
             <h4>Rekening pembayaran voucher / gametime</h4>
-            <label>Nama bank<input type="text" id="voucher-payment-bank-name" placeholder="BCA" /></label>
-            <label>Nomor rekening<input type="text" id="voucher-payment-bank-number" placeholder="1234567890" /></label>
-            <label>Nama pemilik rekening<input type="text" id="voucher-payment-bank-holder" placeholder="Qhead Gold" /></label>
+            <p class="mini-note">Tambahkan satu atau lebih rekening bank beserta logo bank untuk ditampilkan ke pembeli saat checkout.</p>
+            <div id="voucher-payment-banks-list" class="voucher-payment-banks-list"></div>
+            <button type="button" class="ghost-btn" id="voucher-payment-add-bank">+ Tambah Bank</button>
             <label>URL QRIS (opsional)<input type="url" id="voucher-payment-qris-url" placeholder="https://..." /></label>
             <label>Instruksi pembayaran<textarea id="voucher-payment-instructions" rows="4"></textarea></label>
             <label>Syarat & ketentuan voucher / gametime<textarea id="voucher-payment-terms" rows="6" placeholder="Satu poin per baris. Tampil di panel kanan saat user memilih layanan voucher/gametime."></textarea></label>
@@ -794,8 +794,8 @@
   </div>
   <script src="analytics-client.js?v=1"></script>
   <script src="push-client.js?v=1"></script>
-  <script src="voucher-chat-ui.js?v=20260709f"></script>
-  <script src="voucher-admin.js?v=20260709f"></script>
+  <script src="voucher-chat-ui.js?v=20260709h"></script>
+  <script src="voucher-admin.js?v=20260709h"></script>
   <script src="admin.js"></script>
 </body>
 </html>

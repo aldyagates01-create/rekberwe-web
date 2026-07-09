@@ -129,7 +129,7 @@
               <input type="file" id="${escapeHtml(uploadId)}" accept="image/jpeg,image/png,image/webp" multiple hidden />
               <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true"><path d="M12 5v10M8 9l4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 15v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             </label>
-            <input type="text" id="${escapeHtml(inputId)}" class="voucher-chat-input" placeholder="Tulis pesan ke admin..." autocomplete="off" />
+            <input type="text" id="${escapeHtml(inputId)}" class="voucher-chat-input" placeholder="Tulis pesan ke admin..." data-i18n-placeholder="chat.placeholder" autocomplete="off" />
             <button type="submit" class="primary-btn voucher-chat-send-btn" aria-label="Kirim pesan">
               <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true"><path d="m5 12 14-7v4h7v6h-7v4z" fill="currentColor"/></svg>
             </button>

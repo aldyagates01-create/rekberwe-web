@@ -114,18 +114,54 @@ export function defaultVoucherPaymentSettings() {
   };
 }
 
+function normalizeVoucherPaymentBank(bank = {}, index = 0) {
+  const name = String(bank.name || bank.bankName || "").trim();
+  const number = String(bank.number || bank.bankNumber || "").trim();
+  const holder = String(bank.holder || bank.bankHolder || "").trim();
+  const logoUrl = String(bank.logoUrl || bank.logo || "").trim();
+  const id = String(bank.id || bank.bankId || "").trim() || `bank-${index + 1}`;
+  return { id, name, number, holder, logoUrl };
+}
+
 export function normalizeVoucherPaymentSettings(input = {}) {
   const raw = input || {};
+  let banks = Array.isArray(raw.banks)
+    ? raw.banks.map((bank, index) => normalizeVoucherPaymentBank(bank, index)).filter((bank) => bank.name || bank.number)
+    : [];
+  if (!banks.length && (raw.bankName || raw.bankNumber)) {
+    banks = [normalizeVoucherPaymentBank({
+      id: "bank-1",
+      name: raw.bankName,
+      number: raw.bankNumber,
+      holder: raw.bankHolder,
+      logoUrl: raw.bankLogoUrl || "",
+    }, 0)];
+  }
+  const primary = banks[0] || {};
   return {
-    bankName: String(raw.bankName || "").trim(),
-    bankNumber: String(raw.bankNumber || "").trim(),
-    bankHolder: String(raw.bankHolder || "").trim(),
+    bankName: primary.name || String(raw.bankName || "").trim(),
+    bankNumber: primary.number || String(raw.bankNumber || "").trim(),
+    bankHolder: primary.holder || String(raw.bankHolder || "").trim(),
+    banks,
     qrisUrl: String(raw.qrisUrl || "").trim(),
     instructions: String(raw.instructions || defaultVoucherPaymentSettings().instructions).trim()
       || defaultVoucherPaymentSettings().instructions,
     termsAndConditions: String(raw.termsAndConditions || defaultVoucherPaymentSettings().termsAndConditions).trim()
       || defaultVoucherPaymentSettings().termsAndConditions,
   };
+}
+
+export function getVoucherPaymentBanks(payment = {}) {
+  const normalized = normalizeVoucherPaymentSettings(payment);
+  if (normalized.banks.length) return normalized.banks;
+  if (!normalized.bankName && !normalized.bankNumber) return [];
+  return [{
+    id: "bank-1",
+    name: normalized.bankName,
+    number: normalized.bankNumber,
+    holder: normalized.bankHolder,
+    logoUrl: "",
+  }];
 }
 
 export function getVoucherStatusLabel(status) {

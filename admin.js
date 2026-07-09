@@ -58,9 +58,8 @@ const elements = {
   adminVerificationSearch: document.getElementById("admin-verification-search"),
   adminTransactionList: document.getElementById("admin-transaction-list"),
   adminLogout: document.getElementById("admin-logout"),
-  voucherPaymentBankName: document.getElementById("voucher-payment-bank-name"),
-  voucherPaymentBankNumber: document.getElementById("voucher-payment-bank-number"),
-  voucherPaymentBankHolder: document.getElementById("voucher-payment-bank-holder"),
+  voucherPaymentBanksList: document.getElementById("voucher-payment-banks-list"),
+  voucherPaymentAddBank: document.getElementById("voucher-payment-add-bank"),
   voucherPaymentQrisUrl: document.getElementById("voucher-payment-qris-url"),
   voucherPaymentInstructions: document.getElementById("voucher-payment-instructions"),
   voucherPaymentTerms: document.getElementById("voucher-payment-terms"),
@@ -248,6 +247,7 @@ elements.adminLogout?.addEventListener("click", async () => {
 });
 
 elements.adminFeeForm.addEventListener("submit", handleSaveFeeSettings);
+elements.voucherPaymentAddBank?.addEventListener("click", () => addVoucherPaymentBankRow());
 elements.saveMaintenanceSettingsBtn?.addEventListener("click", handleSaveMaintenanceSettings);
 bindSettingsFormProtection();
 elements.adminSendTestEmail?.addEventListener("click", handleAdminSendTestEmail);
@@ -1675,6 +1675,122 @@ function renderFeeSettingsMeta(settings) {
   renderStorageInfo(settings?.storageInfo);
 }
 
+function buildVoucherPaymentBankRowHtml(bank = {}, index = 0) {
+  const id = String(bank.id || `bank-${index + 1}`);
+  const logoUrl = String(bank.logoUrl || "").trim();
+  return `
+    <article class="voucher-payment-bank-row" data-bank-id="${escapeAttribute(id)}">
+      <div class="voucher-payment-bank-row-head">
+        <strong>Bank ${index + 1}</strong>
+        <button type="button" class="ghost-btn voucher-bank-remove-btn">Hapus</button>
+      </div>
+      <div class="voucher-payment-bank-logo-field">
+        <label class="file-upload-field">Logo bank
+          <input type="file" class="voucher-bank-logo-input" accept="image/jpeg,image/png,image/webp" />
+          <span class="file-upload-hint mini-note">${logoUrl ? "Logo sudah diupload" : "Belum ada logo dipilih"}</span>
+        </label>
+        ${logoUrl ? `<img class="voucher-bank-logo-preview" src="${escapeAttribute(logoUrl)}" alt="Logo bank" />` : `<img class="voucher-bank-logo-preview hidden" alt="" />`}
+        <input type="hidden" class="voucher-bank-logo-url" value="${escapeAttribute(logoUrl)}" />
+      </div>
+      <label>Nama bank<input type="text" class="voucher-bank-name" value="${escapeAttribute(bank.name || bank.bankName || "")}" placeholder="BCA" /></label>
+      <label>Nomor rekening<input type="text" class="voucher-bank-number" value="${escapeAttribute(bank.number || bank.bankNumber || "")}" placeholder="1234567890" /></label>
+      <label>Nama pemilik rekening<input type="text" class="voucher-bank-holder" value="${escapeAttribute(bank.holder || bank.bankHolder || "")}" placeholder="Qhead Gold" /></label>
+    </article>
+  `;
+}
+
+function bindVoucherPaymentBankRowEvents(container = document) {
+  container.querySelectorAll(".voucher-bank-remove-btn").forEach((button) => {
+    if (button.dataset.bound) return;
+    button.dataset.bound = "1";
+    button.addEventListener("click", () => {
+      const row = button.closest(".voucher-payment-bank-row");
+      const list = elements.voucherPaymentBanksList;
+      const rows = list?.querySelectorAll(".voucher-payment-bank-row") || [];
+      if (rows.length <= 1) {
+        showStatus("Minimal satu rekening bank harus tersedia.", true);
+        return;
+      }
+      row?.remove();
+      settingsFormDirty = true;
+    });
+  });
+  container.querySelectorAll(".voucher-bank-logo-input").forEach((input) => {
+    if (input.dataset.bound) return;
+    input.dataset.bound = "1";
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      const row = input.closest(".voucher-payment-bank-row");
+      if (!file || !row) return;
+      const formData = new FormData();
+      formData.append("logo", file);
+      try {
+        const payload = await uploadWithProgress("/api/admin/settings/voucher-bank-logo", formData);
+        const logoInput = row.querySelector(".voucher-bank-logo-url");
+        const preview = row.querySelector(".voucher-bank-logo-preview");
+        if (logoInput) logoInput.value = payload.logoUrl || "";
+        if (preview) {
+          preview.src = payload.logoUrl || "";
+          preview.classList.toggle("hidden", !payload.logoUrl);
+        }
+        const hint = row.querySelector(".file-upload-hint");
+        if (hint) hint.textContent = "Logo sudah diupload";
+        settingsFormDirty = true;
+      } catch (error) {
+        showStatus(error.message || "Gagal upload logo bank.", true);
+      }
+    });
+  });
+}
+
+function addVoucherPaymentBankRow(bank = {}) {
+  if (!elements.voucherPaymentBanksList) return;
+  const index = elements.voucherPaymentBanksList.querySelectorAll(".voucher-payment-bank-row").length;
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = buildVoucherPaymentBankRowHtml(bank, index);
+  const row = wrapper.firstElementChild;
+  if (!row) return;
+  elements.voucherPaymentBanksList.appendChild(row);
+  bindVoucherPaymentBankRowEvents(row);
+  settingsFormDirty = true;
+}
+
+function collectVoucherPaymentBanksFromDom() {
+  return Array.from(elements.voucherPaymentBanksList?.querySelectorAll(".voucher-payment-bank-row") || [])
+    .map((row, index) => ({
+      id: row.dataset.bankId || `bank-${index + 1}`,
+      name: String(row.querySelector(".voucher-bank-name")?.value || "").trim(),
+      number: String(row.querySelector(".voucher-bank-number")?.value || "").trim(),
+      holder: String(row.querySelector(".voucher-bank-holder")?.value || "").trim(),
+      logoUrl: String(row.querySelector(".voucher-bank-logo-url")?.value || "").trim(),
+    }))
+    .filter((bank) => bank.name || bank.number);
+}
+
+function renderVoucherPaymentBanksInSettings(payment = {}) {
+  if (!elements.voucherPaymentBanksList) return;
+  const banks = Array.isArray(payment.banks) && payment.banks.length
+    ? payment.banks
+    : (payment.bankName || payment.bankNumber
+      ? [{
+        id: "bank-1",
+        name: payment.bankName,
+        number: payment.bankNumber,
+        holder: payment.bankHolder,
+        logoUrl: payment.bankLogoUrl || "",
+      }]
+      : []);
+  elements.voucherPaymentBanksList.innerHTML = banks.length
+    ? banks.map((bank, index) => buildVoucherPaymentBankRowHtml(bank, index)).join("")
+    : buildVoucherPaymentBankRowHtml({}, 0);
+  bindVoucherPaymentBankRowEvents(elements.voucherPaymentBanksList);
+  if (elements.voucherPaymentQrisUrl) elements.voucherPaymentQrisUrl.value = payment.qrisUrl || "";
+  if (elements.voucherPaymentInstructions) elements.voucherPaymentInstructions.value = payment.instructions || "";
+  if (elements.voucherPaymentTerms) elements.voucherPaymentTerms.value = payment.termsAndConditions || "";
+}
+
+window.renderVoucherPaymentSettingsPanel = renderVoucherPaymentBanksInSettings;
+
 function renderFeeSettings(settings) {
   const tiers = settings?.accountFeeTiers || [];
   elements.adminPayoutAccount.value = settings?.adminPayoutAccount || "";
@@ -1695,7 +1811,7 @@ function renderFeeSettings(settings) {
     elements.maintenanceModeMessage.value = settings?.maintenanceMessage || "";
   }
   renderMaintenanceSettingsState(settings);
-  window.RekberAdminVoucher?.renderPaymentSettings?.(settings);
+  renderVoucherPaymentBanksInSettings(settings?.voucherPayment || {});
   for (let index = 0; index < 4; index += 1) {
     const tier = tiers[index] || { maxAmount: "", fee: "", feeType: "flat" };
     document.getElementById(`tier-${index + 1}-max`).value = tier.maxAmount ?? "";
@@ -2057,14 +2173,19 @@ async function handleSaveFeeSettings(event) {
       accountSecurityGuide: String(elements.accountSecurityGuide?.value || "").trim(),
       maintenanceMode: Boolean(elements.maintenanceModeEnabled?.checked),
       maintenanceMessage: String(elements.maintenanceModeMessage?.value || "").trim(),
-      voucherPayment: {
-        bankName: String(elements.voucherPaymentBankName?.value || "").trim(),
-        bankNumber: String(elements.voucherPaymentBankNumber?.value || "").trim(),
-        bankHolder: String(elements.voucherPaymentBankHolder?.value || "").trim(),
-        qrisUrl: String(elements.voucherPaymentQrisUrl?.value || "").trim(),
-        instructions: String(elements.voucherPaymentInstructions?.value || "").trim(),
-        termsAndConditions: String(elements.voucherPaymentTerms?.value || "").trim(),
-      },
+      voucherPayment: (() => {
+        const banks = collectVoucherPaymentBanksFromDom();
+        const primary = banks[0] || {};
+        return {
+          banks,
+          bankName: primary.name || "",
+          bankNumber: primary.number || "",
+          bankHolder: primary.holder || "",
+          qrisUrl: String(elements.voucherPaymentQrisUrl?.value || "").trim(),
+          instructions: String(elements.voucherPaymentInstructions?.value || "").trim(),
+          termsAndConditions: String(elements.voucherPaymentTerms?.value || "").trim(),
+        };
+      })(),
     }),
   });
 

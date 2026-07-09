@@ -19,9 +19,8 @@ const adminVoucherElements = {
   reportLoadButton: document.getElementById("voucher-report-load-btn"),
   reportSummary: document.getElementById("voucher-report-summary"),
   reportList: document.getElementById("voucher-report-list"),
-  voucherPaymentBankName: document.getElementById("voucher-payment-bank-name"),
-  voucherPaymentBankNumber: document.getElementById("voucher-payment-bank-number"),
-  voucherPaymentBankHolder: document.getElementById("voucher-payment-bank-holder"),
+  voucherPaymentBanksList: document.getElementById("voucher-payment-banks-list"),
+  voucherPaymentAddBank: document.getElementById("voucher-payment-add-bank"),
   voucherPaymentQrisUrl: document.getElementById("voucher-payment-qris-url"),
   voucherPaymentInstructions: document.getElementById("voucher-payment-instructions"),
   voucherPaymentTerms: document.getElementById("voucher-payment-terms"),
@@ -855,13 +854,7 @@ async function submitAdminVoucherChat(event) {
 }
 
 function renderAdminVoucherPaymentSettings(settings) {
-  const payment = settings?.voucherPayment || {};
-  if (adminVoucherElements.voucherPaymentBankName) adminVoucherElements.voucherPaymentBankName.value = payment.bankName || "";
-  if (adminVoucherElements.voucherPaymentBankNumber) adminVoucherElements.voucherPaymentBankNumber.value = payment.bankNumber || "";
-  if (adminVoucherElements.voucherPaymentBankHolder) adminVoucherElements.voucherPaymentBankHolder.value = payment.bankHolder || "";
-  if (adminVoucherElements.voucherPaymentQrisUrl) adminVoucherElements.voucherPaymentQrisUrl.value = payment.qrisUrl || "";
-  if (adminVoucherElements.voucherPaymentInstructions) adminVoucherElements.voucherPaymentInstructions.value = payment.instructions || "";
-  if (adminVoucherElements.voucherPaymentTerms) adminVoucherElements.voucherPaymentTerms.value = payment.termsAndConditions || "";
+  window.renderVoucherPaymentSettingsPanel?.(settings?.voucherPayment || {});
 }
 
 async function deleteAdminVoucherOrder(orderCode) {
