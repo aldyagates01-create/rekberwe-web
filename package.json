@@ -8,7 +8,10 @@
     "start": "node --import tsx server/server.js",
     "dev": "node --import tsx --watch server/server.js",
     "dev:web": "npm run dev --prefix web",
-    "check": "node --check app.js && node --check server/server.js"
+    "check": "node --check app.js && node --check server/server.js",
+    "admin-desktop:install": "npm install --prefix admin-desktop",
+    "admin-desktop:start": "npm --prefix admin-desktop start",
+    "admin-desktop:build": "npm --prefix admin-desktop run build:win"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",

@@ -28,6 +28,8 @@ let adminTypingStopTimer = null;
 let adminSupportTypingStopTimer = null;
 let adminSupportPresenceTickTimer = null;
 let adminRoomPresenceTickTimer = null;
+let adminSessionKeepaliveTimer = null;
+let adminLiveEventRetryTimer = null;
 let settingsFormDirty = false;
 
 const adminAppConfig = {
@@ -453,6 +455,7 @@ async function bootstrap() {
   renderAdminUser(session.user);
   initResizableLayouts();
   setupAdminLiveEvents();
+  startAdminSessionKeepalive();
   await refreshDashboardData();
   openAdminPage("overview");
   window.RekberAdminVoucher?.init();
@@ -883,6 +886,12 @@ function unlockAdminNotificationAudio() {
 }
 
 function playAdminNotificationSound(kind = "chat") {
+  window.RekberDesktop?.notify?.({
+    title: kind === "transaction" ? "Aktivitas baru — RekberWE Admin" : "Pesan baru — RekberWE Admin",
+    body: kind === "transaction"
+      ? "Ada order, transaksi, atau aktivitas admin yang perlu dicek."
+      : "Ada pesan chat baru masuk.",
+  });
   if (!adminNotificationState.audioUnlocked) return;
   const now = Date.now();
   if (now - adminNotificationState.lastSoundAt < 1200) return;
@@ -3458,7 +3467,44 @@ function initResizableLayouts() {
   });
 }
 
+function startAdminSessionKeepalive() {
+  if (adminSessionKeepaliveTimer) window.clearInterval(adminSessionKeepaliveTimer);
+  adminSessionKeepaliveTimer = window.setInterval(async () => {
+    try {
+      const session = await fetchJson("/api/session");
+      if (!session.user?.isAdmin) {
+        showAdminLoginGate("Session admin berakhir. Silakan login ulang.");
+        stopAdminSessionKeepalive();
+        return;
+      }
+      state.currentUser = session.user;
+    } catch {
+      // Abaikan gangguan jaringan sementara; coba lagi interval berikutnya.
+    }
+  }, 3 * 60 * 1000);
+}
+
+function stopAdminSessionKeepalive() {
+  if (adminSessionKeepaliveTimer) {
+    window.clearInterval(adminSessionKeepaliveTimer);
+    adminSessionKeepaliveTimer = null;
+  }
+}
+
+function scheduleAdminLiveEventReconnect() {
+  if (adminLiveEventRetryTimer || !state.currentUser?.isAdmin) return;
+  adminLiveEventRetryTimer = window.setTimeout(() => {
+    adminLiveEventRetryTimer = null;
+    if (!state.currentUser?.isAdmin) return;
+    setupAdminLiveEvents();
+  }, 5000);
+}
+
 function setupAdminLiveEvents() {
+  if (adminLiveEventRetryTimer) {
+    window.clearTimeout(adminLiveEventRetryTimer);
+    adminLiveEventRetryTimer = null;
+  }
   if (adminEventSource) {
     adminEventSource.close();
     adminEventSource = null;
@@ -3611,6 +3657,9 @@ function setupAdminLiveEvents() {
   adminEventSource.addEventListener("error", () => {
     if (adminPresenceTimer) window.clearInterval(adminPresenceTimer);
     adminPresenceTimer = null;
+    adminEventSource?.close();
+    adminEventSource = null;
+    scheduleAdminLiveEventReconnect();
   });
 }
 
@@ -3630,6 +3679,7 @@ function updateAdminNotificationBadges() {
   setAdminButtonBadge(verificationButton, (state.users || []).filter((user) => user.needsVerificationReview).length);
   setAdminButtonBadge(voucherOrdersButton, getAdminVoucherNotificationCount());
   setAdminNotifBadge(getAdminDashboardNotificationCount());
+  window.RekberDesktop?.setBadge?.(getAdminDashboardNotificationCount());
   if (elements.adminNotifPanel && !elements.adminNotifPanel.classList.contains("hidden")) {
     renderAdminNotificationPanel();
   }

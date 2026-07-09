@@ -87,6 +87,8 @@ import { registerVoucherRoutes } from "./voucher-routes.js";
 import { voucherOrderForViewer, normalizeVoucherPaymentSettings } from "./voucher-utils.js";
 import { resolveVoucherOrderMediaUrls, resolveVoucherPaymentSettingsUrls } from "./upload-url.js";
 import { createSqliteSessionStore } from "./sqlite-session-store.js";
+import { createLazySessionStore, createPgSessionStore } from "./pg-session-store.js";
+import { runPgSessionQuery } from "./database.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
@@ -412,8 +414,17 @@ if (!sessionSecret && isProduction) {
   throw new Error("SESSION_SECRET wajib diset di production.");
 }
 
+const sessionMaxAge = Number(process.env.SESSION_MAX_AGE_MS || 1000 * 60 * 60 * 24 * 30);
+
 let sessionStore = null;
-if (!postgresEnabled) {
+if (postgresEnabled) {
+  sessionStore = createLazySessionStore(async () => {
+    const store = createPgSessionStore(runPgSessionQuery);
+    await store.ready();
+    console.log("Session store PostgreSQL aktif.");
+    return store;
+  });
+} else {
   try {
     sessionStore = createSqliteSessionStore(dataDir);
     console.log("Session store SQLite aktif.");
@@ -429,11 +440,12 @@ app.use(
     store: sessionStore || undefined,
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     cookie: {
       httpOnly: true,
       sameSite: "lax",
       secure: isProduction,
-      maxAge: 1000 * 60 * 60 * 24 * 7,
+      maxAge: sessionMaxAge,
     },
   }),
 );

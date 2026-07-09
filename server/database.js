@@ -2296,3 +2296,11 @@ export async function isVoucherProductCatalogImage(uploadPath) {
   );
   return Boolean(row);
 }
+
+export async function runPgSessionQuery(sql, params = []) {
+  if (!postgresEnabled) {
+    throw new Error("PostgreSQL tidak aktif.");
+  }
+  await ensureReady();
+  return pool.query(sql, params);
+}
