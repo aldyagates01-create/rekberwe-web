@@ -526,7 +526,7 @@ async function refreshVoucherData(options = {}) {
     }
     if (latest) {
       voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder || latest, latest);
-      if (isVoucherChatRoomStatus(latest.status) && ["checkout", "chat"].includes(voucherState.screen)) {
+      if (!options.skipChatroomRedirect && isVoucherChatRoomStatus(latest.status) && ["checkout", "chat"].includes(voucherState.screen)) {
         goToVoucherChatroom(latest.orderCode);
         return;
       }

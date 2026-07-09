@@ -339,19 +339,31 @@ bootstrap().catch((error) => {
   if (state.currentUser?.banned) {
     setAuthStatus(state.currentUser.bannedReason || "Akun Anda sedang diblokir admin.", true);
   } else {
-    setAuthStatus("Website belum bisa memuat data login. Silakan coba refresh halaman.", true);
+    const message = error instanceof Error && error.message
+      ? error.message
+      : "Website belum bisa memuat data login. Silakan coba refresh halaman.";
+    setAuthStatus(message, true);
   }
   renderAll();
 });
 
 async function bootstrap() {
-  state.providerConfig = await fetchJson("/api/config");
+  try {
+    state.providerConfig = await fetchJson("/api/config");
+  } catch (error) {
+    throw new Error(error?.message || "Gagal memuat konfigurasi website.");
+  }
   initResizableLayouts();
   initViewportListener();
   handleProviderAuthCallback();
   renderAll();
   updateProviderAvailability();
-  await hydrateCurrentSession();
+  try {
+    await hydrateCurrentSession();
+  } catch (error) {
+    console.error("Gagal memuat sesi login:", error);
+    state.currentUser = null;
+  }
   renderAll();
   const routeParams = new URLSearchParams(window.location.search);
   const returnTo = routeParams.get("returnTo");
@@ -390,8 +402,13 @@ async function bootstrap() {
   }
   const initialResults = await Promise.allSettled(initialJobs);
   const failedInitialJob = initialResults.find((item) => item.status === "rejected");
-  if (failedInitialJob && !hasTransactionRoute && !hasVoucherRoute) {
-    throw failedInitialJob.reason;
+  if (failedInitialJob) {
+    console.error("Gagal memuat data awal:", failedInitialJob.reason);
+    if (!hasTransactionRoute && !hasVoucherRoute) {
+      const reason = failedInitialJob.reason;
+      const message = reason instanceof Error ? reason.message : "Gagal memuat data akun.";
+      setAuthStatus(message, true);
+    }
   }
   renderAll();
   if (hasSupportRoute) {
@@ -436,7 +453,7 @@ async function bootstrap() {
       renderNotifications();
     };
     window.RekberVoucher?.init(state.currentUser);
-    await window.RekberVoucher?.refresh?.().catch(() => {});
+    await window.RekberVoucher?.refresh?.({ skipChatroomRedirect: true }).catch(() => {});
     await tryCompletePendingSellerJoin();
   }
 }
@@ -494,7 +511,16 @@ async function fetchJson(url, options = {}) {
   });
 
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : {};
+  let payload = {};
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new Error(response.ok
+        ? "Respons server tidak valid. Silakan refresh halaman."
+        : `Server error (${response.status}). Silakan coba lagi.`);
+    }
+  }
   if (!response.ok) {
     throw new Error(payload.message || "Permintaan gagal.");
   }

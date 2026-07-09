@@ -467,10 +467,18 @@ function shouldBypassMaintenance(req) {
   if (requestPath === "/admin" || requestPath === "/maintenance") return true;
   if (requestPath.startsWith("/auth/")) return true;
   if (requestPath.startsWith("/api/admin/")) return true;
-  if (requestPath === "/api/session" || requestPath === "/api/logout") return true;
+  if (requestPath === "/api/session" || requestPath === "/api/logout" || requestPath === "/api/config") return true;
+  if (requestPath === "/api/transactions" || requestPath === "/api/me/dashboard") return true;
+  if (requestPath.startsWith("/api/voucher/")) return true;
   if (requestPath.startsWith("/assets/")) return true;
   if (
     requestPath === "/styles.css"
+    || requestPath === "/app.js"
+    || requestPath === "/voucher-app.js"
+    || requestPath === "/voucher-chat-ui.js"
+    || requestPath === "/voucher-upload-bridge.js"
+    || requestPath === "/chatroom.js"
+    || requestPath === "/chatroom.html"
     || requestPath === "/admin.html"
     || requestPath === "/admin.js"
     || requestPath === "/analytics-client.js"
