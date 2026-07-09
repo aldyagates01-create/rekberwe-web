@@ -1321,6 +1321,47 @@ select {
   background: #070b14;
 }
 
+.voucher-chatroom-page {
+  min-height: 100vh;
+  background: #070b14;
+}
+
+.voucher-chatroom-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 16px 32px;
+  min-height: calc(100vh - 40px);
+}
+
+.voucher-chatroom-upload-card {
+  max-width: 520px;
+  margin: 12vh auto 0;
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.voucher-chatroom-upload-card h2 {
+  margin: 0 0 8px;
+  font-size: 1.35rem;
+}
+
+.voucher-chatroom-upload-card .chatroom-upload-progress {
+  margin: 18px 0 12px;
+  text-align: left;
+}
+
+.voucher-chatroom-upload-card .chatroom-upload-hint {
+  margin: 0;
+}
+
+.voucher-chatroom-page .voucher-room-shell {
+  min-height: calc(100vh - 48px);
+}
+
+.voucher-chatroom-page .voucher-room-shell .voucher-chat-box {
+  min-height: 360px;
+}
+
 .voucher-standalone-shell {
   max-width: 920px;
   margin: 0 auto;
@@ -1356,7 +1397,8 @@ select {
   flex: 1;
 }
 
-.voucher-history-room .voucher-chat-layout {
+.voucher-history-room .voucher-chat-layout,
+.voucher-history-room .voucher-room-shell {
   flex: 1;
   min-height: 0;
 }
@@ -11015,7 +11057,8 @@ body.admin-locked .admin-notif-floating {
   min-height: 0;
 }
 
-#voucher-chat-view:not(.hidden) .voucher-chat-layout {
+#voucher-chat-view:not(.hidden) .voucher-chat-layout,
+#voucher-chat-view:not(.hidden) .voucher-room-shell {
   flex: 1;
   min-height: 0;
 }
@@ -12576,5 +12619,500 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     margin-bottom: 8px;
+  }
+}
+
+/* ── Voucher chat room (shared layout) ── */
+.voucher-room-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+}
+
+.voucher-room-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.voucher-room-toolbar.is-history {
+  justify-content: flex-end;
+}
+
+.voucher-room-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.voucher-room-dispute-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 0.78rem;
+  border-radius: 10px;
+}
+
+.voucher-room-back-btn {
+  text-decoration: none;
+}
+
+.voucher-room-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+@media (min-width: 960px) {
+  .voucher-room-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+    align-items: stretch;
+  }
+
+  .voucher-room-shell.admin .voucher-room-grid,
+  .voucher-room-shell.standalone .voucher-room-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  }
+}
+
+.voucher-room-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 10px;
+}
+
+.voucher-room-order-card {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(143, 164, 205, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+}
+
+.voucher-room-order-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.voucher-room-order-code {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8ea2c3;
+}
+
+.voucher-room-order-card h3 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+.voucher-room-order-price {
+  margin: 0 0 4px;
+  color: #c5d4ef;
+  font-size: 0.88rem;
+}
+
+.voucher-room-order-meta {
+  margin: 0;
+  color: #8ea2c3;
+  font-size: 0.76rem;
+}
+
+.voucher-room-chat-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+}
+
+.voucher-room-shell .voucher-chat-box {
+  flex: 1;
+  min-height: 280px;
+  max-height: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(143, 164, 205, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.voucher-chat-date-sep {
+  display: flex;
+  justify-content: center;
+  margin: 6px 0;
+}
+
+.voucher-chat-date-sep span {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #8ea2c3;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.voucher-bubble-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 88%;
+}
+
+.voucher-bubble-row.is-own {
+  align-self: flex-end;
+  flex-direction: row;
+  margin-left: auto;
+}
+
+.voucher-bubble-row.is-other {
+  align-self: flex-start;
+}
+
+.voucher-bubble-avatar {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.voucher-bubble-avatar.is-admin {
+  background: rgba(82, 94, 255, 0.18);
+  border: 1px solid rgba(105, 118, 255, 0.28);
+}
+
+.voucher-bubble-avatar.is-user {
+  background: rgba(99, 102, 241, 0.28);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  color: #eef2ff;
+}
+
+.voucher-bubble-stack {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.voucher-bubble-row.is-own .voucher-bubble-stack {
+  align-items: flex-end;
+}
+
+.voucher-bubble {
+  padding: 10px 12px;
+  border-radius: 14px;
+  line-height: 1.45;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.voucher-bubble p {
+  margin: 0;
+}
+
+.voucher-bubble-row.is-other .voucher-bubble {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(143, 164, 205, 0.12);
+  border-bottom-left-radius: 4px;
+}
+
+.voucher-bubble-row.is-own .voucher-bubble {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.92), rgba(79, 70, 229, 0.88));
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  color: #f8f9ff;
+  border-bottom-right-radius: 4px;
+}
+
+.voucher-bubble-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #7f93b8;
+  font-size: 0.68rem;
+}
+
+.voucher-bubble-read {
+  color: #60a5fa;
+  font-size: 0.72rem;
+  letter-spacing: -0.08em;
+}
+
+.voucher-bubble-attachment img,
+.voucher-bubble .voucher-chat-image {
+  display: block;
+  max-width: min(240px, 100%);
+  margin-top: 6px;
+  border-radius: 10px;
+}
+
+.voucher-bubble-attachment-file {
+  display: inline-block;
+  margin-top: 6px;
+  color: inherit;
+  text-decoration: underline;
+}
+
+.voucher-room-shell .voucher-chat-compose {
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+.voucher-room-shell .voucher-chat-send-btn {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.voucher-room-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.voucher-room-sidebar-close {
+  display: none;
+}
+
+.voucher-room-side-card {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(143, 164, 205, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.voucher-room-side-card h4 {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #dfe8f8;
+}
+
+.voucher-room-detail-list {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.voucher-room-detail-list div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.voucher-room-detail-list dt {
+  margin: 0;
+  color: #8ea2c3;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.voucher-room-detail-list dd {
+  margin: 0;
+  color: #edf3ff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
+}
+
+.voucher-room-security-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: #a9bbd8;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.voucher-room-agent-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.voucher-room-agent-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(82, 94, 255, 0.16);
+  border: 1px solid rgba(105, 118, 255, 0.24);
+}
+
+.voucher-room-online-badge {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.voucher-room-admin-actions-card .voucher-admin-chat-actions {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.voucher-room-sidebar-backdrop {
+  display: none;
+}
+
+#voucher-chat-view:not(.hidden) .voucher-room-shell,
+.voucher-history-room .voucher-room-shell,
+#admin-voucher-order-room .voucher-room-shell {
+  flex: 1;
+  min-height: 0;
+}
+
+.voucher-standalone-page .voucher-standalone-shell {
+  max-width: 1100px;
+}
+
+.voucher-standalone-page .voucher-room-shell {
+  min-height: calc(100vh - 48px);
+}
+
+.voucher-standalone-page .voucher-room-shell .voucher-chat-box {
+  min-height: 360px;
+}
+
+#admin-voucher-order-room .voucher-room-shell {
+  min-height: 520px;
+}
+
+@media (max-width: 959px) {
+  .voucher-room-sidebar-toggle {
+    min-height: 36px;
+  }
+
+  .voucher-room-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 120;
+    width: min(92vw, 360px);
+    padding: 16px 14px calc(16px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-left: 1px solid rgba(143, 164, 205, 0.16);
+    background: #0b1220;
+    box-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
+    transform: translateX(105%);
+    transition: transform 0.22s ease;
+  }
+
+  .voucher-room-shell.sidebar-open .voucher-room-sidebar {
+    transform: translateX(0);
+  }
+
+  .voucher-room-sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-end;
+    width: 34px;
+    height: 34px;
+    margin-bottom: 4px;
+    border: 1px solid rgba(143, 164, 205, 0.16);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #dfe8f8;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .voucher-room-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    background: rgba(3, 7, 18, 0.62);
+    backdrop-filter: blur(2px);
+  }
+
+  .voucher-room-shell.sidebar-open .voucher-room-sidebar-backdrop {
+    display: block;
+  }
+
+  .voucher-room-shell .voucher-chat-box {
+    min-height: 220px;
+  }
+}
+
+@media (min-width: 769px) {
+  #voucher-chat-view:not(.hidden) .voucher-room-shell .voucher-chat-box,
+  .voucher-history-room .voucher-room-shell .voucher-chat-box {
+    min-height: 420px;
+    max-height: min(62vh, 680px);
+  }
+}
+
+@media (max-width: 768px) {
+  body.in-room-mode.in-voucher-room #voucher-history-room:not(.hidden) .voucher-room-shell {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  body.in-room-mode.in-voucher-room #voucher-history-room:not(.hidden) .voucher-room-shell .voucher-chat-box {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none !important;
+    overflow-y: auto;
+  }
+
+  body.in-room-mode.in-voucher-room #voucher-history-room:not(.hidden) .voucher-room-order-card {
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  body.in-room-mode.in-voucher-room #voucher-history-room:not(.hidden) .voucher-room-order-card h3 {
+    font-size: var(--fl-fs-base);
+  }
+
+  body.in-room-mode.in-voucher-room #voucher-history-room:not(.hidden) .voucher-bubble {
+    font-size: var(--fl-fs-sm);
+    padding: 7px 9px;
   }
 }

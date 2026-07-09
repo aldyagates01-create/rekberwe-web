@@ -941,7 +941,10 @@ function renderVoucherOrdersPage() {
   `;
 }
 
-function renderVoucherMessageItem(message) {
+function renderVoucherMessageItem(message, options = {}) {
+  if (window.VoucherChatUI?.renderMessageBubble) {
+    return window.VoucherChatUI.renderMessageBubble(message, options);
+  }
   const isAdmin = message.senderRole === "admin";
   const attachment = message.attachmentUrl
     ? (String(message.attachmentType || "").startsWith("image/")
@@ -957,6 +960,129 @@ function renderVoucherMessageItem(message) {
       ${message.text ? `<p>${voucherEscapeHtml(message.text)}</p>` : ""}
       ${attachment}
     </article>
+  `;
+}
+
+function buildVoucherChatToolbarActions(order, options = {}) {
+  const canDispute = ["processing", "needs_verification", "completed"].includes(order.status);
+  if (!canDispute) return "";
+  const attr = options.disputeAttr || "data-voucher-dispute";
+  return `<button type="button" class="danger-btn voucher-room-dispute-btn" ${attr}="${voucherEscapeHtml(order.orderCode)}">Laporkan Masalah / Ajukan Sengketa</button>`;
+}
+
+function buildVoucherChatBottomMarkup(order, options = {}) {
+  const canChat = ["awaiting_confirmation", "processing", "needs_verification", "dispute"].includes(order.status);
+  const canCancel = ["awaiting_payment", "awaiting_confirmation", "processing"].includes(order.status);
+  const cancelAttr = options.cancelAttr || "data-voucher-cancel";
+  const disputeAttr = options.disputeAttr || "data-voucher-dispute";
+  if (!canChat) {
+    if (order.status === "completed") {
+      return `
+        <div class="voucher-chat-compose voucher-chat-completed-actions">
+          <p class="mini-note">Order sudah selesai. Jika ada masalah pada akun, ajukan sengketa untuk membuka kembali chat dengan admin.</p>
+          <div class="voucher-chat-actions">
+            <button type="button" class="primary-btn voucher-chat-action-btn" ${disputeAttr}="${voucherEscapeHtml(order.orderCode)}">Ajukan Sengketa</button>
+          </div>
+        </div>
+      `;
+    }
+    return `<p class="mini-note voucher-chat-waiting">Chat akan aktif setelah admin memproses pembayaran Anda.</p>`;
+  }
+  const actionsHtml = `
+    <div class="voucher-chat-actions">
+      ${canCancel ? `<button type="button" class="ghost-btn voucher-chat-action-btn" ${cancelAttr}="${voucherEscapeHtml(order.orderCode)}">Batalkan</button>` : ""}
+    </div>
+  `;
+  if (window.VoucherChatUI?.buildComposeMarkup) {
+    return window.VoucherChatUI.buildComposeMarkup({
+      formId: options.formId || "voucher-chat-form",
+      inputId: options.inputId || "voucher-chat-input",
+      uploadId: options.uploadId || "voucher-chat-upload",
+      actionsHtml,
+    });
+  }
+  return "";
+}
+
+function bindVoucherRoomSidebar(container = document) {
+  if (window.VoucherChatUI?.bindSidebarEvents) {
+    window.VoucherChatUI.bindSidebarEvents(container);
+  }
+}
+
+function buildVoucherChatMarkup(order, options = {}) {
+  const canChat = ["awaiting_confirmation", "processing", "needs_verification", "dispute"].includes(order.status);
+  const showAccountForms = shouldShowVoucherAccountForm(order) && canChat;
+  const viewerRole = options.viewerRole || "user";
+  const chatBoxId = options.chatBoxId || "voucher-chat-box";
+  const formId = options.formId || "voucher-chat-form";
+  const inputId = options.inputId || "voucher-chat-input";
+  const uploadId = options.uploadId || "voucher-chat-upload";
+  const accountsFormId = options.accountsFormId || "voucher-accounts-form";
+  const backButton = options.backButton || "";
+  const layoutMode = options.layoutMode || "workspace";
+  const toolbarActionsHtml = options.toolbarActionsHtml ?? buildVoucherChatToolbarActions(order, options);
+  const accountsFormHtml = showAccountForms
+    ? buildVoucherAccountFormsMarkup(order, { formId: accountsFormId })
+    : "";
+  const replaceProofHtml = order.status === "awaiting_confirmation"
+    ? buildVoucherReplaceProofMarkup(order, {
+      formId: options.replaceProofFormId || "voucher-replace-proof-form",
+      inputId: options.replaceProofInputId || "voucher-replace-proof-input",
+    })
+    : "";
+  const bottomHtml = buildVoucherChatBottomMarkup(order, {
+    formId,
+    inputId,
+    uploadId,
+    cancelAttr: options.cancelAttr,
+    disputeAttr: options.disputeAttr,
+  });
+
+  if (window.VoucherChatUI?.buildRoomMarkup) {
+    return window.VoucherChatUI.buildRoomMarkup(order, {
+      viewerRole,
+      layoutMode,
+      chatBoxId,
+      backButton,
+      toolbarActionsHtml,
+      toolbarHtml: options.hideToolbar ? `
+        <div class="voucher-room-toolbar is-history">
+          <div class="voucher-room-toolbar-actions">
+            ${toolbarActionsHtml}
+            <button type="button" class="ghost-btn voucher-room-sidebar-toggle" data-voucher-sidebar-open>Detail</button>
+          </div>
+        </div>
+      ` : undefined,
+      statusClass: voucherStatusClass,
+      accountsFormHtml,
+      replaceProofHtml,
+      bottomHtml,
+      sidebarId: options.sidebarId,
+      sidebarExtra: options.sidebarExtra || "",
+      adminActionsHtml: options.adminActionsHtml || "",
+      buyerLabel: options.buyerLabel || `${order.user?.displayName || "Pembeli"} - Pembeli`,
+    });
+  }
+
+  return `
+    <section class="voucher-chat-layout">
+      <div class="voucher-chat-head">
+        ${backButton}
+        <div>
+          <p class="eyebrow">Order ${voucherEscapeHtml(order.orderCode)}</p>
+          <h3>${voucherEscapeHtml(order.product?.name || "Voucher")}</h3>
+          <p class="mini-note">${Math.max(1, Number(order.quantity || 1))} pcs • ${voucherFormatCurrency(order.price)}</p>
+          <span class="${voucherStatusClass(order.status)}">${voucherEscapeHtml(order.statusLabel || order.status)}</span>
+        </div>
+      </div>
+      <div class="voucher-chat-box" id="${voucherEscapeHtml(chatBoxId)}">
+        ${(order.messages || []).map((message) => renderVoucherMessageItem(message, { viewerRole })).join("")}
+      </div>
+      ${accountsFormHtml}
+      ${replaceProofHtml}
+      ${bottomHtml}
+    </section>
   `;
 }
 
@@ -997,68 +1123,7 @@ function renderVoucherChat() {
     });
   }
   bindFileUploadFields(voucherElements.chatView);
-}
-
-function buildVoucherChatMarkup(order, options = {}) {
-  const canChat = ["awaiting_confirmation", "processing", "needs_verification", "dispute"].includes(order.status);
-  const canCancel = ["awaiting_payment", "awaiting_confirmation", "processing"].includes(order.status);
-  const canDispute = ["processing", "needs_verification", "completed"].includes(order.status);
-  const showAccountForms = shouldShowVoucherAccountForm(order) && canChat;
-  const chatBoxId = options.chatBoxId || "voucher-chat-box";
-  const formId = options.formId || "voucher-chat-form";
-  const inputId = options.inputId || "voucher-chat-input";
-  const uploadId = options.uploadId || "voucher-chat-upload";
-  const accountsFormId = options.accountsFormId || "voucher-accounts-form";
-  const backButton = options.backButton || "";
-  return `
-    <section class="voucher-chat-layout">
-    <div class="voucher-chat-head">
-      ${backButton}
-      <div>
-        <p class="eyebrow">Order ${voucherEscapeHtml(order.orderCode)}</p>
-        <h3>${voucherEscapeHtml(order.product?.name || "Voucher")}</h3>
-        <p class="mini-note">${Math.max(1, Number(order.quantity || 1))} pcs • ${voucherFormatCurrency(order.price)}</p>
-        <span class="${voucherStatusClass(order.status)}">${voucherEscapeHtml(order.statusLabel || order.status)}</span>
-      </div>
-    </div>
-    <div class="voucher-chat-box" id="${voucherEscapeHtml(chatBoxId)}">
-      ${(order.messages || []).map(renderVoucherMessageItem).join("")}
-    </div>
-    ${showAccountForms ? buildVoucherAccountFormsMarkup(order, { formId: accountsFormId }) : ""}
-    ${order.status === "awaiting_confirmation" ? buildVoucherReplaceProofMarkup(order, {
-    formId: options.replaceProofFormId || "voucher-replace-proof-form",
-    inputId: options.replaceProofInputId || "voucher-replace-proof-input",
-  }) : ""}
-    ${canChat ? `
-      <div class="voucher-chat-compose">
-        <form id="${voucherEscapeHtml(formId)}" class="voucher-chat-form">
-          <div class="voucher-chat-compose-row">
-            <label class="voucher-chat-attach-btn" title="Lampirkan gambar">
-              <input type="file" id="${voucherEscapeHtml(uploadId)}" accept="image/jpeg,image/png,image/webp" multiple hidden />
-              <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true"><path d="M12 5v10M8 9l4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 15v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-              <span class="voucher-chat-attach-label">File</span>
-            </label>
-            <input type="text" id="${voucherEscapeHtml(inputId)}" class="voucher-chat-input" placeholder="Tulis pesan ke admin..." autocomplete="off" />
-            <button type="submit" class="primary-btn voucher-chat-send-btn">Kirim</button>
-          </div>
-        </form>
-        <div class="voucher-chat-actions">
-          ${canCancel ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-voucher-cancel="${voucherEscapeHtml(order.orderCode)}">Batalkan</button>` : ""}
-          ${canDispute ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-voucher-dispute="${voucherEscapeHtml(order.orderCode)}">Ajukan Sengketa</button>` : ""}
-        </div>
-      </div>
-    ` : `
-      <div class="voucher-chat-compose voucher-chat-completed-actions">
-        ${order.status === "completed" ? `
-          <p class="mini-note">Order sudah selesai. Jika ada masalah pada akun, ajukan sengketa untuk membuka kembali chat dengan admin.</p>
-          <div class="voucher-chat-actions">
-            <button type="button" class="primary-btn voucher-chat-action-btn" data-voucher-dispute="${voucherEscapeHtml(order.orderCode)}">Ajukan Sengketa</button>
-          </div>
-        ` : `<p class="mini-note voucher-chat-waiting">Chat akan aktif setelah admin memproses pembayaran Anda.</p>`}
-      </div>
-    `}
-    </section>
-  `;
+  bindVoucherRoomSidebar(voucherElements.chatView);
 }
 
 function renderVoucherHistoryRoom(order) {
@@ -1089,6 +1154,8 @@ function renderVoucherHistoryRoom(order) {
   const selectionEnd = hadFocus ? prevInput.selectionEnd : null;
 
   container.innerHTML = buildVoucherChatMarkup(order, {
+    layoutMode: "history",
+    hideToolbar: true,
     chatBoxId: "voucher-history-chat-box",
     formId: "voucher-history-chat-form",
     inputId: "voucher-history-chat-input",
@@ -1116,6 +1183,7 @@ function renderVoucherHistoryRoom(order) {
     });
   }
   bindFileUploadFields(container);
+  bindVoucherRoomSidebar(container);
 }
 
 async function openVoucherOrderChat(orderCode) {
@@ -1162,6 +1230,24 @@ async function submitVoucherPaymentProof(event) {
   const file = fileInput?.files?.[0];
   if (!file || !voucherState.activeOrder) return;
   const orderCode = voucherState.activeOrder.orderCode;
+  const isReplaceForm = form.id === "voucher-replace-proof-form"
+    || form.id === "voucher-history-replace-proof-form";
+
+  if (!isReplaceForm && window.VoucherUploadBridge?.storePendingPaymentProof) {
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      await window.VoucherUploadBridge.storePendingPaymentProof(orderCode, file);
+      window.VoucherUploadBridge.openVoucherChatroom(orderCode, { upload: true });
+      resetFileUploadInput(fileInput);
+      window.setAuthStatus?.("Membuka ruang chat... Upload bukti berjalan di tab baru.");
+    } catch (error) {
+      window.setAuthStatus?.(error.message || "Gagal menyiapkan upload bukti.", true);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+    return;
+  }
+
   const formData = new FormData();
   formData.append("paymentProof", file);
 
@@ -1303,6 +1389,7 @@ async function runVoucherOrderAction(orderCode, action) {
 }
 
 function bindVoucherEvents() {
+  bindVoucherRoomSidebar(document);
   voucherElements.serviceButtons.forEach((button) => {
     button.addEventListener("click", () => setWorkspaceService(button.dataset.workspaceService));
   });

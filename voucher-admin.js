@@ -580,6 +580,9 @@ function renderAdminVoucherOrders() {
 }
 
 function renderAdminVoucherMessage(message) {
+  if (window.VoucherChatUI?.renderMessageBubble) {
+    return window.VoucherChatUI.renderMessageBubble(message, { viewerRole: "admin" });
+  }
   const attachment = message.attachmentUrl
     ? (String(message.attachmentType || "").startsWith("image/")
       ? `<a href="${escapeAttribute(message.attachmentUrl)}" target="_blank" rel="noreferrer"><img class="voucher-chat-image" src="${escapeAttribute(message.attachmentUrl)}" alt="" /></a>`
@@ -591,6 +594,69 @@ function renderAdminVoucherMessage(message) {
       ${message.text ? `<p>${escapeHtml(message.text)}</p>` : ""}
       ${attachment}
     </article>
+  `;
+}
+
+function buildAdminVoucherActionsHtml(order) {
+  const canProcess = ["awaiting_confirmation", "needs_verification"].includes(order.status);
+  const canComplete = ["processing", "needs_verification", "dispute"].includes(order.status);
+  const canCancel = ["awaiting_payment", "awaiting_confirmation", "processing", "dispute"].includes(order.status);
+  const quantity = Math.max(1, Number(order.quantity || 1));
+  const accounts = Array.isArray(order.accountAccounts) ? order.accountAccounts : [];
+  const accountsReady = order.product?.requiresAccountLogin
+    && accounts.length >= quantity
+    && accounts.slice(0, quantity).every((item) => item.email && item.email.includes("@") && item.password);
+  const canRequestAccountRevision = accountsReady
+    && !order.accountRevisionRequested
+    && ["processing", "needs_verification", "dispute"].includes(order.status);
+  return `
+    <section class="voucher-room-side-card voucher-room-admin-actions-card">
+      <h4>Aksi Admin</h4>
+      <div class="voucher-admin-chat-actions">
+        ${canProcess ? `<button type="button" class="primary-btn" data-admin-voucher-action="process">PROSES</button>` : ""}
+        ${order.status === "processing" ? `<button type="button" class="ghost-btn" data-admin-voucher-action="needs_verification">Butuh Verifikasi</button>` : ""}
+        ${canRequestAccountRevision ? `<button type="button" class="ghost-btn" data-admin-voucher-action="request_account_revision">Minta Perbaikan Data Akun</button>` : ""}
+        ${canCancel ? `<button type="button" class="ghost-btn" data-admin-voucher-action="cancel">BATALKAN</button>` : ""}
+        ${canComplete ? `<button type="button" class="primary-btn" data-admin-voucher-action="complete">Selesai</button>` : ""}
+        <button type="button" class="ghost-btn danger-btn" data-admin-voucher-delete-order="${escapeAttribute(order.orderCode)}">Hapus Order</button>
+      </div>
+    </section>
+  `;
+}
+
+function buildAdminVoucherSidebarExtra(order) {
+  const profit = (order.price || 0) - (order.costPrice || order.product?.costPrice || 0);
+  return `
+    <section class="voucher-room-side-card">
+      <h4>Ringkasan Finansial</h4>
+      <dl class="voucher-room-detail-list">
+        <div><dt>Harga jual</dt><dd>${formatCurrency(order.price)}</dd></div>
+        <div><dt>Harga modal</dt><dd>${formatCurrency(order.costPrice || order.product?.costPrice || 0)}</dd></div>
+        <div><dt>Profit</dt><dd>${formatCurrency(profit)}</dd></div>
+      </dl>
+    </section>
+    ${renderAdminVoucherAccountCredentials(order)}
+    ${order.paymentProofUrl ? `<p class="mini-note voucher-room-proof-link"><a href="${escapeAttribute(order.paymentProofUrl)}" target="_blank" rel="noreferrer">Lihat bukti pembayaran</a></p>` : ""}
+  `;
+}
+
+function buildAdminVoucherComposeMarkup() {
+  if (window.VoucherChatUI?.buildComposeMarkup) {
+    return window.VoucherChatUI.buildComposeMarkup({
+      formId: "admin-voucher-chat-form",
+      inputId: "admin-voucher-chat-input",
+      uploadId: "admin-voucher-chat-upload",
+    });
+  }
+  return `
+    <form id="admin-voucher-chat-form" class="profile-form">
+      <label>Pesan admin<input type="text" id="admin-voucher-chat-input" /></label>
+      <label class="file-upload-field">Lampiran
+        <input type="file" id="admin-voucher-chat-upload" accept="image/jpeg,image/png,image/webp" multiple />
+        <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
+      </label>
+      <button type="submit" class="primary-btn">Kirim ke pembeli</button>
+    </form>
   `;
 }
 
@@ -636,6 +702,26 @@ function renderAdminVoucherOrderRoom() {
     return;
   }
 
+  const activeElement = document.activeElement;
+  const prevInput = document.getElementById("admin-voucher-chat-input");
+  const hadFocus = activeElement === prevInput;
+  const previousValue = prevInput?.value || "";
+  const selectionStart = hadFocus ? prevInput.selectionStart : null;
+  const selectionEnd = hadFocus ? prevInput.selectionEnd : null;
+
+  if (window.VoucherChatUI?.buildRoomMarkup) {
+    adminVoucherElements.orderRoom.innerHTML = window.VoucherChatUI.buildRoomMarkup(order, {
+      viewerRole: "admin",
+      layoutMode: "admin",
+      chatBoxId: "admin-voucher-chat-box",
+      statusClass: adminVoucherStatusClass,
+      buyerLabel: order.user?.displayName || "-",
+      adminActionsHtml: buildAdminVoucherActionsHtml(order),
+      sidebarExtra: buildAdminVoucherSidebarExtra(order),
+      bottomHtml: buildAdminVoucherComposeMarkup(),
+      toolbarActionsHtml: "",
+    });
+  } else {
   const canProcess = ["awaiting_confirmation", "needs_verification"].includes(order.status);
   const canComplete = ["processing", "needs_verification", "dispute"].includes(order.status);
   const canCancel = ["awaiting_payment", "awaiting_confirmation", "processing", "dispute"].includes(order.status);
@@ -672,18 +758,23 @@ function renderAdminVoucherOrderRoom() {
       <button type="button" class="ghost-btn danger-btn" data-admin-voucher-delete-order="${escapeAttribute(order.orderCode)}">Hapus Order</button>
     </div>
     <div class="voucher-chat-box" id="admin-voucher-chat-box">${(order.messages || []).map(renderAdminVoucherMessage).join("")}</div>
-    <form id="admin-voucher-chat-form" class="profile-form">
-      <label>Pesan admin<input type="text" id="admin-voucher-chat-input" /></label>
-      <label class="file-upload-field">Lampiran
-        <input type="file" id="admin-voucher-chat-upload" accept="image/jpeg,image/png,image/webp" multiple />
-        <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
-      </label>
-      <button type="submit" class="primary-btn">Kirim ke pembeli</button>
-    </form>
+    ${buildAdminVoucherComposeMarkup()}
   `;
+  }
   const box = document.getElementById("admin-voucher-chat-box");
   if (box) box.scrollTop = box.scrollHeight;
+  const nextInput = document.getElementById("admin-voucher-chat-input");
+  if (nextInput && previousValue && !nextInput.value) {
+    nextInput.value = previousValue;
+    if (hadFocus) {
+      nextInput.focus();
+      if (selectionStart != null && selectionEnd != null) {
+        nextInput.setSelectionRange(selectionStart, selectionEnd);
+      }
+    }
+  }
   bindAdminFileUploadFields(adminVoucherElements.orderRoom || document.getElementById("admin-voucher-order-room"));
+  window.VoucherChatUI?.bindSidebarEvents?.(adminVoucherElements.orderRoom || document);
 }
 
 async function openAdminVoucherOrder(orderCode) {

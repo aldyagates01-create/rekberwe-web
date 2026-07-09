@@ -300,11 +300,64 @@ function buildPaymentSection(order) {
   `;
 }
 
-function buildChatSection(order) {
-  const canChat = ["processing", "needs_verification", "dispute", "awaiting_confirmation"].includes(order.status);
+function buildStandaloneChatBottom(order) {
+  const canChat = ["awaiting_confirmation", "processing", "needs_verification", "dispute"].includes(order.status);
   const canCancel = ["awaiting_payment", "awaiting_confirmation", "processing"].includes(order.status);
   const canDispute = ["processing", "needs_verification", "completed"].includes(order.status);
+  if (!canChat) {
+    if (order.status === "completed") {
+      return `
+        <div class="voucher-chat-compose voucher-chat-completed-actions">
+          <p class="mini-note">Order sudah selesai. Jika ada masalah pada akun, ajukan sengketa untuk membuka kembali chat dengan admin.</p>
+          <div class="voucher-chat-actions">
+            <button type="button" class="primary-btn voucher-chat-action-btn" data-room-order-action="dispute">Ajukan Sengketa</button>
+          </div>
+        </div>
+      `;
+    }
+    return `<p class="mini-note voucher-chat-waiting">Chat akan aktif setelah admin memproses pembayaran Anda.</p>`;
+  }
+  const actionsHtml = `
+    <div class="voucher-chat-actions">
+      ${canCancel ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-room-order-action="cancel">Batalkan</button>` : ""}
+      ${canDispute ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-room-order-action="dispute">Ajukan Sengketa</button>` : ""}
+    </div>
+  `;
+  if (window.VoucherChatUI?.buildComposeMarkup) {
+    return window.VoucherChatUI.buildComposeMarkup({
+      formId: "voucher-standalone-chat-form",
+      inputId: "voucher-standalone-chat-input",
+      uploadId: "voucher-standalone-chat-upload",
+      actionsHtml,
+    });
+  }
+  return "";
+}
+
+function buildStandaloneToolbarActions(order) {
+  const canDispute = ["processing", "needs_verification", "completed"].includes(order.status);
+  if (!canDispute) return "";
+  return `<button type="button" class="danger-btn voucher-room-dispute-btn" data-room-order-action="dispute">Laporkan Masalah / Ajukan Sengketa</button>`;
+}
+
+function buildChatSection(order) {
+  const canChat = ["processing", "needs_verification", "dispute", "awaiting_confirmation"].includes(order.status);
   const showAccountForms = shouldShowAccountForm(order) && canChat;
+  if (window.VoucherChatUI?.buildRoomMarkup) {
+    return window.VoucherChatUI.buildRoomMarkup(order, {
+      viewerRole: "user",
+      layoutMode: "standalone",
+      chatBoxId: "voucher-standalone-chat-box",
+      backButton: '<a class="ghost-btn voucher-room-back-btn" href="/">← Kembali ke dashboard</a>',
+      toolbarActionsHtml: buildStandaloneToolbarActions(order),
+      statusClass,
+      accountsFormHtml: showAccountForms ? buildAccountFormsMarkup(order) : "",
+      replaceProofHtml: order.status === "awaiting_confirmation" ? buildReplaceProofMarkup() : "",
+      bottomHtml: buildStandaloneChatBottom(order),
+    });
+  }
+  const canCancel = ["awaiting_payment", "awaiting_confirmation", "processing"].includes(order.status);
+  const canDispute = ["processing", "needs_verification", "completed"].includes(order.status);
   return `
     <section class="voucher-chat-layout voucher-standalone-chat-layout">
       <div class="voucher-chat-box" id="voucher-standalone-chat-box">
@@ -356,7 +409,8 @@ function renderRoom(order) {
   const selectionStart = hadFocus ? prevInput.selectionStart : null;
   const selectionEnd = hadFocus ? prevInput.selectionEnd : null;
 
-  roomRoot.innerHTML = `
+  roomRoot.innerHTML = isAwaitingPayment
+    ? `
     <section class="card voucher-standalone-card">
       <div class="voucher-chat-head">
         <a class="ghost-btn" href="/">← Kembali ke dashboard</a>
@@ -366,9 +420,10 @@ function renderRoom(order) {
           <span class="${statusClass(order.status)}">${escapeHtml(order.statusLabel || order.status)}</span>
         </div>
       </div>
-      ${isAwaitingPayment ? buildPaymentSection(order) : buildChatSection(order)}
+      ${buildPaymentSection(order)}
     </section>
-  `;
+  `
+    : buildChatSection(order);
 
   if (isAwaitingPayment) {
     document.querySelector("[data-voucher-scroll-payment]")?.addEventListener("click", () => {
@@ -395,6 +450,7 @@ function renderRoom(order) {
     }
   }
   bindRoomFileUploadFields(roomRoot);
+  window.VoucherChatUI?.bindSidebarEvents?.(roomRoot);
 }
 
 async function promptOrderNote(action) {
@@ -580,8 +636,20 @@ function bindRoomEvents(orderCode) {
       }
       return;
     }
-    if (event.target?.id === "voucher-standalone-payment-form"
-      || event.target?.id === "voucher-standalone-replace-proof-form") {
+    if (event.target?.id === "voucher-standalone-payment-form") {
+      event.preventDefault();
+      const fileInput = event.target.querySelector('input[type="file"]');
+      const file = fileInput?.files?.[0];
+      if (!file) return;
+      try {
+        await window.VoucherUploadBridge.storePendingPaymentProof(orderCode, file);
+        window.VoucherUploadBridge.openVoucherChatroom(orderCode, { upload: true, sameWindow: true });
+      } catch (error) {
+        alert(error.message || "Gagal menyiapkan upload bukti pembayaran.");
+      }
+      return;
+    }
+    if (event.target?.id === "voucher-standalone-replace-proof-form") {
       event.preventDefault();
       try {
         await submitPaymentProof(orderCode, event.target.id);
