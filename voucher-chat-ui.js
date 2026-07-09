@@ -50,26 +50,51 @@
     return groups;
   }
 
+  function isAccountSubmissionMessage(message) {
+    return /^Data akun subscription/i.test(String(message?.text || ""));
+  }
+
+  function renderAvatarHtml(message, options = {}) {
+    const senderName = message.senderName || (message.senderRole === "admin" ? "Rekberwe.id" : "Anda");
+    const initial = String(senderName).trim().charAt(0).toUpperCase() || "?";
+    const adminAvatarUrl = options.adminAvatarUrl || "/assets/rekberwe-logo-shield.png?v=7";
+    const userAvatarUrl = options.userAvatarUrl || options.order?.user?.avatar || "";
+    const isAdminMessage = message.senderRole === "admin";
+    if (isAdminMessage) {
+      if (adminAvatarUrl) {
+        return `<img class="voucher-bubble-avatar is-admin" src="${escapeHtml(adminAvatarUrl)}" alt="RekberWe Admin" loading="lazy" decoding="async" />`;
+      }
+      return `<span class="voucher-bubble-avatar is-admin" aria-hidden="true">🛡</span>`;
+    }
+    if (userAvatarUrl) {
+      return `<img class="voucher-bubble-avatar is-user" src="${escapeHtml(userAvatarUrl)}" alt="${escapeHtml(senderName)}" loading="lazy" decoding="async" />`;
+    }
+    return `<span class="voucher-bubble-avatar is-user" aria-hidden="true">${escapeHtml(initial)}</span>`;
+  }
+
   function renderMessageBubble(message, options = {}) {
     const viewerRole = options.viewerRole || "user";
     const isOwn = String(message.senderRole || "") === viewerRole;
     const rowClass = isOwn ? "is-own" : "is-other";
     const senderName = message.senderName || (message.senderRole === "admin" ? "Rekberwe.id" : "Anda");
-    const initial = String(senderName).trim().charAt(0).toUpperCase() || "?";
     const attachment = message.attachmentUrl
       ? (String(message.attachmentType || "").startsWith("image/")
         ? `<a class="voucher-bubble-attachment" href="${escapeHtml(message.attachmentUrl)}" target="_blank" rel="noreferrer"><img class="voucher-chat-image" src="${escapeHtml(message.attachmentUrl)}" alt="${escapeHtml(message.attachmentName || "Lampiran")}" loading="lazy" decoding="async" /></a>`
         : `<a class="voucher-bubble-attachment-file" href="${escapeHtml(message.attachmentUrl)}" target="_blank" rel="noreferrer">${escapeHtml(message.attachmentName || "Lihat lampiran")}</a>`)
       : "";
-    const avatar = isOwn
-      ? `<span class="voucher-bubble-avatar is-user" aria-hidden="true">${escapeHtml(initial)}</span>`
-      : `<span class="voucher-bubble-avatar is-admin" aria-hidden="true">🛡</span>`;
+    const avatar = renderAvatarHtml(message, options);
+    const accountMessage = isAccountSubmissionMessage(message);
+    const textHtml = message.text
+      ? (accountMessage
+        ? `<div class="voucher-account-message-body">${escapeHtml(message.text).replace(/\n/g, "<br>")}${options.order?.accountRevisionRequested && isOwn ? `<button type="button" class="voucher-account-edit-link" data-voucher-scroll-accounts>Edit data akun</button>` : ""}</div>`
+        : `<p>${escapeHtml(message.text)}</p>`)
+      : "";
     return `
       <article class="voucher-bubble-row ${rowClass}">
         ${isOwn ? "" : avatar}
         <div class="voucher-bubble-stack">
-          <div class="voucher-bubble">
-            ${message.text ? `<p>${escapeHtml(message.text)}</p>` : ""}
+          <div class="voucher-bubble${accountMessage ? " is-account" : ""}">
+            ${textHtml}
             ${attachment}
           </div>
           <div class="voucher-bubble-meta">
@@ -120,6 +145,7 @@
     const unitPrice = quantity ? Math.round(Number(order.price || 0) / quantity) : Number(order.price || 0);
     const buyerName = options.buyerLabel || order.user?.displayName || "Pembeli";
     const sidebarId = options.sidebarId || "voucher-room-sidebar";
+    const adminAvatarUrl = options.adminAvatarUrl || "/assets/rekberwe-logo-shield.png?v=7";
     return `
       <aside class="voucher-room-sidebar" id="${escapeHtml(sidebarId)}">
         <button type="button" class="voucher-room-sidebar-close" data-voucher-sidebar-close aria-label="Tutup detail">×</button>
@@ -148,7 +174,7 @@
         </section>
         <section class="voucher-room-side-card voucher-room-agent-card">
           <div class="voucher-room-agent-head">
-            <span class="voucher-room-agent-avatar" aria-hidden="true">🛡</span>
+            <img class="voucher-room-agent-avatar" src="${escapeHtml(adminAvatarUrl)}" alt="RekberWe Admin" loading="lazy" decoding="async" />
             <div>
               <strong>RekberWe.id</strong>
               <span class="voucher-room-online-badge">ONLINE</span>
@@ -199,7 +225,12 @@
             </header>
             <div class="voucher-room-chat-panel">
               <div class="voucher-chat-box" id="${escapeHtml(chatBoxId)}">
-                ${renderChatMessages(order.messages, { viewerRole: options.viewerRole || "user" })}
+                ${renderChatMessages(order.messages, {
+                  viewerRole: options.viewerRole || "user",
+                  order,
+                  adminAvatarUrl: options.adminAvatarUrl || "/assets/rekberwe-logo-shield.png?v=7",
+                  userAvatarUrl: order.user?.avatar || "",
+                })}
               </div>
               ${options.accountsFormHtml || ""}
               ${options.replaceProofHtml || ""}
@@ -228,6 +259,11 @@
       }
       if (event.target.closest("[data-voucher-sidebar-close], [data-voucher-sidebar-backdrop]")) {
         shell.classList.remove("sidebar-open");
+        return;
+      }
+      if (event.target.closest("[data-voucher-scroll-accounts]")) {
+        const form = shell.querySelector(".voucher-account-forms-card, .voucher-account-forms");
+        form?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
     });
   }

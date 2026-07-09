@@ -99,6 +99,7 @@ export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, get
       quantity: Math.max(1, Number(row.quantity || 1)),
       accountAccounts: parseVoucherAccountAccounts(credentialRow),
       accountRevisionRequested: Boolean(row.account_revision_requested),
+      proofRevisionRequested: Boolean(row.proof_revision_requested),
       orderSource: row.order_source || "platform",
       buyerTelegram: row.buyer_telegram || "",
       disputeReason: row.dispute_reason || "",
@@ -438,7 +439,7 @@ export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, get
           UPDATE voucher_orders
           SET status = $2, payment_proof_url = $3, payment_proof_name = $4,
               dispute_reason = $5, cancel_reason = $6, account_revision_requested = $7,
-              completed_at = $8, updated_at = $9
+              proof_revision_requested = $8, completed_at = $9, updated_at = $10
           WHERE order_code = $1
         `,
         [
@@ -451,6 +452,9 @@ export function createVoucherPgApi({ query, queryOne, queryRows, queryValue, get
           fields.accountRevisionRequested !== undefined
             ? Boolean(fields.accountRevisionRequested)
             : Boolean(current.accountRevisionRequested),
+          fields.proofRevisionRequested !== undefined
+            ? Boolean(fields.proofRevisionRequested)
+            : Boolean(current.proofRevisionRequested),
           fields.completedAt !== undefined ? (fields.completedAt || null) : (current.completedAt || null),
           now,
         ],

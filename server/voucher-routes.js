@@ -26,6 +26,7 @@ import {
   validateVoucherOrderAction,
   isManualVoucherOrder,
   voucherOrderForViewer,
+  formatVoucherAccountSubmissionMessage,
 } from "./voucher-utils.js";
 import { resolveUploadAccessUrl, resolveVoucherOrderMediaUrls } from "./upload-url.js";
 import { resolveVoucherProductCostInput } from "./voucher-product-cost.js";
@@ -168,6 +169,7 @@ export function registerVoucherRoutes(app, {
       ...(isReplacement ? {} : { status: "awaiting_confirmation" }),
       paymentProofUrl: stored.fileUrl,
       paymentProofName: file.originalname,
+      proofRevisionRequested: false,
     });
     const latest = await addVoucherOrderMessage(
       code,
@@ -203,14 +205,13 @@ export function registerVoucherRoutes(app, {
       const accounts = Array.isArray(req.body.accounts) ? req.body.accounts : [];
       const wasRevision = Boolean(order.accountRevisionRequested);
       let updated = await updateVoucherOrderAccounts(code, accounts);
+      const quantity = Math.max(1, Number(updated.quantity || 1));
       updated = await addVoucherOrderMessage(
         code,
         req.session.user.id,
         req.session.user.displayName,
         "user",
-        wasRevision
-          ? `Data akun subscription (${updated.quantity} pcs) telah diperbarui.`
-          : `Data akun subscription (${updated.quantity} pcs) telah dikirim.`,
+        formatVoucherAccountSubmissionMessage(accounts, quantity, wasRevision),
       );
       await broadcastEvent("voucher_order_updated", code, { order: updated });
       respondWithVoucherOrder(res, req, updated);
@@ -313,6 +314,9 @@ export function registerVoucherRoutes(app, {
       case "request_account_revision":
         patch.accountRevisionRequested = true;
         break;
+      case "request_proof_revision":
+        patch.proofRevisionRequested = true;
+        break;
       case "complete":
         nextStatus = "completed";
         patch.completedAt = new Date().toISOString();
@@ -347,6 +351,7 @@ export function registerVoucherRoutes(app, {
       manual_process: "Order manual sedang diproses. Gunakan tombol salin order untuk menyalin data ke pembeli.",
       needs_verification: "Admin meminta kode verifikasi yang masuk ke email akun terkait. Silakan cek email Anda dan kirimkan kode verifikasi di chat ini.",
       request_account_revision: "Admin meminta perbaikan data akun. Silakan perbarui email dan password akun subscription lalu kirim ulang melalui formulir di bawah.",
+      request_proof_revision: "Admin meminta ganti bukti transfer. Silakan upload bukti pembayaran yang benar melalui formulir di bawah.",
       complete: "Order sudah selesai diproses. Silakan cek akun Anda dan ajukan sengketa jika terjadi masalah pada akun.",
       dispute: `Sengketa diajukan: ${note}`,
       cancel: `Order dibatalkan: ${patch.cancelReason}`,

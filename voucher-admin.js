@@ -579,9 +579,14 @@ function renderAdminVoucherOrders() {
   }).join("") || "<p class='mini-note'>Belum ada order voucher.</p>";
 }
 
-function renderAdminVoucherMessage(message) {
+function renderAdminVoucherMessage(message, order) {
   if (window.VoucherChatUI?.renderMessageBubble) {
-    return window.VoucherChatUI.renderMessageBubble(message, { viewerRole: "admin" });
+    return window.VoucherChatUI.renderMessageBubble(message, {
+      viewerRole: "admin",
+      order,
+      adminAvatarUrl: "/assets/rekberwe-logo-shield.png?v=7",
+      userAvatarUrl: order?.user?.avatar || "",
+    });
   }
   const attachment = message.attachmentUrl
     ? (String(message.attachmentType || "").startsWith("image/")
@@ -609,12 +614,16 @@ function buildAdminVoucherActionsHtml(order) {
   const canRequestAccountRevision = accountsReady
     && !order.accountRevisionRequested
     && ["processing", "needs_verification", "dispute"].includes(order.status);
+  const canRequestProofRevision = order.status === "awaiting_confirmation"
+    && Boolean(order.paymentProofUrl)
+    && !order.proofRevisionRequested;
   return `
     <section class="voucher-room-side-card voucher-room-admin-actions-card">
       <h4>Aksi Admin</h4>
       <div class="voucher-admin-chat-actions">
         ${canProcess ? `<button type="button" class="primary-btn" data-admin-voucher-action="process">PROSES</button>` : ""}
         ${order.status === "processing" ? `<button type="button" class="ghost-btn" data-admin-voucher-action="needs_verification">Butuh Verifikasi</button>` : ""}
+        ${canRequestProofRevision ? `<button type="button" class="ghost-btn" data-admin-voucher-action="request_proof_revision">Minta Ganti Bukti TF</button>` : ""}
         ${canRequestAccountRevision ? `<button type="button" class="ghost-btn" data-admin-voucher-action="request_account_revision">Minta Perbaikan Data Akun</button>` : ""}
         ${canCancel ? `<button type="button" class="ghost-btn" data-admin-voucher-action="cancel">BATALKAN</button>` : ""}
         ${canComplete ? `<button type="button" class="primary-btn" data-admin-voucher-action="complete">Selesai</button>` : ""}
@@ -720,6 +729,8 @@ function renderAdminVoucherOrderRoom() {
       sidebarExtra: buildAdminVoucherSidebarExtra(order),
       bottomHtml: buildAdminVoucherComposeMarkup(),
       toolbarActionsHtml: "",
+      adminAvatarUrl: "/assets/rekberwe-logo-shield.png?v=7",
+      userAvatarUrl: order.user?.avatar || "",
     });
   } else {
   const canProcess = ["awaiting_confirmation", "needs_verification"].includes(order.status);
@@ -733,6 +744,9 @@ function renderAdminVoucherOrderRoom() {
   const canRequestAccountRevision = accountsReady
     && !order.accountRevisionRequested
     && ["processing", "needs_verification", "dispute"].includes(order.status);
+  const canRequestProofRevision = order.status === "awaiting_confirmation"
+    && Boolean(order.paymentProofUrl)
+    && !order.proofRevisionRequested;
   adminVoucherElements.orderRoom.innerHTML = `
     <div class="section-head">
       <p class="eyebrow">${escapeHtml(order.orderCode)}</p>
@@ -752,12 +766,13 @@ function renderAdminVoucherOrderRoom() {
     <div class="voucher-admin-chat-actions">
       ${canProcess ? `<button type="button" class="primary-btn" data-admin-voucher-action="process">PROSES</button>` : ""}
       ${order.status === "processing" ? `<button type="button" class="ghost-btn" data-admin-voucher-action="needs_verification">Butuh Verifikasi</button>` : ""}
+      ${canRequestProofRevision ? `<button type="button" class="ghost-btn" data-admin-voucher-action="request_proof_revision">Minta Ganti Bukti TF</button>` : ""}
       ${canRequestAccountRevision ? `<button type="button" class="ghost-btn" data-admin-voucher-action="request_account_revision">Minta Perbaikan Data Akun</button>` : ""}
       ${canCancel ? `<button type="button" class="ghost-btn" data-admin-voucher-action="cancel">BATALKAN</button>` : ""}
       ${canComplete ? `<button type="button" class="primary-btn" data-admin-voucher-action="complete">Selesai</button>` : ""}
       <button type="button" class="ghost-btn danger-btn" data-admin-voucher-delete-order="${escapeAttribute(order.orderCode)}">Hapus Order</button>
     </div>
-    <div class="voucher-chat-box" id="admin-voucher-chat-box">${(order.messages || []).map(renderAdminVoucherMessage).join("")}</div>
+    <div class="voucher-chat-box" id="admin-voucher-chat-box">${(order.messages || []).map((message) => renderAdminVoucherMessage(message, order)).join("")}</div>
     ${buildAdminVoucherComposeMarkup()}
   `;
   }

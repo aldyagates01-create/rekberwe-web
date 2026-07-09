@@ -163,28 +163,17 @@ function shouldShowAccountForm(order) {
   return !hasAccountsComplete(order);
 }
 
+function shouldShowReplaceProof(order) {
+  return Boolean(order?.proofRevisionRequested) && order.status === "awaiting_confirmation";
+}
+
 function buildAccountFormsMarkup(order) {
   if (!order?.product?.requiresAccountLogin) return "";
   const isRevision = Boolean(order.accountRevisionRequested);
   const quantity = Math.max(1, Number(order.quantity || 1));
   const accounts = Array.isArray(order.accountAccounts) ? order.accountAccounts : [];
   if (hasAccountsComplete(order) && !isRevision) {
-    return `
-      <section class="voucher-account-forms-card voucher-account-forms-compact is-complete">
-        <div class="voucher-account-forms-head">
-          <h4>Data akun · ${quantity} pcs</h4>
-          <p class="mini-note">Terkirim</p>
-        </div>
-        <div class="voucher-account-complete-list">
-          ${accounts.slice(0, quantity).map((item, index) => `
-            <div class="voucher-account-complete-row">
-              <span class="voucher-account-num">${index + 1}</span>
-              <span class="voucher-account-complete-email">${escapeHtml(item.email)}</span>
-            </div>
-          `).join("")}
-        </div>
-      </section>
-    `;
+    return "";
   }
   const revisionNotice = isRevision
     ? `<p class="mini-note voucher-account-revision-note">Admin meminta perbaikan data akun. Silakan perbarui email dan password lalu kirim ulang.</p>`
@@ -212,11 +201,12 @@ function buildAccountFormsMarkup(order) {
   `;
 }
 
-function buildReplaceProofMarkup() {
+function buildReplaceProofMarkup(order) {
+  if (!shouldShowReplaceProof(order)) return "";
   return `
     <section class="voucher-replace-proof-card voucher-replace-proof-compact">
       <form id="voucher-standalone-replace-proof-form" class="voucher-replace-proof-form">
-        <p class="mini-note voucher-replace-proof-label">Salah bukti? Ganti di sini</p>
+        <p class="mini-note voucher-replace-proof-label">Admin meminta ganti bukti transfer. Upload bukti baru di sini.</p>
         <div class="voucher-replace-proof-row">
           <label class="file-upload-field voucher-replace-proof-file">
             <span class="voucher-replace-proof-file-text">Pilih file</span>
@@ -352,7 +342,7 @@ function buildChatSection(order) {
       toolbarActionsHtml: buildStandaloneToolbarActions(order),
       statusClass,
       accountsFormHtml: showAccountForms ? buildAccountFormsMarkup(order) : "",
-      replaceProofHtml: order.status === "awaiting_confirmation" ? buildReplaceProofMarkup() : "",
+      replaceProofHtml: buildReplaceProofMarkup(order),
       bottomHtml: buildStandaloneChatBottom(order),
     });
   }
@@ -364,7 +354,7 @@ function buildChatSection(order) {
         ${(order.messages || []).map(renderMessage).join("")}
       </div>
       ${showAccountForms ? buildAccountFormsMarkup(order) : ""}
-      ${order.status === "awaiting_confirmation" ? buildReplaceProofMarkup() : ""}
+      ${buildReplaceProofMarkup(order)}
       ${canChat ? `
         <div class="voucher-chat-compose">
           <form id="voucher-standalone-chat-form" class="voucher-chat-form">

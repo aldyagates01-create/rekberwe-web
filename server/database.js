@@ -1021,6 +1021,7 @@ async function initializePostgres() {
     ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1;
     ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_accounts TEXT DEFAULT '[]';
     ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS account_revision_requested BOOLEAN DEFAULT FALSE;
+    ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS proof_revision_requested BOOLEAN DEFAULT FALSE;
     ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS order_source TEXT DEFAULT 'platform';
     ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS buyer_telegram TEXT DEFAULT '';
     ALTER TABLE voucher_orders ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ NULL;

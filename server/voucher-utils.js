@@ -19,6 +19,19 @@ export const VOUCHER_CANCELLABLE_STATUSES = new Set([
 
 export const DEFAULT_VOUCHER_PRODUCT_IMAGE = "/assets/rekberwe-logo-shield.png?v=7";
 
+export function formatVoucherAccountSubmissionMessage(accounts = [], quantity = 1, wasRevision = false) {
+  const normalized = Array.isArray(accounts) ? accounts.slice(0, Math.max(1, Number(quantity || 1))) : [];
+  const header = wasRevision
+    ? `Data akun subscription (${Math.max(1, Number(quantity || 1))} pcs) telah diperbarui.`
+    : `Data akun subscription (${Math.max(1, Number(quantity || 1))} pcs) telah dikirim.`;
+  const details = normalized.map((item, index) => {
+    const email = String(item?.email || "").trim();
+    const password = String(item?.password || "").trim();
+    return `Akun ${index + 1}\nEmail: ${email}\nPassword: ${password}`;
+  }).join("\n\n");
+  return details ? `${header}\n\n${details}` : header;
+}
+
 export function stripPublicVoucherProduct(product) {
   if (!product) return product;
   const { costPrice, ...publicProduct } = product;
@@ -369,10 +382,12 @@ export function validateVoucherOrderAction(order, action, actorIsAdmin) {
   if (!order) return { ok: false, message: "Order tidak ditemukan." };
   switch (action) {
     case "submit_payment":
-      if (!["awaiting_payment", "awaiting_confirmation"].includes(order.status)) {
-        return { ok: false, message: "Order tidak lagi menunggu pembayaran." };
+      if (order.status === "awaiting_payment") return { ok: true };
+      if (order.status === "awaiting_confirmation" && order.proofRevisionRequested) return { ok: true };
+      if (order.status === "awaiting_confirmation") {
+        return { ok: false, message: "Ganti bukti transfer hanya bisa setelah admin meminta." };
       }
-      return { ok: true };
+      return { ok: false, message: "Order tidak lagi menunggu pembayaran." };
     case "process":
       if (!actorIsAdmin) return { ok: false, message: "Hanya admin yang bisa memproses order." };
       if (!["awaiting_confirmation", "needs_verification"].includes(order.status)) {
@@ -413,6 +428,18 @@ export function validateVoucherOrderAction(order, action, actorIsAdmin) {
         if (!accountsReady) {
           return { ok: false, message: "Pembeli belum mengirim data akun." };
         }
+      }
+      return { ok: true };
+    case "request_proof_revision":
+      if (!actorIsAdmin) return { ok: false, message: "Hanya admin yang bisa meminta ganti bukti transfer." };
+      if (order.status !== "awaiting_confirmation") {
+        return { ok: false, message: "Ganti bukti hanya bisa diminta saat menunggu konfirmasi admin." };
+      }
+      if (!order.paymentProofUrl) {
+        return { ok: false, message: "Pembeli belum mengirim bukti pembayaran." };
+      }
+      if (order.proofRevisionRequested) {
+        return { ok: false, message: "Permintaan ganti bukti transfer sudah aktif." };
       }
       return { ok: true };
     case "complete":

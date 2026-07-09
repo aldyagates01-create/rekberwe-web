@@ -454,7 +454,7 @@ async function bootstrap() {
       renderNotifications();
     };
     window.RekberVoucher?.init(state.currentUser);
-    await window.RekberVoucher?.refresh?.({ skipHistoryRedirect: true }).catch(() => {});
+    await window.RekberVoucher?.refresh?.({ skipActiveOrderView: true }).catch(() => {});
     await tryCompletePendingSellerJoin();
   }
 }
@@ -3598,6 +3598,14 @@ function openMemberView(view) {
 function openWorkspaceSection(section) {
   if (section !== "transactions" || state.transactionScreen !== "room") {
     exitRoomMode();
+  }
+  if (section !== "transactions" && state.transactionScreen === "room") {
+    state.transactionScreen = "list";
+    state.historyChatType = null;
+    state.historyVoucherOrder = null;
+    state.historySelection = { type: "", code: "" };
+    state.activeTransaction = null;
+    window.RekberVoucher?.clearHistoryRoom?.();
   }
   if (section !== "dashboard") {
     state.mobileCreateOpen = false;

@@ -58,5 +58,11 @@ export function resolveVoucherOrderMediaUrls(order) {
     ...order,
     paymentProofUrl,
     messages,
+    user: order.user
+      ? {
+        ...order.user,
+        avatar: resolveUploadAccessUrl(order.user.avatar),
+      }
+      : order.user,
   };
 }

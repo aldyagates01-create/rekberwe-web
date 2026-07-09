@@ -437,6 +437,10 @@ function shouldShowVoucherAccountForm(order) {
   return !hasVoucherAccountsComplete(order);
 }
 
+function shouldShowVoucherReplaceProof(order) {
+  return Boolean(order?.proofRevisionRequested) && order.status === "awaiting_confirmation";
+}
+
 function buildVoucherAccountFormsMarkup(order, options = {}) {
   if (!order?.product?.requiresAccountLogin) return "";
   const isRevision = Boolean(order.accountRevisionRequested);
@@ -444,22 +448,7 @@ function buildVoucherAccountFormsMarkup(order, options = {}) {
   const accounts = Array.isArray(order.accountAccounts) ? order.accountAccounts : [];
   const formId = options.formId || "voucher-accounts-form";
   if (hasVoucherAccountsComplete(order) && !isRevision) {
-    return `
-      <section class="voucher-account-forms-card voucher-account-forms-compact is-complete">
-        <div class="voucher-account-forms-head">
-          <h4>Data akun · ${quantity} pcs</h4>
-          <p class="mini-note">Terkirim</p>
-        </div>
-        <div class="voucher-account-complete-list">
-        ${accounts.slice(0, quantity).map((item, index) => `
-          <div class="voucher-account-complete-row">
-            <span class="voucher-account-num">${index + 1}</span>
-            <span class="voucher-account-complete-email">${voucherEscapeHtml(item.email)}</span>
-          </div>
-        `).join("")}
-        </div>
-      </section>
-    `;
+    return "";
   }
   const revisionNotice = isRevision
     ? `<p class="mini-note voucher-account-revision-note">Admin meminta perbaikan data akun. Silakan perbarui email dan password lalu kirim ulang.</p>`
@@ -532,12 +521,6 @@ async function refreshVoucherData(options = {}) {
     }
     if (latest) {
       voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder || latest, latest);
-      if (!options.skipHistoryRedirect && isVoucherChatRoomStatus(latest.status) && ["checkout", "chat"].includes(voucherState.screen)) {
-        if (typeof window.openHistoryVoucherRoom === "function") {
-          window.openHistoryVoucherRoom(latest.orderCode);
-          return;
-        }
-      }
       refreshVoucherActiveOrderView();
     }
   }
@@ -801,12 +784,13 @@ function renderVoucherCheckout(order) {
 }
 
 function buildVoucherReplaceProofMarkup(order, options = {}) {
+  if (!shouldShowVoucherReplaceProof(order)) return "";
   const formId = options.formId || "voucher-replace-proof-form";
   const inputId = options.inputId || "voucher-replace-proof-input";
   return `
     <section class="voucher-replace-proof-card voucher-replace-proof-compact">
       <form id="${voucherEscapeHtml(formId)}" class="voucher-replace-proof-form">
-        <p class="mini-note voucher-replace-proof-label">Salah bukti? Ganti di sini</p>
+        <p class="mini-note voucher-replace-proof-label">Admin meminta ganti bukti transfer. Upload bukti baru di sini.</p>
         <div class="voucher-replace-proof-row">
           <label class="file-upload-field voucher-replace-proof-file">
             <span class="voucher-replace-proof-file-text">Pilih file</span>
@@ -849,16 +833,10 @@ function refreshVoucherActiveOrderView(options = {}) {
     if (voucherState.screen === "checkout") renderVoucherCheckout(order);
     return;
   }
-  if (!isVoucherHistoryRoomActive(order.orderCode) && isVoucherChatRoomStatus(order.status)) {
-    if (typeof window.openHistoryVoucherRoom === "function") {
-      window.openHistoryVoucherRoom(order.orderCode);
-      return;
-    }
-  }
   if (!isVoucherChatRoomStatus(order.status)) return;
-  renderVoucherChat();
-  if (options.forceChatScreen || voucherState.screen === "checkout" || voucherState.screen === "chat") {
-    openVoucherScreen("chat");
+  if (voucherState.screen === "chat") {
+    renderVoucherChat();
+    if (options.forceChatScreen) openVoucherScreen("chat");
   }
 }
 
@@ -984,7 +962,11 @@ function renderVoucherOrdersPage() {
 
 function renderVoucherMessageItem(message, options = {}) {
   if (window.VoucherChatUI?.renderMessageBubble) {
-    return window.VoucherChatUI.renderMessageBubble(message, options);
+    return window.VoucherChatUI.renderMessageBubble(message, {
+      ...options,
+      order: options.order || voucherState.activeOrder || null,
+      adminAvatarUrl: options.adminAvatarUrl || "/assets/rekberwe-logo-shield.png?v=7",
+    });
   }
   const isAdmin = message.senderRole === "admin";
   const attachment = message.attachmentUrl
@@ -1066,12 +1048,10 @@ function buildVoucherChatMarkup(order, options = {}) {
   const accountsFormHtml = showAccountForms
     ? buildVoucherAccountFormsMarkup(order, { formId: accountsFormId })
     : "";
-  const replaceProofHtml = order.status === "awaiting_confirmation"
-    ? buildVoucherReplaceProofMarkup(order, {
-      formId: options.replaceProofFormId || "voucher-replace-proof-form",
-      inputId: options.replaceProofInputId || "voucher-replace-proof-input",
-    })
-    : "";
+  const replaceProofHtml = buildVoucherReplaceProofMarkup(order, {
+    formId: options.replaceProofFormId || "voucher-replace-proof-form",
+    inputId: options.replaceProofInputId || "voucher-replace-proof-input",
+  });
   const bottomHtml = buildVoucherChatBottomMarkup(order, {
     formId,
     inputId,
@@ -1612,11 +1592,11 @@ function handleVoucherLiveEvent(payload) {
   if (index >= 0) voucherState.orders[index] = payload.order;
   else voucherState.orders.unshift(payload.order);
   if (voucherState.activeOrder?.orderCode === payload.order.orderCode) {
-    const previousStatus = voucherState.activeOrder.status;
     voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder, payload.order);
-    if (previousStatus === "awaiting_payment" && payload.order.status === "awaiting_confirmation") {
-      navigateToVoucherChatAfterPayment(voucherState.activeOrder);
-    } else {
+    if (isVoucherHistoryRoomActive(payload.order.orderCode)) {
+      renderVoucherHistoryRoom(payload.order);
+      window.syncHistoryVoucherOrder?.(payload.order);
+    } else if (voucherState.screen === "checkout" || voucherState.screen === "chat") {
       refreshActiveVoucherChatView();
     }
   }

@@ -328,6 +328,7 @@ ensureColumn("voucher_orders", "cost_price", "INTEGER DEFAULT 0");
 ensureColumn("voucher_orders", "quantity", "INTEGER DEFAULT 1");
 ensureColumn("voucher_orders", "account_accounts", "TEXT DEFAULT '[]'");
 ensureColumn("voucher_orders", "account_revision_requested", "INTEGER DEFAULT 0");
+ensureColumn("voucher_orders", "proof_revision_requested", "INTEGER DEFAULT 0");
 ensureColumn("voucher_orders", "order_source", "TEXT DEFAULT 'platform'");
 ensureColumn("voucher_orders", "buyer_telegram", "TEXT DEFAULT ''");
 ensureColumn("voucher_orders", "completed_at", "TEXT DEFAULT ''");
@@ -1838,6 +1839,7 @@ function hydrateVoucherOrder(row) {
     quantity: Math.max(1, Number(row.quantity || 1)),
     accountAccounts: parseVoucherAccountAccounts(credentialRow),
     accountRevisionRequested: Boolean(row.account_revision_requested),
+    proofRevisionRequested: Boolean(row.proof_revision_requested),
     orderSource: row.order_source || "platform",
     buyerTelegram: row.buyer_telegram || "",
     createdAt: row.created_at,
@@ -2202,7 +2204,7 @@ export function updateVoucherOrderFields(orderCode, fields = {}) {
     UPDATE voucher_orders
     SET status = ?, payment_proof_url = ?, payment_proof_name = ?,
         dispute_reason = ?, cancel_reason = ?, account_revision_requested = ?,
-        completed_at = ?, updated_at = ?
+        proof_revision_requested = ?, completed_at = ?, updated_at = ?
     WHERE order_code = ?
   `).run(
     nextStatus,
@@ -2213,6 +2215,9 @@ export function updateVoucherOrderFields(orderCode, fields = {}) {
     fields.accountRevisionRequested !== undefined
       ? (fields.accountRevisionRequested ? 1 : 0)
       : (current.accountRevisionRequested ? 1 : 0),
+    fields.proofRevisionRequested !== undefined
+      ? (fields.proofRevisionRequested ? 1 : 0)
+      : (current.proofRevisionRequested ? 1 : 0),
     fields.completedAt !== undefined ? (fields.completedAt || "") : (current.completedAt || ""),
     now,
     orderCode,
