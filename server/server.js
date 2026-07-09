@@ -2056,7 +2056,10 @@ app.get("/admin", (_req, res) => res.sendFile(path.join(webRoot, "admin.html")))
 app.get("/privacy", (_req, res) => res.sendFile(path.join(webRoot, "privacy.html")));
 app.get("/data-deletion", (_req, res) => res.sendFile(path.join(webRoot, "data-deletion.html")));
 app.get("/voucher-order/:code", (_req, res) => res.sendFile(path.join(webRoot, "voucher-order.html")));
-app.get("/chatroom/:code", (_req, res) => res.sendFile(path.join(webRoot, "chatroom.html")));
+app.get("/chatroom/:code", (_req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.sendFile(path.join(webRoot, "chatroom.html"));
+});
 app.get("/chatroom", (_req, res) => res.redirect("/"));
 
 if (useNextFrontend) {

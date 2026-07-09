@@ -154,6 +154,16 @@ function isVoucherHistoryRoomActive(orderCode = "") {
   );
 }
 
+const VOUCHER_ASSET_VERSION = "20260709b";
+
+function goToVoucherChatroom(orderCode, options = {}) {
+  const code = String(orderCode || "").trim().toUpperCase();
+  if (!code) return;
+  const url = window.VoucherUploadBridge?.buildChatroomUrl(code, options)
+    || `/chatroom/${encodeURIComponent(code)}${options.upload ? "?upload=1" : ""}`;
+  window.location.assign(url);
+}
+
 async function navigateToVoucherChatAfterPayment(order, options = {}) {
   if (!order) return;
   voucherState.activeOrder = order;
@@ -172,11 +182,7 @@ async function navigateToVoucherChatAfterPayment(order, options = {}) {
     return;
   }
 
-  renderVoucherChat();
-  openVoucherScreen("chat");
-  window.requestAnimationFrame(() => {
-    document.getElementById("voucher-chat-box")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  });
+  goToVoucherChatroom(order.orderCode);
 }
 
 function voucherUploadWithProgress(url, formData, onProgress) {
@@ -507,10 +513,23 @@ async function refreshVoucherData(options = {}) {
   if (document.body.classList.contains("workspace-voucher-active")) {
     renderWorkspaceVoucherSidePanel();
   }
-  if (!options.skipActiveOrderView && voucherState.activeOrder) {
-    const latest = voucherState.orders.find((item) => item.orderCode === voucherState.activeOrder.orderCode);
+  if (!options.skipActiveOrderView) {
+    const trackedCode = voucherState.activeOrder?.orderCode;
+    let latest = trackedCode
+      ? voucherState.orders.find((item) => item.orderCode === trackedCode)
+      : null;
+    if (!latest) {
+      latest = voucherState.orders.find((item) =>
+        ["awaiting_payment", "awaiting_confirmation", "processing", "needs_verification", "dispute"].includes(item.status),
+      );
+      if (latest) voucherState.activeOrder = latest;
+    }
     if (latest) {
-      voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder, latest);
+      voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder || latest, latest);
+      if (isVoucherChatRoomStatus(latest.status) && ["checkout", "chat"].includes(voucherState.screen)) {
+        goToVoucherChatroom(latest.orderCode);
+        return;
+      }
       refreshVoucherActiveOrderView();
     }
   }
@@ -749,6 +768,10 @@ async function confirmVoucherPurchase(productId) {
 
 function renderVoucherCheckout(order) {
   if (!voucherElements.checkoutView || !order) return;
+  if (order.status !== "awaiting_payment" && isVoucherChatRoomStatus(order.status)) {
+    goToVoucherChatroom(order.orderCode);
+    return;
+  }
   voucherElements.checkoutView.innerHTML = `
     <div class="section-head">
       <p class="eyebrow">Pembayaran</p>
@@ -814,6 +837,10 @@ function refreshVoucherActiveOrderView(options = {}) {
     if (voucherState.screen === "checkout") renderVoucherCheckout(order);
     return;
   }
+  if (!isVoucherHistoryRoomActive(order.orderCode) && isVoucherChatRoomStatus(order.status)) {
+    goToVoucherChatroom(order.orderCode);
+    return;
+  }
   if (!isVoucherChatRoomStatus(order.status)) return;
   renderVoucherChat();
   if (options.forceChatScreen || voucherState.screen === "checkout" || voucherState.screen === "chat") {
@@ -876,10 +903,11 @@ function buildVoucherAwaitingPaymentBody(order, options = {}) {
           <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
         </label>
         ${buildVoucherPaymentUploadProgressMarkup()}
-        <p class="mini-note">Setelah bukti terkirim, Anda akan masuk ke ruang chat untuk melengkapi data akun (jika diperlukan).</p>
+        <p class="mini-note">Pilih bukti transfer lalu klik tombol di bawah. Anda akan diarahkan ke halaman <strong>/chatroom</strong> dengan progress upload, lalu masuk ruang chat.</p>
+        <p class="mini-note">Sudah upload bukti? <a href="/chatroom/${voucherEscapeHtml(order.orderCode)}" class="voucher-chatroom-open-link">Buka ruang chat order ini</a></p>
         <div class="topbar-actions">
           ${showBackButton ? `<button type="button" class="ghost-btn" data-voucher-screen="catalog">Kembali ke katalog</button>` : ""}
-          <button type="submit" class="primary-btn voucher-payment-submit-btn">Kirim bukti pembayaran</button>
+          <button type="submit" class="primary-btn voucher-payment-submit-btn">Kirim bukti & buka ruang chat</button>
         </div>
       </form>
     </div>
@@ -1192,6 +1220,8 @@ async function openVoucherOrderChat(orderCode) {
   if (payload.order.status === "awaiting_payment") {
     renderVoucherCheckout(payload.order);
     openVoucherScreen("checkout");
+  } else if (isVoucherChatRoomStatus(payload.order.status)) {
+    goToVoucherChatroom(payload.order.orderCode);
   } else {
     renderVoucherChat();
     openVoucherScreen("chat");
@@ -1237,12 +1267,10 @@ async function submitVoucherPaymentProof(event) {
     if (submitBtn) submitBtn.disabled = true;
     try {
       await window.VoucherUploadBridge.storePendingPaymentProof(orderCode, file);
-      window.VoucherUploadBridge.openVoucherChatroom(orderCode, { upload: true });
+      window.VoucherUploadBridge.openVoucherChatroom(orderCode, { upload: true, sameWindow: true });
       resetFileUploadInput(fileInput);
-      window.setAuthStatus?.("Membuka ruang chat... Upload bukti berjalan di tab baru.");
     } catch (error) {
       window.setAuthStatus?.(error.message || "Gagal menyiapkan upload bukti.", true);
-    } finally {
       if (submitBtn) submitBtn.disabled = false;
     }
     return;

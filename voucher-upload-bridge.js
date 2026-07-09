@@ -90,13 +90,13 @@
 
   function openVoucherChatroom(orderCode, options = {}) {
     const url = buildChatroomUrl(orderCode, options);
-    if (options.sameWindow) {
-      global.location.href = url;
+    if (options.sameWindow || options.upload) {
+      global.location.assign(url);
       return null;
     }
     const popup = global.open(url, "_blank");
     if (!popup) {
-      global.location.href = url;
+      global.location.assign(url);
     }
     return popup;
   }
