@@ -42,6 +42,7 @@ const PRESENCE_ONLINE_MS = 30000;
 const PRESENCE_UI_TICK_MS = 5000;
 const PRESENCE_HEARTBEAT_MS = 15000;
 const TYPING_ACTIVE_MS = 5000;
+let userBackgroundSyncTimer = null;
 
 const sellerBankUiState = {
   dirty: false,
@@ -2390,12 +2391,13 @@ async function handleSendMessage(event) {
     }
 
     state.activeTransaction = latestTransaction;
+    state.transactions = state.transactions.map((item) => (
+      item.code === latestTransaction.code ? latestTransaction : item
+    ));
     await sendTypingState(state.activeTransaction.code, false);
-    roomChatScrollState = { wasNearBottom: true, distanceFromBottom: 0 };
-    await refreshTransactions();
-    await refreshDashboard();
-    renderRoom(state.activeTransaction);
-    renderProfile();
+    syncTransactionChatBox(elements.chatBox, state.activeTransaction);
+    updateRoomActionButtons(state.activeTransaction);
+    scheduleBackgroundUserSync();
     elements.chatForm.reset();
     if (elements.proofUpload) elements.proofUpload.value = "";
     renderPendingAttachments();
@@ -3802,6 +3804,93 @@ async function openMobileTransactionChat(code) {
   return true;
 }
 
+function mergeTransactionState(current, incoming) {
+  if (!incoming) return current;
+  if (!current || current.code !== incoming.code) return incoming;
+  const currentMessages = Array.isArray(current.messages) ? current.messages : [];
+  const incomingMessages = Array.isArray(incoming.messages) ? incoming.messages : [];
+  const currentUploads = Array.isArray(current.uploads) ? current.uploads : [];
+  const incomingUploads = Array.isArray(incoming.uploads) ? incoming.uploads : [];
+  return {
+    ...incoming,
+    messages: incomingMessages.length >= currentMessages.length ? incomingMessages : currentMessages,
+    uploads: incomingUploads.length >= currentUploads.length ? incomingUploads : currentUploads,
+  };
+}
+
+function mergeSupportThreadState(current, incoming) {
+  if (!incoming) return current;
+  if (!current || current.id !== incoming.id) return incoming;
+  const currentMessages = Array.isArray(current.messages) ? current.messages : [];
+  const incomingMessages = Array.isArray(incoming.messages) ? incoming.messages : [];
+  return {
+    ...incoming,
+    messages: incomingMessages.length >= currentMessages.length ? incomingMessages : currentMessages,
+  };
+}
+
+function scheduleBackgroundUserSync() {
+  if (userBackgroundSyncTimer) window.clearTimeout(userBackgroundSyncTimer);
+  userBackgroundSyncTimer = window.setTimeout(async () => {
+    try {
+      await refreshTransactions();
+      if (state.activeTransaction) {
+        const latest = state.transactions.find((item) => item.code === state.activeTransaction.code);
+        if (latest) {
+          state.activeTransaction = mergeTransactionState(state.activeTransaction, latest);
+          if (state.transactionScreen === "room") {
+            syncTransactionChatBox(elements.chatBox, state.activeTransaction);
+            updateRoomActionButtons(state.activeTransaction);
+          }
+        }
+      }
+      await refreshDashboard();
+      renderActivityTabs();
+      renderProfile();
+      renderMemberVisibility();
+    } catch (error) {
+      console.error("Background sync gagal:", error);
+    }
+  }, 2000);
+}
+
+function syncTransactionChatBox(container, transaction) {
+  if (!container || !transaction) return;
+  const code = String(transaction.code || "");
+  if (container.dataset.transactionCode !== code) {
+    container.dataset.transactionCode = code;
+    container.dataset.timelineCount = "0";
+  }
+  const timeline = buildTransactionTimeline(transaction);
+  const prevCount = Number(container.dataset.timelineCount || 0);
+  if (timeline.length === prevCount) return;
+  const scrollState = captureScrollState(container);
+  const renderItem = (item) => (
+    item.kind === "upload" ? renderChatUploadItem(item, transaction) : renderChatItem(item, transaction)
+  );
+  if (timeline.length < prevCount || prevCount === 0) {
+    container.innerHTML = timeline.map(renderItem).join("");
+  } else {
+    container.insertAdjacentHTML("beforeend", timeline.slice(prevCount).map(renderItem).join(""));
+    scrollState.wasNearBottom = true;
+  }
+  container.dataset.timelineCount = String(timeline.length);
+  restoreScrollState(container, scrollState);
+}
+
+function syncSupportMessagesBox(container, messages, renderFn) {
+  if (!container) return;
+  const list = Array.isArray(messages) ? messages : [];
+  const prevCount = Number(container.dataset.messageCount || 0);
+  if (list.length === prevCount) return;
+  const wasNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 48;
+  container.innerHTML = list.length
+    ? list.map(renderFn).join("")
+    : "<div class=\"upload-empty-state\">Belum ada pesan live chat.</div>";
+  container.dataset.messageCount = String(list.length);
+  if (wasNearBottom) container.scrollTop = container.scrollHeight;
+}
+
 function renderRoom(transaction) {
   roomChatScrollState = captureScrollState(elements.chatBox);
   state.transactionScreen = "room";
@@ -3833,9 +3922,7 @@ function renderRoom(transaction) {
   if (elements.proofList) {
     elements.proofList.innerHTML = "";
   }
-  const timeline = buildTransactionTimeline(transaction);
-  elements.chatBox.innerHTML = timeline.map((item) => item.kind === "upload" ? renderChatUploadItem(item, transaction) : renderChatItem(item, transaction)).join("");
-  restoreScrollState(elements.chatBox, roomChatScrollState);
+  syncTransactionChatBox(elements.chatBox, transaction);
   markUserTransactionSeen(transaction);
   updateRoomActionButtons(transaction);
   renderSellerBankForm(transaction);
@@ -4359,9 +4446,7 @@ function renderSupportWidget() {
   }
   updateSupportWidgetBadge();
   renderSupportWidgetPresence();
-  elements.supportWidgetMessages.innerHTML = messages.length
-    ? messages.map(renderSupportMessage).join("")
-    : "<div class=\"upload-empty-state\">Belum ada pesan live chat.</div>";
+  syncSupportMessagesBox(elements.supportWidgetMessages, messages, renderSupportMessage);
   if (!elements.supportWidgetPanel?.classList.contains("hidden")) {
     elements.supportWidgetMessages.scrollTop = elements.supportWidgetMessages.scrollHeight;
   }
@@ -4415,7 +4500,7 @@ async function handleSupportMessageSubmit(event) {
     if (!payload?.thread) {
       throw new Error("Live chat gagal diperbarui.");
     }
-    state.supportThread = payload.thread;
+    state.supportThread = mergeSupportThreadState(state.supportThread, payload.thread);
     elements.supportWidgetForm.reset();
     if (elements.supportWidgetUpload) elements.supportWidgetUpload.value = "";
     markSupportThreadSeen();
@@ -5267,6 +5352,11 @@ function setupLiveEvents() {
         }
       }
       if (payload.type === "transaction_updated" && payload.transaction) {
+        state.transactions = state.transactions.map((item) => (
+          item.code === payload.code
+            ? mergeTransactionState(item, payload.transaction)
+            : item
+        ));
         if (!previousTransaction) {
           shouldPlayTransactionSound = true;
         } else {
@@ -5277,13 +5367,21 @@ function setupLiveEvents() {
             shouldPlayChatSound = true;
           }
         }
+        if (state.activeTransaction?.code === payload.code) {
+          state.activeTransaction = mergeTransactionState(state.activeTransaction, payload.transaction);
+          if (state.transactionScreen === "room") {
+            syncTransactionChatBox(elements.chatBox, state.activeTransaction);
+            renderRoomPresence(state.activeTransaction);
+            updateRoomActionButtons(state.activeTransaction);
+          }
+        }
       }
 
       if (payload.type === "support_updated" && payload.thread) {
         const previousCount = state.supportThread?.messages?.length || 0;
         const nextCount = payload.thread.messages?.length || 0;
         const lastMessage = payload.thread.messages?.[nextCount - 1];
-        state.supportThread = payload.thread;
+        state.supportThread = mergeSupportThreadState(state.supportThread, payload.thread);
         renderSupportWidget();
         if (nextCount > previousCount && lastMessage?.senderRole === "admin") {
           playUserNotificationSound("chat");
@@ -5358,18 +5456,7 @@ function setupLiveEvents() {
         state.transactionScreen = "list";
       }
 
-      if (payload.type === "transaction_updated" && payload.transaction && state.activeTransaction?.code === payload.code) {
-        state.activeTransaction = payload.transaction;
-        if (state.transactionScreen === "room") {
-          renderRoom(state.activeTransaction);
-        }
-      }
-
-      await refreshTransactions();
-      await refreshDashboard();
-      renderActivityTabs();
-      renderProfile();
-      renderMemberVisibility();
+      scheduleBackgroundUserSync();
       if (shouldPlayTransactionSound) {
         playUserNotificationSound("transaction");
       } else if (shouldPlayChatSound) {

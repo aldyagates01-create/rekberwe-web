@@ -1952,9 +1952,7 @@ function renderActiveTransaction() {
   if (elements.adminProofList) {
     elements.adminProofList.innerHTML = "";
   }
-  const timeline = buildAdminTransactionTimeline(transaction);
-  elements.adminChatBox.innerHTML = timeline.map((item) => item.kind === "upload" ? renderAdminChatUploadItem(item, transaction) : renderChatItem(item, transaction)).join("");
-  restoreScrollState(elements.adminChatBox, adminChatScrollState);
+  syncAdminTransactionChatBox(elements.adminChatBox, transaction);
   markAdminTransactionSeen(transaction);
 
   const payoutBlockReason = getAdminSendPayoutBlockReason(transaction);
@@ -2279,9 +2277,12 @@ async function handleAdminSendMessage(event) {
     }
 
     state.activeTransaction = latestTransaction;
+    state.transactions = state.transactions.map((item) => (
+      item.code === latestTransaction.code ? latestTransaction : item
+    ));
     await sendAdminTypingState(state.activeTransaction.code, false);
-    adminChatScrollState = { wasNearBottom: true, distanceFromBottom: 0 };
-    await refreshDashboardData();
+    syncAdminTransactionChatBox(elements.adminChatBox, state.activeTransaction);
+    scheduleBackgroundAdminSync();
     elements.adminChatForm.reset();
     elements.adminProofUpload.value = "";
     renderAdminPendingAttachments();
@@ -3019,6 +3020,78 @@ async function sendAdminTypingState(code, isTyping) {
 }
 
 const TYPING_ACTIVE_MS = 5000;
+let adminBackgroundSyncTimer = null;
+
+function mergeAdminTransactionState(current, incoming) {
+  if (!incoming) return current;
+  if (!current || current.code !== incoming.code) return incoming;
+  const currentMessages = Array.isArray(current.messages) ? current.messages : [];
+  const incomingMessages = Array.isArray(incoming.messages) ? incoming.messages : [];
+  const currentUploads = Array.isArray(current.uploads) ? current.uploads : [];
+  const incomingUploads = Array.isArray(incoming.uploads) ? incoming.uploads : [];
+  return {
+    ...incoming,
+    messages: incomingMessages.length >= currentMessages.length ? incomingMessages : currentMessages,
+    uploads: incomingUploads.length >= currentUploads.length ? incomingUploads : currentUploads,
+  };
+}
+
+function mergeAdminSupportThreadState(current, incoming) {
+  if (!incoming) return current;
+  if (!current || current.id !== incoming.id) return incoming;
+  const currentMessages = Array.isArray(current.messages) ? current.messages : [];
+  const incomingMessages = Array.isArray(incoming.messages) ? incoming.messages : [];
+  return {
+    ...incoming,
+    messages: incomingMessages.length >= currentMessages.length ? incomingMessages : currentMessages,
+  };
+}
+
+function scheduleBackgroundAdminSync() {
+  if (adminBackgroundSyncTimer) window.clearTimeout(adminBackgroundSyncTimer);
+  adminBackgroundSyncTimer = window.setTimeout(() => {
+    refreshDashboardData().catch((error) => {
+      console.error("Background admin sync gagal:", error);
+    });
+  }, 2000);
+}
+
+function syncAdminTransactionChatBox(container, transaction) {
+  if (!container || !transaction) return;
+  const code = String(transaction.code || "");
+  if (container.dataset.transactionCode !== code) {
+    container.dataset.transactionCode = code;
+    container.dataset.timelineCount = "0";
+  }
+  const timeline = buildAdminTransactionTimeline(transaction);
+  const prevCount = Number(container.dataset.timelineCount || 0);
+  if (timeline.length === prevCount) return;
+  const scrollState = captureScrollState(container);
+  const renderItem = (item) => (
+    item.kind === "upload" ? renderAdminChatUploadItem(item, transaction) : renderChatItem(item, transaction)
+  );
+  if (timeline.length < prevCount || prevCount === 0) {
+    container.innerHTML = timeline.map(renderItem).join("");
+  } else {
+    container.insertAdjacentHTML("beforeend", timeline.slice(prevCount).map(renderItem).join(""));
+    scrollState.wasNearBottom = true;
+  }
+  container.dataset.timelineCount = String(timeline.length);
+  restoreScrollState(container, scrollState);
+}
+
+function syncAdminSupportMessagesBox(container, messages, renderFn) {
+  if (!container) return;
+  const list = Array.isArray(messages) ? messages : [];
+  const prevCount = Number(container.dataset.messageCount || 0);
+  if (list.length === prevCount) return;
+  const wasNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 48;
+  container.innerHTML = list.length
+    ? list.map(renderFn).join("")
+    : "<div class=\"upload-empty-state\">Belum ada pesan live chat.</div>";
+  container.dataset.messageCount = String(list.length);
+  if (wasNearBottom) container.scrollTop = container.scrollHeight;
+}
 
 function getActiveSupportTyping(thread) {
   if (!thread?.typing) return {};
@@ -3232,10 +3305,11 @@ function renderSupportThreads() {
     elements.adminSupportRoomStatus.textContent = String(active.status || "open");
   }
   markAdminSupportThreadSeen(active);
-  elements.adminSupportMessages.innerHTML = active.messages.length
-    ? active.messages.map((message) => renderSupportAdminMessage(message, active.user)).join("")
-    : "<div class=\"upload-empty-state\">Belum ada pesan live chat.</div>";
-  elements.adminSupportMessages.scrollTop = elements.adminSupportMessages.scrollHeight;
+  syncAdminSupportMessagesBox(
+    elements.adminSupportMessages,
+    active.messages,
+    (message) => renderSupportAdminMessage(message, active.user),
+  );
   renderAdminSupportPresence(active);
   updateAdminNotificationBadges();
 }
@@ -3307,7 +3381,9 @@ async function handleAdminSupportMessageSubmit(event) {
     if (!payload?.thread) {
       throw new Error("Live chat admin gagal diperbarui.");
     }
-    state.supportThreads = state.supportThreads.map((thread) => thread.id === threadId ? payload.thread : thread);
+    state.supportThreads = state.supportThreads.map((thread) => (
+      thread.id === threadId ? mergeAdminSupportThreadState(thread, payload.thread) : thread
+    ));
     elements.adminSupportForm.reset();
     if (elements.adminSupportUpload) elements.adminSupportUpload.value = "";
     markAdminSupportThreadSeen(payload.thread);
@@ -3616,6 +3692,15 @@ function setupAdminLiveEvents() {
             shouldPlayChatSound = true;
           }
         }
+        state.transactions = state.transactions.map((item) => (
+          item.code === payload.code
+            ? mergeAdminTransactionState(item, payload.transaction)
+            : item
+        ));
+        if (state.activeTransaction?.code === payload.code) {
+          state.activeTransaction = mergeAdminTransactionState(state.activeTransaction, payload.transaction);
+          syncAdminTransactionChatBox(elements.adminChatBox, state.activeTransaction);
+        }
       }
 
       if (payload.type === "support_updated" && payload.thread) {
@@ -3623,7 +3708,8 @@ function setupAdminLiveEvents() {
         const previousCount = previousThread?.messages?.length || 0;
         const nextCount = payload.thread.messages?.length || 0;
         const lastMessage = payload.thread.messages?.[nextCount - 1];
-        state.supportThreads = [...(state.supportThreads || []).filter((thread) => thread.id !== payload.thread.id), payload.thread]
+        const mergedThread = mergeAdminSupportThreadState(previousThread, payload.thread);
+        state.supportThreads = [...(state.supportThreads || []).filter((thread) => thread.id !== payload.thread.id), mergedThread]
           .sort((a, b) => new Date(b.updatedAt || b.updated_at || 0) - new Date(a.updatedAt || a.updated_at || 0));
         renderSupportThreads();
         if (!previousThread && nextCount > 0) {
@@ -3657,12 +3743,7 @@ function setupAdminLiveEvents() {
         state.activeTransaction = null;
       }
 
-      if (payload.type === "transaction_updated" && payload.transaction && state.activeTransaction?.code === payload.code) {
-        state.activeTransaction = payload.transaction;
-        renderActiveTransaction();
-      }
-
-      await refreshDashboardData();
+      scheduleBackgroundAdminSync();
       updateAdminNotificationBadges();
       if (shouldPlayTransactionSound) {
         playAdminNotificationSound("transaction", transactionNotificationMeta || undefined);

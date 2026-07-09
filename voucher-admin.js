@@ -71,6 +71,17 @@ function handleAdminVoucherChatInputTyping() {
   }, 1600);
 }
 
+function mergeAdminVoucherOrder(current, incoming) {
+  if (!incoming) return current;
+  if (!current || current.orderCode !== incoming.orderCode) return incoming;
+  const currentMessages = Array.isArray(current.messages) ? current.messages : [];
+  const incomingMessages = Array.isArray(incoming.messages) ? incoming.messages : [];
+  return {
+    ...incoming,
+    messages: incomingMessages.length >= currentMessages.length ? incomingMessages : currentMessages,
+  };
+}
+
 function handleAdminVoucherTypingEvent(payload) {
   const code = String(payload.orderCode || payload.code || "").toUpperCase();
   if (!code) return;
@@ -1010,20 +1021,28 @@ async function submitAdminVoucherChat(event) {
   const files = Array.from(chatUpload?.files || []);
   if (!text && !files.length) return;
   sendAdminVoucherTypingState(order.orderCode, false);
+  let latestOrder = order;
   if (text) {
-    await fetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/messages`, {
+    const payload = await fetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/messages`, {
       method: "POST",
       body: JSON.stringify({ text }),
     });
+    latestOrder = mergeAdminVoucherOrder(order, payload.order);
   }
   if (files.length) {
     const formData = new FormData();
     files.forEach((file) => formData.append("chatFiles", file));
-    await uploadWithProgress(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/uploads`, formData);
+    const uploadPayload = await uploadWithProgress(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/uploads`, formData);
+    latestOrder = mergeAdminVoucherOrder(latestOrder, uploadPayload.order);
   }
+  adminVoucherState.activeOrder = latestOrder;
+  const orderIndex = adminVoucherState.orders.findIndex((item) => item.orderCode === latestOrder.orderCode);
+  if (orderIndex >= 0) adminVoucherState.orders[orderIndex] = latestOrder;
   document.getElementById("admin-voucher-chat-input").value = "";
   resetAdminFileUploadInput(chatUpload);
-  await openAdminVoucherOrder(order.orderCode);
+  window.VoucherChatUI?.syncChatBox?.("admin-voucher-chat-box", latestOrder, { viewerRole: "admin" });
+  updateAdminVoucherTypingIndicator();
+  renderAdminVoucherOrders();
 }
 
 function renderAdminVoucherPaymentSettings(settings) {
@@ -1180,8 +1199,29 @@ function handleAdminVoucherLiveEvent(payload) {
       renderAdminVoucherOrders();
       renderManualVoucherOrdersList();
     }
+    return Promise.resolve();
   }
-  return refreshAdminVoucherData().catch(() => {});
+  if (!payload.order) return Promise.resolve();
+  const code = String(payload.order.orderCode || "").toUpperCase();
+  const index = adminVoucherState.orders.findIndex((item) => item.orderCode === code);
+  if (index >= 0) {
+    adminVoucherState.orders[index] = mergeAdminVoucherOrder(adminVoucherState.orders[index], payload.order);
+  } else {
+    adminVoucherState.orders.unshift(payload.order);
+  }
+  if (adminVoucherState.activeOrder?.orderCode === code) {
+    const previousStatus = adminVoucherState.activeOrder.status;
+    adminVoucherState.activeOrder = mergeAdminVoucherOrder(adminVoucherState.activeOrder, payload.order);
+    if (previousStatus !== payload.order.status) {
+      renderAdminVoucherOrderRoom();
+    } else {
+      window.VoucherChatUI?.syncChatBox?.("admin-voucher-chat-box", adminVoucherState.activeOrder, { viewerRole: "admin" });
+      updateAdminVoucherTypingIndicator();
+    }
+  }
+  renderAdminVoucherOrders();
+  renderManualVoucherOrdersList();
+  return Promise.resolve();
 }
 
 window.RekberAdminVoucher = {

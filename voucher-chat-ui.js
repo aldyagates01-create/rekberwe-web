@@ -268,6 +268,29 @@
     });
   }
 
+  function syncChatBox(chatBoxId, order, options = {}) {
+    const box = global.document.getElementById(chatBoxId);
+    if (!box || !order) return;
+    const messages = Array.isArray(order.messages) ? order.messages : [];
+    const orderCode = String(order.orderCode || "");
+    if (box.dataset.orderCode !== orderCode) {
+      box.dataset.orderCode = orderCode;
+      box.dataset.messageCount = "0";
+    }
+    const prevCount = Number(box.dataset.messageCount || 0);
+    if (messages.length === prevCount) return;
+    const viewerRole = options.viewerRole || "user";
+    const wasNearBottom = box.scrollHeight - box.scrollTop - box.clientHeight <= 100;
+    box.innerHTML = renderChatMessages(messages, {
+      viewerRole,
+      order,
+      adminAvatarUrl: options.adminAvatarUrl || "/assets/rekberwe-logo-shield.png?v=7",
+      userAvatarUrl: order.user?.avatar || "",
+    });
+    box.dataset.messageCount = String(messages.length);
+    if (wasNearBottom) box.scrollTop = box.scrollHeight;
+  }
+
   global.VoucherChatUI = {
     escapeHtml,
     formatDateTime,
@@ -281,5 +304,6 @@
     buildSidebar,
     buildRoomMarkup,
     bindSidebarEvents,
+    syncChatBox,
   };
 })(window);

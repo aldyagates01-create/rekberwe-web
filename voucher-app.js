@@ -289,6 +289,19 @@ function mergeVoucherMessages(currentMessages = [], incomingMessages = []) {
   });
 }
 
+function syncVoucherChatBox(chatBoxId, order, options = {}) {
+  if (window.VoucherChatUI?.syncChatBox) {
+    window.VoucherChatUI.syncChatBox(chatBoxId, order, options);
+    return;
+  }
+  const box = document.getElementById(chatBoxId);
+  if (!box || !order) return;
+  const messages = Array.isArray(order.messages) ? order.messages : [];
+  box.innerHTML = messages.map((message) => renderVoucherMessageItem(message, { viewerRole: options.viewerRole || "user" })).join("");
+  box.dataset.messageCount = String(messages.length);
+  box.scrollTop = box.scrollHeight;
+}
+
 function mergeVoucherOrderPreservingMessages(current, incoming) {
   if (!incoming) return current;
   if (!current || current.orderCode !== incoming.orderCode) return incoming;
@@ -1745,17 +1758,20 @@ async function submitVoucherChatMessage(event, options = {}) {
   if (!order) return;
   const inputId = options.inputId || "voucher-chat-input";
   const uploadId = options.uploadId || "voucher-chat-upload";
+  const chatBoxId = options.chatBoxId || (inputId === "voucher-history-chat-input" ? "voucher-history-chat-box" : "voucher-chat-box");
   const textInput = document.getElementById(inputId);
   const uploadInput = document.getElementById(uploadId);
   const text = String(textInput?.value || "").trim();
   const files = Array.from(uploadInput?.files || []);
   if (!text && !files.length) return;
   sendVoucherTypingState(order.orderCode, false);
+  let latestOrder = order;
   if (text) {
-    await voucherFetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/messages`, {
+    const payload = await voucherFetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}/messages`, {
       method: "POST",
       body: JSON.stringify({ text }),
     });
+    latestOrder = mergeVoucherOrderPreservingMessages(order, payload.order);
   }
   if (files.length) {
     const formData = new FormData();
@@ -1767,14 +1783,15 @@ async function submitVoucherChatMessage(event, options = {}) {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.message || "Upload chat gagal.");
-    voucherState.activeOrder = payload.order;
-  } else {
-    const payload = await voucherFetchJson(`/api/voucher/orders/${encodeURIComponent(order.orderCode)}`);
-    voucherState.activeOrder = payload.order;
+    latestOrder = mergeVoucherOrderPreservingMessages(latestOrder, payload.order);
   }
+  voucherState.activeOrder = latestOrder;
+  const orderIndex = voucherState.orders.findIndex((item) => item.orderCode === latestOrder.orderCode);
+  if (orderIndex >= 0) voucherState.orders[orderIndex] = latestOrder;
   if (textInput) textInput.value = "";
   resetFileUploadInput(uploadInput);
-  refreshActiveVoucherChatView();
+  syncVoucherChatBox(chatBoxId, latestOrder);
+  updateVoucherTypingIndicator(latestOrder);
   window.refreshUserTransactionHistory?.();
 }
 
@@ -1980,6 +1997,7 @@ function bindVoucherEvents() {
         await submitVoucherChatMessage(event, {
           inputId: "voucher-history-chat-input",
           uploadId: "voucher-history-chat-upload",
+          chatBoxId: "voucher-history-chat-box",
         });
       } catch (error) {
         window.setAuthStatus?.(error.message || "Gagal mengirim pesan.", true);
@@ -2060,12 +2078,26 @@ function handleVoucherLiveEvent(payload) {
   if (index >= 0) voucherState.orders[index] = payload.order;
   else voucherState.orders.unshift(payload.order);
   if (voucherState.activeOrder?.orderCode === payload.order.orderCode) {
+    const previousStatus = voucherState.activeOrder.status;
     voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder, payload.order);
+    const statusChanged = previousStatus !== payload.order.status;
     if (isVoucherHistoryRoomActive(payload.order.orderCode)) {
-      renderVoucherHistoryRoom(payload.order);
-      window.syncHistoryVoucherOrder?.(payload.order);
-    } else if (voucherState.screen === "checkout" || voucherState.screen === "chat") {
-      refreshActiveVoucherChatView();
+      if (statusChanged) {
+        renderVoucherHistoryRoom(voucherState.activeOrder);
+      } else {
+        syncVoucherChatBox("voucher-history-chat-box", voucherState.activeOrder);
+        updateVoucherTypingIndicator(voucherState.activeOrder);
+      }
+      window.syncHistoryVoucherOrder?.(voucherState.activeOrder);
+    } else if (voucherState.screen === "checkout") {
+      renderVoucherCheckout(voucherState.activeOrder);
+    } else if (voucherState.screen === "chat") {
+      if (statusChanged) {
+        refreshActiveVoucherChatView();
+      } else {
+        syncVoucherChatBox("voucher-chat-box", voucherState.activeOrder);
+        updateVoucherTypingIndicator(voucherState.activeOrder);
+      }
     }
   }
   renderVoucherOrdersSidebar();
@@ -2101,5 +2133,6 @@ window.RekberVoucher = {
   clearHistoryRoom() {
     voucherState.historyRoomOrderCode = "";
   },
+  syncChatBox: syncVoucherChatBox,
   buildPaymentCheckoutMarkup: buildVoucherAwaitingPaymentMarkup,
 };
