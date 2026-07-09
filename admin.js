@@ -1690,12 +1690,16 @@ function buildVoucherPaymentBankRowHtml(bank = {}, index = 0) {
         <button type="button" class="ghost-btn voucher-bank-remove-btn">Hapus</button>
       </div>
       <div class="voucher-payment-bank-logo-field">
-        <label class="file-upload-field">Logo bank
-          <input type="file" class="voucher-bank-logo-input" accept="image/jpeg,image/png,image/webp" />
-          <span class="file-upload-hint mini-note">${logoUrl ? "Logo sudah diupload" : "Belum ada logo dipilih"}</span>
-        </label>
-        ${logoUrl ? `<img class="voucher-bank-logo-preview" src="${escapeAttribute(logoUrl)}" alt="Logo bank" />` : `<img class="voucher-bank-logo-preview hidden" alt="" />`}
-        <input type="hidden" class="voucher-bank-logo-url" value="${escapeAttribute(logoUrl)}" />
+        <div class="voucher-payment-bank-logo-upload">
+          <label class="file-upload-field">Logo bank
+            <input type="file" class="voucher-bank-logo-input" accept="image/jpeg,image/png,image/webp" />
+            <span class="file-upload-hint mini-note">${logoUrl ? "Logo sudah diupload" : "Belum ada logo dipilih"}</span>
+          </label>
+          <input type="hidden" class="voucher-bank-logo-url" value="${escapeAttribute(logoUrl)}" />
+        </div>
+        <div class="voucher-bank-logo-preview-wrap${logoUrl ? "" : " hidden"}">
+          <img class="voucher-bank-logo-preview" src="${escapeAttribute(logoUrl)}" alt="Logo bank" />
+        </div>
       </div>
       <label>Nama bank<input type="text" class="voucher-bank-name" value="${escapeAttribute(bank.name || bank.bankName || "")}" placeholder="BCA" /></label>
       <label>Nomor rekening<input type="text" class="voucher-bank-number" value="${escapeAttribute(bank.number || bank.bankNumber || "")}" placeholder="1234567890" /></label>
@@ -1732,12 +1736,11 @@ function bindVoucherPaymentBankRowEvents(container = document) {
       try {
         const payload = await uploadWithProgress("/api/admin/settings/voucher-bank-logo", formData);
         const logoInput = row.querySelector(".voucher-bank-logo-url");
+        const previewWrap = row.querySelector(".voucher-bank-logo-preview-wrap");
         const preview = row.querySelector(".voucher-bank-logo-preview");
         if (logoInput) logoInput.value = payload.logoUrl || "";
-        if (preview) {
-          preview.src = payload.logoUrl || "";
-          preview.classList.toggle("hidden", !payload.logoUrl);
-        }
+        if (preview) preview.src = payload.logoUrl || "";
+        if (previewWrap) previewWrap.classList.toggle("hidden", !payload.logoUrl);
         const hint = row.querySelector(".file-upload-hint");
         if (hint) hint.textContent = "Logo sudah diupload";
         settingsFormDirty = true;

@@ -966,15 +966,11 @@ function buildVoucherPaymentStepper(order) {
   `;
 }
 
-function buildVoucherPaymentBankCardsMarkup(payment = {}, options = {}) {
-  const banks = getVoucherPaymentBanks(payment);
+function buildVoucherPaymentBankCardMarkup(bank = {}, options = {}) {
   const copyLabel = options.copyLabel || window.t?.("voucher.copy") || "Salin";
   const copiedLabel = options.copiedLabel || window.t?.("voucher.copied") || "Sudah di copy";
   const holderLabel = options.holderLabel || window.t?.("voucher.account_holder") || "a.n";
-  if (!banks.length) {
-    return `<p class="mini-note">Rekening pembayaran belum dikonfigurasi admin.</p>`;
-  }
-  return banks.map((bank) => `
+  return `
     <article class="voucher-pay-bank-card">
       <div class="voucher-pay-bank-card-top">
         ${bank.logoUrl
@@ -993,7 +989,44 @@ function buildVoucherPaymentBankCardsMarkup(payment = {}, options = {}) {
         </div>
       </div>
     </article>
-  `).join("");
+  `;
+}
+
+function buildVoucherPaymentBankCardsMarkup(payment = {}, options = {}) {
+  const banks = getVoucherPaymentBanks(payment);
+  if (!banks.length) {
+    return `<p class="mini-note">Rekening pembayaran belum dikonfigurasi admin.</p>`;
+  }
+  const selectLabel = vt("voucher.select_bank", "Pilih bank");
+  const selectId = options.selectId || "voucher-pay-bank-select";
+  return `
+    <div class="voucher-pay-bank-selector">
+      <label class="voucher-pay-bank-select-field">
+        <span class="voucher-pay-bank-select-label">${voucherEscapeHtml(selectLabel)}</span>
+        <select class="voucher-pay-bank-select" id="${voucherEscapeHtml(selectId)}" aria-label="${voucherEscapeHtml(selectLabel)}">
+          ${banks.map((bank, index) => `
+            <option value="${index}">${voucherEscapeHtml(bank.name || `Bank ${index + 1}`)}</option>
+          `).join("")}
+        </select>
+      </label>
+      <div class="voucher-pay-bank-detail-list">
+        ${banks.map((bank, index) => `
+          <div class="voucher-pay-bank-detail${index === 0 ? "" : " hidden"}" data-bank-index="${index}">
+            ${buildVoucherPaymentBankCardMarkup(bank, options)}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function syncVoucherPayBankDetail(select) {
+  const container = select?.closest(".voucher-pay-bank-selector");
+  if (!container) return;
+  const index = Number(select.value);
+  container.querySelectorAll(".voucher-pay-bank-detail[data-bank-index]").forEach((detail) => {
+    detail.classList.toggle("hidden", Number(detail.dataset.bankIndex) !== index);
+  });
 }
 
 function buildVoucherPaymentSidebarMarkup(order, payment = {}) {
@@ -1073,9 +1106,7 @@ function buildVoucherAwaitingPaymentBody(order, options = {}) {
         <section class="voucher-pay-card voucher-pay-transfer-card">
           <h4>${voucherEscapeHtml(vt("voucher.make_payment", "Lakukan Pembayaran"))}</h4>
           <p class="mini-note voucher-pay-transfer-note">${voucherEscapeHtml(vt("voucher.transfer_note", "Transfer sesuai nominal ke rekening admin berikut"))}</p>
-          <div class="voucher-pay-bank-list">
-            ${buildVoucherPaymentBankCardsMarkup(payment)}
-          </div>
+          ${buildVoucherPaymentBankCardsMarkup(payment)}
           <div class="voucher-pay-total-box">
             <p class="mini-note">${voucherEscapeHtml(vt("voucher.total_transfer", "Total yang harus ditransfer"))}</p>
             <strong>${voucherEscapeHtml(voucherFormatCurrency(order.price))}</strong>
@@ -1662,6 +1693,11 @@ function bindVoucherEvents() {
     if (!card || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
     await startVoucherCheckout(card.dataset.voucherBuy);
+  });
+
+  document.addEventListener("change", (event) => {
+    const bankSelect = event.target?.closest?.(".voucher-pay-bank-select");
+    if (bankSelect) syncVoucherPayBankDetail(bankSelect);
   });
 
   document.addEventListener("click", async (event) => {

@@ -270,8 +270,9 @@ function extractProductRegion(product) {
 function buildPaymentBankCards(payment = {}) {
   const banks = getPaymentBanks(payment);
   const holderLabel = window.t?.("voucher.account_holder") || "a.n";
+  const selectLabel = window.t?.("voucher.select_bank") || "Pilih bank";
   if (!banks.length) return `<p class="mini-note">Rekening pembayaran belum dikonfigurasi admin.</p>`;
-  return banks.map((bank) => `
+  const renderCard = (bank) => `
     <article class="voucher-pay-bank-card">
       <div class="voucher-pay-bank-card-top">
         ${bank.logoUrl
@@ -287,7 +288,24 @@ function buildPaymentBankCards(payment = {}) {
         </div>
       </div>
     </article>
-  `).join("");
+  `;
+  return `
+    <div class="voucher-pay-bank-selector">
+      <label class="voucher-pay-bank-select-field">
+        <span class="voucher-pay-bank-select-label">${escapeHtml(selectLabel)}</span>
+        <select class="voucher-pay-bank-select" id="voucher-standalone-bank-select" aria-label="${escapeHtml(selectLabel)}">
+          ${banks.map((bank, index) => `<option value="${index}">${escapeHtml(bank.name || `Bank ${index + 1}`)}</option>`).join("")}
+        </select>
+      </label>
+      <div class="voucher-pay-bank-detail-list">
+        ${banks.map((bank, index) => `
+          <div class="voucher-pay-bank-detail${index === 0 ? "" : " hidden"}" data-bank-index="${index}">
+            ${renderCard(bank)}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function buildPaymentStepper(order) {
@@ -711,6 +729,17 @@ function startRoomLiveUpdates(orderCode) {
 }
 
 function bindRoomEvents(orderCode) {
+  document.addEventListener("change", (event) => {
+    const bankSelect = event.target?.closest?.(".voucher-pay-bank-select");
+    if (!bankSelect) return;
+    const container = bankSelect.closest(".voucher-pay-bank-selector");
+    if (!container) return;
+    const index = Number(bankSelect.value);
+    container.querySelectorAll(".voucher-pay-bank-detail[data-bank-index]").forEach((detail) => {
+      detail.classList.toggle("hidden", Number(detail.dataset.bankIndex) !== index);
+    });
+  });
+
   document.addEventListener("submit", async (event) => {
     if (event.target?.id === "voucher-standalone-chat-form") {
       event.preventDefault();
