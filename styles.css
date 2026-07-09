@@ -1414,9 +1414,9 @@ select {
 
 .voucher-chat-compose-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px;
-  align-items: center;
+  align-items: stretch;
 }
 
 .voucher-chat-attach-btn {
@@ -1451,13 +1451,14 @@ select {
 
 .voucher-chat-input {
   width: 100%;
-  min-height: 40px;
-  padding: 8px 12px;
-  border-radius: 10px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: 12px;
   border: 1px solid rgba(143, 164, 205, 0.16);
   background: rgba(0, 0, 0, 0.18);
   color: #edf3ff;
-  font-size: 0.88rem;
+  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .voucher-chat-input:focus {
@@ -1467,10 +1468,10 @@ select {
 }
 
 .voucher-chat-send-btn {
-  min-height: 40px;
-  padding: 0 16px;
-  font-size: 0.84rem;
-  border-radius: 10px;
+  min-height: 48px;
+  padding: 0 18px;
+  font-size: 0.88rem;
+  border-radius: 12px;
   white-space: nowrap;
 }
 
@@ -11268,6 +11269,56 @@ body.admin-locked .admin-notif-floating {
   background: rgba(224, 178, 50, 0.03);
 }
 
+.voucher-replace-proof-compact {
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.voucher-replace-proof-form {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.voucher-replace-proof-label {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.voucher-replace-proof-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.voucher-replace-proof-file {
+  margin: 0;
+  min-height: 34px;
+  padding: 4px 8px;
+  gap: 4px;
+}
+
+.voucher-replace-proof-file-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #d8c07a;
+}
+
+.voucher-replace-proof-file .file-upload-hint {
+  font-size: 0.68rem;
+}
+
+.voucher-replace-proof-row .voucher-payment-submit-btn {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
 .voucher-replace-proof-card h4 {
   margin: 0;
   font-size: 0.82rem;
@@ -12285,15 +12336,15 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   }
 
   #voucher-chat-view:not(.hidden) .voucher-chat-input {
-    min-height: 38px;
-    padding: 6px 10px;
-    font-size: 0.84rem;
+    min-height: 46px;
+    padding: 8px 12px;
+    font-size: 0.92rem;
   }
 
   #voucher-chat-view:not(.hidden) .voucher-chat-send-btn {
-    min-height: 38px;
-    padding: 0 10px;
-    font-size: 0.76rem;
+    min-height: 46px;
+    padding: 0 12px;
+    font-size: 0.8rem;
   }
 
   .voucher-history-room:not(.hidden) .voucher-chat-box {

@@ -214,16 +214,17 @@ function buildAccountFormsMarkup(order) {
 
 function buildReplaceProofMarkup() {
   return `
-    <section class="voucher-replace-proof-card">
-      <h4>Ganti bukti pembayaran</h4>
-      <p class="mini-note">Salah upload? Kirim bukti transfer yang benar di sini.</p>
-      <form id="voucher-standalone-replace-proof-form" class="profile-form voucher-payment-proof-form">
-        <label class="file-upload-field">
-          Upload bukti pembayaran baru
-          <input type="file" id="voucher-standalone-replace-proof-input" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
-          <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
-        </label>
-        <button type="submit" class="ghost-btn voucher-payment-submit-btn">Kirim bukti baru</button>
+    <section class="voucher-replace-proof-card voucher-replace-proof-compact">
+      <form id="voucher-standalone-replace-proof-form" class="voucher-replace-proof-form">
+        <p class="mini-note voucher-replace-proof-label">Salah bukti? Ganti di sini</p>
+        <div class="voucher-replace-proof-row">
+          <label class="file-upload-field voucher-replace-proof-file">
+            <span class="voucher-replace-proof-file-text">Pilih file</span>
+            <input type="file" id="voucher-standalone-replace-proof-input" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
+            <span class="file-upload-hint mini-note">Belum ada file</span>
+          </label>
+          <button type="submit" class="ghost-btn voucher-payment-submit-btn">Kirim</button>
+        </div>
       </form>
     </section>
   `;
@@ -314,12 +315,15 @@ function buildChatSection(order) {
       ${canChat ? `
         <div class="voucher-chat-compose">
           <form id="voucher-standalone-chat-form" class="voucher-chat-form">
-            <label>Pesan<input type="text" id="voucher-standalone-chat-input" placeholder="Tulis pesan ke admin..." /></label>
-            <label class="file-upload-field">Lampiran
-              <input type="file" id="voucher-standalone-chat-upload" accept="image/jpeg,image/png,image/webp" multiple />
-              <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
-            </label>
-            <button type="submit" class="primary-btn">Kirim</button>
+            <div class="voucher-chat-compose-row">
+              <label class="voucher-chat-attach-btn" title="Lampirkan gambar">
+                <input type="file" id="voucher-standalone-chat-upload" accept="image/jpeg,image/png,image/webp" multiple hidden />
+                <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true"><path d="M12 5v10M8 9l4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 15v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                <span class="voucher-chat-attach-label">File</span>
+              </label>
+              <input type="text" id="voucher-standalone-chat-input" class="voucher-chat-input" placeholder="Tulis pesan ke admin..." autocomplete="off" />
+              <button type="submit" class="primary-btn voucher-chat-send-btn">Kirim</button>
+            </div>
           </form>
           <div class="voucher-chat-actions">
             ${canCancel ? `<button type="button" class="ghost-btn voucher-chat-action-btn" data-room-order-action="cancel">Batalkan</button>` : ""}

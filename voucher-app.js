@@ -454,7 +454,7 @@ async function refreshVoucherData() {
     const latest = voucherState.orders.find((item) => item.orderCode === voucherState.activeOrder.orderCode);
     if (latest) {
       voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder, latest);
-      if (voucherState.screen === "chat") renderVoucherChat();
+      refreshVoucherActiveOrderView();
     }
   }
 }
@@ -712,19 +712,59 @@ function buildVoucherReplaceProofMarkup(order, options = {}) {
   const formId = options.formId || "voucher-replace-proof-form";
   const inputId = options.inputId || "voucher-replace-proof-input";
   return `
-    <section class="voucher-replace-proof-card">
-      <h4>Ganti bukti pembayaran</h4>
-      <p class="mini-note">Salah upload? Kirim bukti transfer yang benar di sini.</p>
-      <form id="${voucherEscapeHtml(formId)}" class="profile-form voucher-payment-proof-form">
-        <label class="file-upload-field">
-          Upload bukti pembayaran baru
-          <input type="file" id="${voucherEscapeHtml(inputId)}" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
-          <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
-        </label>
-        <button type="submit" class="ghost-btn voucher-payment-submit-btn">Kirim bukti baru</button>
+    <section class="voucher-replace-proof-card voucher-replace-proof-compact">
+      <form id="${voucherEscapeHtml(formId)}" class="voucher-replace-proof-form">
+        <p class="mini-note voucher-replace-proof-label">Salah bukti? Ganti di sini</p>
+        <div class="voucher-replace-proof-row">
+          <label class="file-upload-field voucher-replace-proof-file">
+            <span class="voucher-replace-proof-file-text">Pilih file</span>
+            <input type="file" id="${voucherEscapeHtml(inputId)}" name="paymentProof" accept="image/jpeg,image/png,image/webp" required />
+            <span class="file-upload-hint mini-note">Belum ada file</span>
+          </label>
+          <button type="submit" class="ghost-btn voucher-payment-submit-btn">Kirim</button>
+        </div>
       </form>
     </section>
   `;
+}
+
+function isVoucherChatRoomStatus(status) {
+  return ["awaiting_confirmation", "processing", "needs_verification", "dispute", "completed"].includes(status);
+}
+
+function refreshVoucherActiveOrderView(options = {}) {
+  const order = voucherState.activeOrder;
+  if (!order) return;
+  const historyRoom = document.getElementById("voucher-history-room");
+  const inHistoryRoom = voucherState.historyRoomOrderCode === order.orderCode
+    && historyRoom
+    && !historyRoom.classList.contains("hidden");
+  if (inHistoryRoom) {
+    if (order.status === "awaiting_payment") {
+      const renderAwaiting = () => {
+        historyRoom.innerHTML = buildVoucherAwaitingPaymentMarkup(order, {
+          formId: "voucher-history-payment-proof-form",
+          inputId: "voucher-history-payment-proof-input",
+          showMessages: true,
+        });
+        bindFileUploadFields(historyRoom);
+      };
+      ensureVoucherPaymentSettings().then(renderAwaiting).catch(renderAwaiting);
+    } else {
+      renderVoucherHistoryRoom(order);
+    }
+    window.syncHistoryVoucherOrder?.(order);
+    return;
+  }
+  if (order.status === "awaiting_payment") {
+    if (voucherState.screen === "checkout") renderVoucherCheckout(order);
+    return;
+  }
+  if (!isVoucherChatRoomStatus(order.status)) return;
+  renderVoucherChat();
+  if (options.forceChatScreen || voucherState.screen === "checkout" || voucherState.screen === "chat") {
+    openVoucherScreen("chat");
+  }
 }
 
 function buildVoucherPaymentBankMarkup(payment = {}) {
@@ -1030,10 +1070,10 @@ async function openVoucherOrderChat(orderCode) {
   if (payload.order.status === "awaiting_payment") {
     renderVoucherCheckout(payload.order);
     openVoucherScreen("checkout");
-    return;
+  } else {
+    renderVoucherChat();
+    openVoucherScreen("chat");
   }
-  renderVoucherChat();
-  openVoucherScreen("chat");
   window.markUserVoucherOrderSeen?.(payload.order);
 }
 
@@ -1095,26 +1135,16 @@ async function submitVoucherPaymentProof(event) {
     if (index >= 0) voucherState.orders[index] = payload.order;
     else voucherState.orders.unshift(payload.order);
 
-    const inHistoryRoom = voucherState.historyRoomOrderCode === payload.order.orderCode;
     const isReplaceForm = form.id === "voucher-replace-proof-form"
       || form.id === "voucher-history-replace-proof-form";
-    const wasAwaitingConfirmation = voucherState.activeOrder?.status === "awaiting_confirmation";
-    if (inHistoryRoom) {
-      refreshActiveVoucherChatView();
-      window.syncHistoryVoucherOrder?.(payload.order);
-    } else if (isReplaceForm || wasAwaitingConfirmation || voucherState.screen === "chat") {
-      renderVoucherChat();
-    } else {
-      renderVoucherChat();
-      openVoucherScreen("chat");
-    }
+    refreshVoucherActiveOrderView({ forceChatScreen: !isReplaceForm });
     renderVoucherOrdersSidebar();
     window.markUserVoucherOrderSeen?.(payload.order);
     window.refreshUserTransactionHistory?.();
     window.setAuthStatus?.(
-      isReplaceForm || wasAwaitingConfirmation
+      isReplaceForm
         ? "Bukti pembayaran baru terkirim."
-        : "Bukti pembayaran terkirim. Lengkapi data akun di ruang chat jika diperlukan.",
+        : "Bukti pembayaran terkirim. Anda sudah masuk ke ruang chat.",
     );
     resetFileUploadInput(fileInput);
     refreshVoucherData().catch(() => {});
@@ -1128,15 +1158,7 @@ async function submitVoucherPaymentProof(event) {
 }
 
 function refreshActiveVoucherChatView() {
-  const order = voucherState.activeOrder;
-  if (!order) return;
-  const historyRoom = document.getElementById("voucher-history-room");
-  if (voucherState.historyRoomOrderCode === order.orderCode && historyRoom && !historyRoom.classList.contains("hidden")) {
-    renderVoucherHistoryRoom(order);
-    window.syncHistoryVoucherOrder?.(order);
-    return;
-  }
-  if (voucherState.screen === "chat") renderVoucherChat();
+  refreshVoucherActiveOrderView();
 }
 
 async function submitVoucherChatMessage(event, options = {}) {
