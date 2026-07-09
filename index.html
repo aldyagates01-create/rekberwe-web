@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css?v=20260709n" />
+  <link rel="stylesheet" href="/styles.css?v=20260709p" />
 </head>
 <body>
   <div class="bg-orb bg-orb-a"></div>
@@ -288,19 +288,19 @@
               </label>
               <button class="primary-btn" id="join-transaction" data-i18n="menu.join_button">Masuk transaksi</button>
             </div>
-            <div class="sidebar-section" id="active-rekber-section">
-              <div class="section-head sidebar-head">
-                <p class="eyebrow">Rekber aktif</p>
-                <h3>Transaksi berjalan</h3>
-              </div>
-              <div class="activity-list telegram-list" id="active-rekber-list"></div>
-            </div>
             <div class="sidebar-section" id="voucher-orders-sidebar-section">
               <div class="section-head sidebar-head">
                 <p class="eyebrow">Order voucher</p>
                 <h3>GT / Voucher</h3>
               </div>
               <div class="activity-list telegram-list" id="voucher-orders-sidebar-list"></div>
+            </div>
+            <div class="sidebar-section" id="active-rekber-section">
+              <div class="section-head sidebar-head">
+                <p class="eyebrow">Rekber aktif</p>
+                <h3>Transaksi berjalan</h3>
+              </div>
+              <div class="activity-list telegram-list" id="active-rekber-list"></div>
             </div>
             <div class="sidebar-section" id="history-rekber-section">
               <div class="section-head sidebar-head">
@@ -402,6 +402,11 @@
                     <button type="button" class="mobile-section-link" id="mobile-dashboard-see-all">Lihat Semua</button>
                   </div>
                   <div class="mobile-quick-actions-grid">
+                    <button type="button" class="mobile-quick-action-btn" id="mobile-quick-voucher">
+                      <span class="mobile-quick-action-icon icon-purple" aria-hidden="true">🎮</span>
+                      <strong>Beli voucher/GT</strong>
+                      <small>Gametime &amp; voucher digital</small>
+                    </button>
                     <button type="button" class="mobile-quick-action-btn" id="mobile-quick-create">
                       <span class="mobile-quick-action-icon icon-purple" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -415,11 +420,6 @@
                       </span>
                       <strong>Verifikasi</strong>
                       <small>Identitas penjual</small>
-                    </button>
-                    <button type="button" class="mobile-quick-action-btn" id="mobile-quick-voucher">
-                      <span class="mobile-quick-action-icon icon-purple" aria-hidden="true">🎮</span>
-                      <strong>Beli voucher/GT</strong>
-                      <small>Gametime &amp; voucher digital</small>
                     </button>
                     <button type="button" class="mobile-quick-action-btn" id="mobile-quick-guide">
                       <span class="mobile-quick-action-icon icon-green" aria-hidden="true">
@@ -474,10 +474,10 @@
                 <div class="workspace-dashboard-main">
                   <section class="workspace-content-card" id="workspace-inline-transaction-panel">
                     <div class="workspace-service-picker">
-                      <button type="button" class="workspace-service-btn is-active" data-workspace-service="rekber">Rekber</button>
-                      <button type="button" class="workspace-service-btn" data-workspace-service="voucher" data-i18n="voucher.catalog_title">Beli Voucher / Gametime</button>
+                      <button type="button" class="workspace-service-btn is-active" data-workspace-service="voucher" data-i18n="voucher.catalog_title">Beli Voucher / Gametime</button>
+                      <button type="button" class="workspace-service-btn" data-workspace-service="rekber">Rekber</button>
                     </div>
-                    <div id="workspace-rekber-panel">
+                    <div id="workspace-rekber-panel" class="hidden">
                     <div class="section-head">
                       <p class="eyebrow">Buat transaksi</p>
                       <h3>Buat rekber baru langsung dari dashboard</h3>
@@ -571,7 +571,7 @@
                     <p class="mini-note workspace-desktop-only">Catatan: penjual wajib verifikasi di menu Verifikasi sebelum membuat transaksi sebagai penjual.</p>
                     <div class="result-box hidden" id="workspace-transaction-result"></div>
                     </div>
-                    <div id="workspace-voucher-panel" class="hidden">
+                    <div id="workspace-voucher-panel">
                       <div id="voucher-catalog-view"></div>
                       <div id="voucher-detail-view" class="hidden"></div>
                       <div id="voucher-checkout-view" class="hidden"></div>
@@ -1018,17 +1018,17 @@
       <h3 id="mobile-create-choice-title">Pilih layanan yang ingin dibuat</h3>
       <p class="mini-note mobile-create-choice-note">Rekber untuk transaksi escrow, atau beli voucher/gametime langsung dari katalog.</p>
       <div class="mobile-create-choice-grid">
+        <button type="button" class="mobile-create-choice-btn" id="mobile-create-choice-voucher">
+          <span class="mobile-create-choice-icon icon-blue" aria-hidden="true">🎮</span>
+          <strong>Beli voucher/GT</strong>
+          <small>Gametime &amp; voucher digital</small>
+        </button>
         <button type="button" class="mobile-create-choice-btn" id="mobile-create-choice-rekber">
           <span class="mobile-create-choice-icon icon-purple" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 4 6.5V11c0 4.2 3.1 7.9 8 9 4.9-1.1 8-4.8 8-9V6.5L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
           </span>
           <strong>Jasa Rekber</strong>
           <small>Buat transaksi escrow aman</small>
-        </button>
-        <button type="button" class="mobile-create-choice-btn" id="mobile-create-choice-voucher">
-          <span class="mobile-create-choice-icon icon-blue" aria-hidden="true">🎮</span>
-          <strong>Beli voucher/GT</strong>
-          <small>Gametime &amp; voucher digital</small>
         </button>
       </div>
       <button type="button" class="ghost-btn mobile-create-choice-cancel" id="mobile-create-choice-cancel">Batal</button>
@@ -1171,11 +1171,11 @@
   </div>
   <script src="/analytics-client.js?v=1"></script>
   <script src="/push-client.js?v=1"></script>
-  <script src="/i18n.js?v=20260709n"></script>
-  <script src="/voucher-upload-bridge.js?v=20260709n"></script>
-  <script src="/voucher-chat-ui.js?v=20260709n"></script>
-  <script src="/voucher-app.js?v=20260709n"></script>
-  <script src="/app.js?v=20260709n"></script>
+  <script src="/i18n.js?v=20260709p"></script>
+  <script src="/voucher-upload-bridge.js?v=20260709p"></script>
+  <script src="/voucher-chat-ui.js?v=20260709p"></script>
+  <script src="/voucher-app.js?v=20260709p"></script>
+  <script src="/app.js?v=20260709p"></script>
 </body>
 </html>
 

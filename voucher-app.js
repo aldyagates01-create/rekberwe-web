@@ -601,10 +601,21 @@ async function refreshVoucherData(options = {}) {
   }
 }
 
+function sortVoucherCatalogProducts(products = []) {
+  return [...products].sort((a, b) => {
+    const bestsellerDiff = Number(Boolean(b.isBestseller)) - Number(Boolean(a.isBestseller));
+    if (bestsellerDiff !== 0) return bestsellerDiff;
+    const salesDiff = Number(b.salesCount || 0) - Number(a.salesCount || 0);
+    if (salesDiff !== 0) return salesDiff;
+    return String(a.name || "").localeCompare(String(b.name || ""), "id");
+  });
+}
+
 function getVoucherCatalogProducts() {
   const query = String(voucherState.catalogSearchQuery || "").trim().toLowerCase();
-  if (!query) return voucherState.products;
-  return voucherState.products.filter((product) => {
+  const sortedProducts = sortVoucherCatalogProducts(voucherState.products);
+  if (!query) return sortedProducts;
+  return sortedProducts.filter((product) => {
     const haystack = [
       product.name,
       product.description,
@@ -631,7 +642,7 @@ function renderVoucherCatalog(options = {}) {
     const ready = product.readyState || {};
     const disabled = !ready.canPurchase;
     return `
-      <article class="voucher-product-card ${disabled ? "is-disabled" : "is-clickable"}" ${disabled ? "" : `data-voucher-buy="${product.id}"`} ${disabled ? "" : 'tabindex="0" role="button"'}>
+      <article class="voucher-product-card ${product.isBestseller ? "is-bestseller " : ""}${disabled ? "is-disabled" : "is-clickable"}" ${disabled ? "" : `data-voucher-buy="${product.id}"`} ${disabled ? "" : 'tabindex="0" role="button"'}>
         <div class="voucher-product-image-wrap">
           ${product.isBestseller ? `<span class="voucher-bestseller-badge">Terlaris</span>` : ""}
           ${buildVoucherCountdownBadge(ready)}
@@ -1891,7 +1902,7 @@ window.RekberVoucher = {
   init(currentUser) {
     if (!currentUser) return;
     bindVoucherEvents();
-    setWorkspaceService("rekber");
+    setWorkspaceService("voucher");
     if (!currentUser.banned) {
       refreshVoucherData().catch(() => {});
     }

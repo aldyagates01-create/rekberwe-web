@@ -3105,6 +3105,35 @@ select {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
   gap: 18px;
+  align-items: start;
+}
+
+.support-admin-thread-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: min(72vh, 680px);
+  border-radius: 16px;
+  border: 1px solid rgba(143, 164, 205, 0.12);
+  background: rgba(8, 14, 26, 0.72);
+  overflow: hidden;
+}
+
+.support-admin-thread-list {
+  max-height: min(72vh, 680px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 8px;
+  scrollbar-gutter: stable;
+}
+
+.support-admin-thread-list .activity-item {
+  margin: 0;
+}
+
+.support-admin-thread-list .activity-item + .activity-item {
+  margin-top: 8px;
 }
 
 .support-admin-room {
@@ -11686,20 +11715,34 @@ body.admin-locked .admin-notif-floating {
 
 .voucher-bestseller-badge {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 2;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
+  justify-content: center;
+  min-width: 78px;
+  padding: 8px 14px;
   border-radius: 999px;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
+  font-size: 0.92rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: #1a1200;
-  background: linear-gradient(135deg, #ffd76a 0%, #ffb347 100%);
-  border: 1px solid rgba(255, 215, 106, 0.65);
-  box-shadow: 0 4px 14px rgba(255, 183, 71, 0.35);
+  background: linear-gradient(135deg, #ffe08a 0%, #ffb347 55%, #ff9f1a 100%);
+  border: 2px solid rgba(255, 236, 170, 0.95);
+  box-shadow: 0 8px 22px rgba(255, 159, 26, 0.45), 0 0 0 1px rgba(255, 215, 106, 0.35);
+  animation: voucher-bestseller-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes voucher-bestseller-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.voucher-product-card.is-bestseller {
+  border-color: rgba(255, 183, 71, 0.42);
+  box-shadow: 0 0 0 1px rgba(255, 183, 71, 0.18), 0 14px 34px rgba(255, 159, 26, 0.12);
 }
 
 .mobile-profile-quick-links {
