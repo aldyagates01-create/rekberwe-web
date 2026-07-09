@@ -246,12 +246,17 @@ elements.adminLogout?.addEventListener("click", async () => {
   window.location.href = "/";
 });
 
-elements.adminFeeForm.addEventListener("submit", handleSaveFeeSettings);
-elements.voucherPaymentAddBank?.addEventListener("click", () => addVoucherPaymentBankRow());
+elements.adminFeeForm?.addEventListener("submit", handleSaveFeeSettings);
+document.addEventListener("click", (event) => {
+  const addBankButton = event.target.closest("#voucher-payment-add-bank");
+  if (!addBankButton) return;
+  event.preventDefault();
+  addVoucherPaymentBankRow();
+});
 elements.saveMaintenanceSettingsBtn?.addEventListener("click", handleSaveMaintenanceSettings);
 bindSettingsFormProtection();
 elements.adminSendTestEmail?.addEventListener("click", handleAdminSendTestEmail);
-elements.adminChatForm.addEventListener("submit", handleAdminSendMessage);
+elements.adminChatForm?.addEventListener("submit", handleAdminSendMessage);
 elements.adminChatInput?.addEventListener("input", () => {
   if (!state.activeTransaction?.code) return;
   if (adminTypingStopTimer) window.clearTimeout(adminTypingStopTimer);
@@ -1790,6 +1795,7 @@ function renderVoucherPaymentBanksInSettings(payment = {}) {
 }
 
 window.renderVoucherPaymentSettingsPanel = renderVoucherPaymentBanksInSettings;
+window.addVoucherPaymentBankRow = addVoucherPaymentBankRow;
 
 function renderFeeSettings(settings) {
   const tiers = settings?.accountFeeTiers || [];

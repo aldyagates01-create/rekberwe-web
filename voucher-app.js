@@ -10,6 +10,7 @@ const voucherState = {
   paymentSettings: null,
   historyRoomOrderCode: "",
   creatingOrder: false,
+  highlightAccountFormGuide: false,
 };
 
 const voucherElements = {
@@ -34,6 +35,10 @@ function voucherFetchJson(url, options = {}) {
     if (!response.ok) throw new Error(payload.message || "Permintaan gagal.");
     return payload;
   });
+}
+
+function vt(key, fallback = "") {
+  return window.t?.(key) ?? fallback;
 }
 
 function voucherEscapeHtml(value) {
@@ -207,6 +212,9 @@ async function navigateToVoucherChatAfterPayment(order, options = {}) {
   }
 
   if (typeof window.openHistoryVoucherRoom === "function") {
+    if (shouldShowVoucherAccountForm(order)) {
+      voucherState.highlightAccountFormGuide = true;
+    }
     await window.openHistoryVoucherRoom(order.orderCode);
     return;
   }
@@ -497,11 +505,16 @@ function buildVoucherAccountFormsMarkup(order, options = {}) {
   }
   const revisionNotice = isRevision
     ? `<p class="mini-note voucher-account-revision-note">Admin meminta perbaikan data akun. Silakan perbarui email dan password lalu kirim ulang.</p>`
-    : "";
+    : `
+      <div class="voucher-account-guide-banner" role="status">
+        <span class="voucher-account-guide-arrow" aria-hidden="true">▼</span>
+        <p><strong>${voucherEscapeHtml(vt("voucher.account_guide_title", "Langkah wajib berikutnya"))}</strong> ${voucherEscapeHtml(vt("voucher.account_guide_body", "Isi email dan password akun di formulir di bawah ini agar admin dapat memproses order Anda."))}</p>
+      </div>
+    `;
   return `
-    <section class="voucher-account-forms-card voucher-account-forms-compact${isRevision ? " is-revision" : ""}">
+    <section class="voucher-account-forms-card voucher-account-forms-compact${isRevision ? " is-revision" : " is-needs-guide"}">
       <div class="voucher-account-forms-head">
-        <h4>${isRevision ? "Perbaiki data akun" : "Data akun"} · ${quantity} pcs</h4>
+        <h4>${isRevision ? voucherEscapeHtml(vt("voucher.account_fix", "Perbaiki data akun")) : voucherEscapeHtml(vt("voucher.account_data", "Data akun"))} · ${quantity} pcs</h4>
       </div>
       ${revisionNotice}
       <form id="${voucherEscapeHtml(formId)}" class="voucher-account-forms">
@@ -510,15 +523,31 @@ function buildVoucherAccountFormsMarkup(order, options = {}) {
     return `
           <div class="voucher-account-row">
             <span class="voucher-account-num" aria-hidden="true">${index + 1}</span>
-            <input type="email" name="account_email_${index}" value="${voucherEscapeHtml(existing.email || "")}" required autocomplete="username" placeholder="Email akun ${index + 1}" aria-label="Email akun ${index + 1}" />
-            <input type="password" name="account_password_${index}" value="${voucherEscapeHtml(existing.password || "")}" required autocomplete="current-password" placeholder="Password" aria-label="Password akun ${index + 1}" />
+            <input type="email" name="account_email_${index}" value="${voucherEscapeHtml(existing.email || "")}" required autocomplete="username" placeholder="${voucherEscapeHtml(vt("voucher.account_email_placeholder", "Email akun"))} ${index + 1}" aria-label="${voucherEscapeHtml(vt("voucher.account_email_placeholder", "Email akun"))} ${index + 1}" />
+            <input type="password" name="account_password_${index}" value="${voucherEscapeHtml(existing.password || "")}" required autocomplete="current-password" placeholder="${voucherEscapeHtml(vt("voucher.account_password_placeholder", "Password"))}" aria-label="${voucherEscapeHtml(vt("voucher.account_password_placeholder", "Password"))} ${index + 1}" />
           </div>
         `;
   }).join("")}
-        <button type="submit" class="primary-btn voucher-account-submit-btn">${isRevision ? "Kirim perbaikan data akun" : "Kirim data akun"}</button>
+        <button type="submit" class="primary-btn voucher-account-submit-btn">${isRevision ? voucherEscapeHtml(vt("voucher.account_submit_fix", "Kirim perbaikan data akun")) : voucherEscapeHtml(vt("voucher.account_submit", "Kirim data akun"))}</button>
       </form>
     </section>
   `;
+}
+
+function highlightVoucherAccountFormGuide(root = document) {
+  const card = root.querySelector?.(".voucher-account-forms-card.is-needs-guide")
+    || root.querySelector?.(".voucher-account-forms-card");
+  if (!card) return;
+  card.classList.add("is-guide-highlight");
+  const dismiss = () => card.classList.remove("is-guide-highlight");
+  card.querySelectorAll("input").forEach((input) => {
+    input.addEventListener("focus", dismiss, { once: true });
+  });
+  card.querySelector("form")?.addEventListener("submit", dismiss, { once: true });
+  window.setTimeout(dismiss, 45000);
+  window.requestAnimationFrame(() => {
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
 }
 
 function setWorkspaceService(service) {
@@ -529,6 +558,7 @@ function setWorkspaceService(service) {
     button.classList.toggle("is-active", button.dataset.workspaceService === service);
   });
   if (isVoucher) {
+    openVoucherScreen("catalog");
     refreshVoucherData().catch((error) => {
       window.setAuthStatus?.(error.message || "Gagal memuat katalog voucher.", true);
     }).finally(() => {
@@ -914,11 +944,11 @@ function getVoucherPaymentActiveStep(order) {
 
 function buildVoucherPaymentStepper(order) {
   const steps = [
-    { id: 1, label: "Order Dibuat" },
-    { id: 2, label: "Menunggu Pembayaran" },
-    { id: 3, label: "Menunggu Konfirmasi" },
-    { id: 4, label: "Sedang Diproses" },
-    { id: 5, label: "Selesai" },
+    { id: 1, label: vt("voucher.step_order_created", "Order Dibuat") },
+    { id: 2, label: vt("voucher.step_awaiting_payment", "Menunggu Pembayaran") },
+    { id: 3, label: vt("voucher.step_awaiting_confirmation", "Menunggu Konfirmasi") },
+    { id: 4, label: vt("voucher.step_processing", "Sedang Diproses") },
+    { id: 5, label: vt("voucher.step_completed", "Selesai") },
   ];
   const activeStep = getVoucherPaymentActiveStep(order);
   return `
@@ -1027,7 +1057,7 @@ function buildVoucherAwaitingPaymentBody(order, options = {}) {
     <div class="voucher-pay-layout">
       <div class="voucher-pay-main">
         <section class="voucher-pay-card voucher-pay-order-card">
-          <h4>Detail Pesanan</h4>
+          <h4>${voucherEscapeHtml(vt("voucher.order_detail", "Detail Pesanan"))}</h4>
           <div class="voucher-pay-order-row">
             <div class="voucher-pay-product">
               <img class="voucher-pay-product-image" src="${voucherEscapeHtml(productImage)}" alt="${voucherEscapeHtml(order.product?.name || "Produk")}" loading="lazy" decoding="async" />
@@ -1041,33 +1071,33 @@ function buildVoucherAwaitingPaymentBody(order, options = {}) {
         </section>
 
         <section class="voucher-pay-card voucher-pay-transfer-card">
-          <h4>Lakukan Pembayaran</h4>
-          <p class="mini-note voucher-pay-transfer-note">Transfer sesuai nominal ke rekening admin berikut</p>
+          <h4>${voucherEscapeHtml(vt("voucher.make_payment", "Lakukan Pembayaran"))}</h4>
+          <p class="mini-note voucher-pay-transfer-note">${voucherEscapeHtml(vt("voucher.transfer_note", "Transfer sesuai nominal ke rekening admin berikut"))}</p>
           <div class="voucher-pay-bank-list">
             ${buildVoucherPaymentBankCardsMarkup(payment)}
           </div>
           <div class="voucher-pay-total-box">
-            <p class="mini-note">Total yang harus ditransfer</p>
+            <p class="mini-note">${voucherEscapeHtml(vt("voucher.total_transfer", "Total yang harus ditransfer"))}</p>
             <strong>${voucherEscapeHtml(voucherFormatCurrency(order.price))}</strong>
-            <p class="mini-note">Pastikan nominal transfer sama persis</p>
+            <p class="mini-note">${voucherEscapeHtml(vt("voucher.exact_amount_note", "Pastikan nominal transfer sama persis"))}</p>
           </div>
-          ${payment.qrisUrl ? `<p class="voucher-pay-qris-link"><a href="${voucherEscapeHtml(payment.qrisUrl)}" target="_blank" rel="noreferrer">Buka QRIS</a></p>` : ""}
+          ${payment.qrisUrl ? `<p class="voucher-pay-qris-link"><a href="${voucherEscapeHtml(payment.qrisUrl)}" target="_blank" rel="noreferrer">${voucherEscapeHtml(vt("voucher.open_qris", "Buka QRIS"))}</a></p>` : ""}
         </section>
 
         <section class="voucher-pay-card voucher-pay-upload-card">
-          <h4>Upload Bukti Pembayaran</h4>
+          <h4>${voucherEscapeHtml(vt("voucher.upload_proof_title", "Upload Bukti Pembayaran"))}</h4>
           <form id="${voucherEscapeHtml(formId)}" class="voucher-payment-proof-form">
             <label class="file-upload-field voucher-payment-dropzone">
-              <input type="file" id="${voucherEscapeHtml(inputId)}" name="paymentProof" accept="image/jpeg,image/png,image/webp" required data-empty-hint="Klik atau drag file ke sini (PNG, JPG, JPEG, Max 5MB)" />
+              <input type="file" id="${voucherEscapeHtml(inputId)}" name="paymentProof" accept="image/jpeg,image/png,image/webp" required data-empty-hint="${voucherEscapeHtml(vt("voucher.upload_dropzone", "Klik atau drag file ke sini"))} (PNG, JPG, JPEG, Max 5MB)" />
               <span class="voucher-payment-dropzone-icon" aria-hidden="true">⬆</span>
-              <span class="voucher-payment-dropzone-title">Klik atau drag file ke sini</span>
-              <span class="file-upload-hint mini-note">PNG, JPG, JPEG, Max 5MB</span>
+              <span class="voucher-payment-dropzone-title">${voucherEscapeHtml(vt("voucher.upload_dropzone", "Klik atau drag file ke sini"))}</span>
+              <span class="file-upload-hint mini-note">${voucherEscapeHtml(vt("voucher.upload_hint", "PNG, JPG, JPEG, Max 5MB"))}</span>
             </label>
             ${buildVoucherPaymentUploadProgressMarkup()}
-            <p class="voucher-pay-privacy-note"><span aria-hidden="true">🔒</span> Bukti pembayaran hanya dapat dilihat oleh admin.</p>
+            <p class="voucher-pay-privacy-note"><span aria-hidden="true">🔒</span> ${voucherEscapeHtml(vt("voucher.privacy_note", "Bukti pembayaran hanya dapat dilihat oleh admin."))}</p>
             <div class="voucher-pay-form-actions">
-              <button type="button" class="ghost-btn voucher-chat-action-btn" data-voucher-cancel="${voucherEscapeHtml(order.orderCode)}">Batalkan transaksi</button>
-              <button type="submit" class="primary-btn voucher-payment-submit-btn">Upload & Kirim Bukti</button>
+              <button type="button" class="ghost-btn voucher-chat-action-btn" data-voucher-cancel="${voucherEscapeHtml(order.orderCode)}">${voucherEscapeHtml(vt("voucher.cancel_order", "Batalkan transaksi"))}</button>
+              <button type="submit" class="primary-btn voucher-payment-submit-btn">${voucherEscapeHtml(vt("voucher.upload_submit", "Upload & Kirim Bukti"))}</button>
             </div>
           </form>
         </section>
@@ -1085,7 +1115,7 @@ function buildVoucherAwaitingPaymentMarkup(order, options = {}) {
         ${showCatalogBack ? `
           <button type="button" class="ghost-btn voucher-pay-back-btn" data-voucher-screen="catalog">
             <span aria-hidden="true">←</span>
-            <span>Kembali ke Katalog</span>
+            <span>${voucherEscapeHtml(vt("voucher.back_catalog", "Kembali ke Katalog"))}</span>
           </button>
         ` : `<span></span>`}
         <div class="voucher-pay-topbar-actions">
@@ -1384,6 +1414,10 @@ function renderVoucherHistoryRoom(order) {
   }
   bindFileUploadFields(container);
   bindVoucherRoomSidebar(container);
+  if (voucherState.highlightAccountFormGuide && shouldShowVoucherAccountForm(order)) {
+    voucherState.highlightAccountFormGuide = false;
+    window.requestAnimationFrame(() => highlightVoucherAccountFormGuide(container));
+  }
 }
 
 async function openVoucherOrderChat(orderCode) {
@@ -1752,27 +1786,29 @@ function bindVoucherEvents() {
   });
 
   window.addEventListener("rekber:locale-changed", () => {
-    window.RekberI18n?.applyTranslations?.(document);
-    if (voucherState.screen === "catalog") {
-      renderVoucherCatalog({ preserveSearchFocus: true });
-      return;
-    }
-    if (voucherState.screen === "detail") {
-      renderVoucherProductDetail();
-      return;
-    }
-    if (voucherState.screen === "orders") {
-      renderVoucherOrdersPage();
-      return;
-    }
-    const order = voucherState.activeOrder;
-    if (!order) return;
-    if (order.status === "awaiting_payment" && voucherState.screen === "checkout") {
-      renderVoucherCheckout(order);
-    } else if (isVoucherHistoryRoomActive(order.orderCode)) {
-      renderVoucherHistoryRoom(order);
-    }
+    refreshLocalizedVoucherUI();
   });
+}
+
+function refreshLocalizedVoucherUI() {
+  const voucherPanelVisible = !voucherElements.panel?.classList.contains("hidden");
+  if (voucherPanelVisible) {
+    if (!voucherElements.detailView?.classList.contains("hidden")) {
+      renderVoucherProductDetail();
+    } else if (!voucherElements.checkoutView?.classList.contains("hidden") && voucherState.activeOrder) {
+      renderVoucherCheckout(voucherState.activeOrder);
+    } else if (!voucherElements.ordersView?.classList.contains("hidden")) {
+      renderVoucherOrdersPage();
+    } else if (!voucherElements.chatView?.classList.contains("hidden") && voucherState.activeOrder) {
+      refreshActiveVoucherChatView();
+    } else {
+      renderVoucherCatalog({ preserveSearchFocus: true });
+    }
+  }
+  const order = voucherState.activeOrder;
+  if (order && isVoucherHistoryRoomActive(order.orderCode)) {
+    renderVoucherHistoryRoom(order);
+  }
 }
 
 function handleVoucherLiveEvent(payload) {
@@ -1837,6 +1873,7 @@ window.RekberVoucher = {
     return renderVoucherHistoryRoom(order);
   },
   ensurePaymentSettings: ensureVoucherPaymentSettings,
+  refreshLocalizedUI: refreshLocalizedVoucherUI,
   clearHistoryRoom() {
     voucherState.historyRoomOrderCode = "";
   },

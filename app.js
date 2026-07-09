@@ -5381,3 +5381,8 @@ window.renderPublicFeeList = renderPublicFeeList;
 window.renderTermsAndConditions = renderTermsAndConditions;
 window.openHistoryVoucherRoom = openHistoryVoucherRoom;
 
+window.addEventListener("rekber:locale-changed", () => {
+  window.RekberI18n?.applyTranslations?.(document);
+  window.RekberVoucher?.refreshLocalizedUI?.();
+});
+
