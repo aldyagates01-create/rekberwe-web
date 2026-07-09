@@ -214,9 +214,11 @@
     `;
   }
 
+  const boundSidebarRoots = new WeakSet();
+
   function bindSidebarEvents(container = global.document) {
-    if (!container || container.dataset.voucherSidebarBound === "1") return;
-    container.dataset.voucherSidebarBound = "1";
+    if (!container || boundSidebarRoots.has(container)) return;
+    boundSidebarRoots.add(container);
     container.addEventListener("click", (event) => {
       const shell = event.target.closest(".voucher-room-shell");
       if (!shell) return;
