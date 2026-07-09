@@ -1229,11 +1229,20 @@ select {
 .history-room-toolbar {
   display: none;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 0 24px 12px;
 }
 
 .history-room-toolbar:not(.hidden) {
   display: flex;
+}
+
+.history-room-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 #transaction-unified-history-list {
@@ -1242,6 +1251,19 @@ select {
 }
 
 @media (min-width: 769px) {
+  #member-transactions-workspace.room-open:has(#voucher-history-room:not(.hidden)) .room-shell-head {
+    display: none;
+  }
+
+  .voucher-room-toolbar.is-minimal {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .workspace-mobile-only {
+    display: none !important;
+  }
+
   #transaction-room-empty {
     min-height: 0;
     padding: 0 24px 24px;
@@ -13114,5 +13136,9 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   body.in-room-mode.in-voucher-room #voucher-history-room:not(.hidden) .voucher-bubble {
     font-size: var(--fl-fs-sm);
     padding: 7px 9px;
+  }
+
+  .workspace-mobile-only {
+    display: inline-flex;
   }
 }

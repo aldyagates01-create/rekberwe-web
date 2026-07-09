@@ -225,6 +225,7 @@ const elements = {
   historyRekberSection: document.getElementById("history-rekber-section"),
   backToTransactionList: document.getElementById("back-to-transaction-list"),
   historyRoomToolbar: document.getElementById("history-room-toolbar"),
+  historyVoucherDisputeBtn: document.getElementById("history-voucher-dispute-btn"),
   roomPageTitle: document.getElementById("room-page-title"),
   roomPageSubtitle: document.getElementById("room-page-subtitle"),
   transactionRoomEmpty: document.getElementById("transaction-room-empty"),
@@ -453,7 +454,7 @@ async function bootstrap() {
       renderNotifications();
     };
     window.RekberVoucher?.init(state.currentUser);
-    await window.RekberVoucher?.refresh?.({ skipChatroomRedirect: true }).catch(() => {});
+    await window.RekberVoucher?.refresh?.({ skipHistoryRedirect: true }).catch(() => {});
     await tryCompletePendingSellerJoin();
   }
 }
@@ -5103,6 +5104,15 @@ function renderTransactionScreen() {
   elements.joinRoleBox.classList.toggle("hidden", !showTransactionEmpty || !state.pendingJoinTransaction);
   elements.transactionShell?.classList.toggle("room-open", Boolean(showAnyRoom));
   elements.historyRoomToolbar?.classList.toggle("hidden", !showAnyRoom);
+  if (elements.historyVoucherDisputeBtn) {
+    const voucherOrder = showVoucherRoom ? state.historyVoucherOrder : null;
+    const canDispute = voucherOrder
+      && ["processing", "needs_verification", "completed"].includes(voucherOrder.status);
+    elements.historyVoucherDisputeBtn.classList.toggle("hidden", !canDispute);
+    elements.historyVoucherDisputeBtn.dataset.voucherDispute = canDispute
+      ? voucherOrder.orderCode
+      : "";
+  }
   if (showTransactionEmpty) {
     renderUnifiedTransactionHistory();
   }
@@ -5361,4 +5371,5 @@ function setupLiveEvents() {
 
 window.renderPublicFeeList = renderPublicFeeList;
 window.renderTermsAndConditions = renderTermsAndConditions;
+window.openHistoryVoucherRoom = openHistoryVoucherRoom;
 

@@ -182,7 +182,13 @@ async function navigateToVoucherChatAfterPayment(order, options = {}) {
     return;
   }
 
-  goToVoucherChatroom(order.orderCode);
+  if (typeof window.openHistoryVoucherRoom === "function") {
+    await window.openHistoryVoucherRoom(order.orderCode);
+    return;
+  }
+
+  renderVoucherChat();
+  openVoucherScreen("chat");
 }
 
 function voucherUploadWithProgress(url, formData, onProgress) {
@@ -526,9 +532,11 @@ async function refreshVoucherData(options = {}) {
     }
     if (latest) {
       voucherState.activeOrder = mergeVoucherOrderPreservingMessages(voucherState.activeOrder || latest, latest);
-      if (!options.skipChatroomRedirect && isVoucherChatRoomStatus(latest.status) && ["checkout", "chat"].includes(voucherState.screen)) {
-        goToVoucherChatroom(latest.orderCode);
-        return;
+      if (!options.skipHistoryRedirect && isVoucherChatRoomStatus(latest.status) && ["checkout", "chat"].includes(voucherState.screen)) {
+        if (typeof window.openHistoryVoucherRoom === "function") {
+          window.openHistoryVoucherRoom(latest.orderCode);
+          return;
+        }
       }
       refreshVoucherActiveOrderView();
     }
@@ -769,7 +777,11 @@ async function confirmVoucherPurchase(productId) {
 function renderVoucherCheckout(order) {
   if (!voucherElements.checkoutView || !order) return;
   if (order.status !== "awaiting_payment" && isVoucherChatRoomStatus(order.status)) {
-    goToVoucherChatroom(order.orderCode);
+    if (typeof window.openHistoryVoucherRoom === "function") {
+      window.openHistoryVoucherRoom(order.orderCode);
+    } else {
+      goToVoucherChatroom(order.orderCode);
+    }
     return;
   }
   voucherElements.checkoutView.innerHTML = `
@@ -838,8 +850,10 @@ function refreshVoucherActiveOrderView(options = {}) {
     return;
   }
   if (!isVoucherHistoryRoomActive(order.orderCode) && isVoucherChatRoomStatus(order.status)) {
-    goToVoucherChatroom(order.orderCode);
-    return;
+    if (typeof window.openHistoryVoucherRoom === "function") {
+      window.openHistoryVoucherRoom(order.orderCode);
+      return;
+    }
   }
   if (!isVoucherChatRoomStatus(order.status)) return;
   renderVoucherChat();
@@ -903,8 +917,7 @@ function buildVoucherAwaitingPaymentBody(order, options = {}) {
           <span class="file-upload-hint mini-note">Belum ada file dipilih</span>
         </label>
         ${buildVoucherPaymentUploadProgressMarkup()}
-        <p class="mini-note">Pilih bukti transfer lalu klik tombol di bawah. Anda akan diarahkan ke halaman <strong>/chatroom</strong> dengan progress upload, lalu masuk ruang chat.</p>
-        <p class="mini-note">Sudah upload bukti? <a href="/chatroom/${voucherEscapeHtml(order.orderCode)}" class="voucher-chatroom-open-link">Buka ruang chat order ini</a></p>
+        <p class="mini-note">Pilih bukti transfer lalu klik tombol di bawah. Progress upload akan tampil di sini, lalu Anda masuk ruang chat.</p>
         <div class="topbar-actions">
           ${showBackButton ? `<button type="button" class="ghost-btn" data-voucher-screen="catalog">Kembali ke katalog</button>` : ""}
           <button type="submit" class="primary-btn voucher-payment-submit-btn">Kirim bukti & buka ruang chat</button>
@@ -1075,10 +1088,9 @@ function buildVoucherChatMarkup(order, options = {}) {
       backButton,
       toolbarActionsHtml,
       toolbarHtml: options.hideToolbar ? `
-        <div class="voucher-room-toolbar is-history">
+        <div class="voucher-room-toolbar is-history is-minimal">
           <div class="voucher-room-toolbar-actions">
-            ${toolbarActionsHtml}
-            <button type="button" class="ghost-btn voucher-room-sidebar-toggle" data-voucher-sidebar-open>Detail</button>
+            <button type="button" class="ghost-btn voucher-room-sidebar-toggle workspace-mobile-only" data-voucher-sidebar-open>Detail</button>
           </div>
         </div>
       ` : undefined,
@@ -1184,6 +1196,7 @@ function renderVoucherHistoryRoom(order) {
   container.innerHTML = buildVoucherChatMarkup(order, {
     layoutMode: "history",
     hideToolbar: true,
+    toolbarActionsHtml: "",
     chatBoxId: "voucher-history-chat-box",
     formId: "voucher-history-chat-form",
     inputId: "voucher-history-chat-input",
@@ -1221,7 +1234,11 @@ async function openVoucherOrderChat(orderCode) {
     renderVoucherCheckout(payload.order);
     openVoucherScreen("checkout");
   } else if (isVoucherChatRoomStatus(payload.order.status)) {
-    goToVoucherChatroom(payload.order.orderCode);
+    if (typeof window.openHistoryVoucherRoom === "function") {
+      await window.openHistoryVoucherRoom(payload.order.orderCode);
+    } else {
+      goToVoucherChatroom(payload.order.orderCode);
+    }
   } else {
     renderVoucherChat();
     openVoucherScreen("chat");
@@ -1262,8 +1279,11 @@ async function submitVoucherPaymentProof(event) {
   const orderCode = voucherState.activeOrder.orderCode;
   const isReplaceForm = form.id === "voucher-replace-proof-form"
     || form.id === "voucher-history-replace-proof-form";
+  const useStandaloneChatroomUpload = !isReplaceForm
+    && !window.openHistoryVoucherRoom
+    && window.VoucherUploadBridge?.storePendingPaymentProof;
 
-  if (!isReplaceForm && window.VoucherUploadBridge?.storePendingPaymentProof) {
+  if (useStandaloneChatroomUpload) {
     if (submitBtn) submitBtn.disabled = true;
     try {
       await window.VoucherUploadBridge.storePendingPaymentProof(orderCode, file);
