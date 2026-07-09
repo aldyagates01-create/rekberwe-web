@@ -1563,10 +1563,10 @@ function bindForms() {
   elements.mobileRoomGuideButton?.addEventListener("click", () => window.open("/security-guide", "_blank", "noopener"));
   elements.mobileRoomDisputeButton?.addEventListener("click", () => elements.openDispute?.click());
   elements.homeLiveChatShortcut?.addEventListener("click", openSupportWidgetIfClosed);
-  elements.telegramDirectLogin.addEventListener("click", () => startProviderLogin("Telegram"));
-  elements.googleDirectLogin.addEventListener("click", () => startProviderLogin("Google"));
-  elements.facebookDirectLogin.addEventListener("click", () => startProviderLogin("Facebook"));
-  elements.discordDirectLogin.addEventListener("click", () => startProviderLogin("Discord"));
+  elements.telegramDirectLogin?.addEventListener("click", () => startProviderLogin("Telegram"));
+  elements.googleDirectLogin?.addEventListener("click", () => startProviderLogin("Google"));
+  elements.facebookDirectLogin?.addEventListener("click", () => startProviderLogin("Facebook"));
+  elements.discordDirectLogin?.addEventListener("click", () => startProviderLogin("Discord"));
   elements.transactionForm?.addEventListener("submit", handleCreateTransaction);
   elements.workspaceTransactionForm?.addEventListener("submit", handleCreateTransaction);
   [elements.transactionForm, elements.workspaceTransactionForm].forEach((form) => {
@@ -1594,10 +1594,10 @@ function bindForms() {
     if (event.key === "Enter") handleJoinTransaction();
   });
   document.getElementById("profile-open-verification-link")?.addEventListener("click", () => openWorkspaceSection("verification"));
-  elements.joinAsBuyer.addEventListener("click", () => handleRoleJoin("buyer"));
-  elements.joinAsSeller.addEventListener("click", () => handleRoleJoin("seller"));
+  elements.joinAsBuyer?.addEventListener("click", () => handleRoleJoin("buyer"));
+  elements.joinAsSeller?.addEventListener("click", () => handleRoleJoin("seller"));
   elements.backToTransactionList?.addEventListener("click", handleWorkspaceBackNavigation);
-  elements.chatForm.addEventListener("submit", handleSendMessage);
+  elements.chatForm?.addEventListener("submit", handleSendMessage);
   elements.chatInput?.addEventListener("input", () => {
     if (!state.activeTransaction?.code) return;
     if (typingStopTimer) window.clearTimeout(typingStopTimer);
@@ -1627,7 +1627,7 @@ function bindForms() {
   });
   bindWhatsappOtpModalControls();
   bindWhatsappOtpDelegation();
-  elements.closeVerificationModal.addEventListener("click", closeVerificationModal);
+  elements.closeVerificationModal?.addEventListener("click", closeVerificationModal);
   elements.closeLocationConsentModal?.addEventListener("click", () => closeLocationConsentModal(false));
   elements.approveLocationConsentModal?.addEventListener("click", () => closeLocationConsentModal(true));
   elements.confirmModalCancel?.addEventListener("click", () => closeConfirmModal(false));

@@ -16,8 +16,8 @@ const voucherState = {
   currentUserId: "",
 };
 
-const TYPING_ACTIVE_MS = 5000;
-const PRESENCE_ONLINE_MS = 30000;
+const VOUCHER_TYPING_ACTIVE_MS = 5000;
+const VOUCHER_PRESENCE_ONLINE_MS = 30000;
 let voucherTypingStopTimer = null;
 let voucherAdminPresenceTimer = null;
 
@@ -47,7 +47,7 @@ function isVoucherAdminOnline(presence) {
   if (!presence) return false;
   if (presence.isOnline === true) return true;
   if (!presence.lastSeenAt) return false;
-  return Date.now() - new Date(presence.lastSeenAt).getTime() <= PRESENCE_ONLINE_MS;
+  return Date.now() - new Date(presence.lastSeenAt).getTime() <= VOUCHER_PRESENCE_ONLINE_MS;
 }
 
 function formatVoucherAdminPresenceLabel(presence) {
@@ -64,7 +64,7 @@ function getActiveVoucherTyping(orderCode) {
   const typing = voucherState.typingByOrder[String(orderCode || "").toUpperCase()] || {};
   const now = Date.now();
   return Object.fromEntries(
-    Object.entries(typing).filter(([, value]) => now - new Date(value).getTime() <= TYPING_ACTIVE_MS),
+    Object.entries(typing).filter(([, value]) => now - new Date(value).getTime() <= VOUCHER_TYPING_ACTIVE_MS),
   );
 }
 
