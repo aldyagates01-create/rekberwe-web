@@ -164,6 +164,40 @@ export function getVoucherPaymentBanks(payment = {}) {
   }];
 }
 
+export function normalizeVoucherExpenseItem(item = {}, index = 0) {
+  const expenseDate = String(item.expenseDate || item.date || "").trim().slice(0, 10);
+  const amount = Math.max(0, Math.round(Number(item.amount || 0)));
+  const description = String(item.description || item.note || "").trim();
+  const id = String(item.id || `exp-${index + 1}`).trim();
+  if (!expenseDate || amount <= 0) return null;
+  return { id, expenseDate, amount, description };
+}
+
+export function normalizeVoucherExpenses(raw = []) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  return raw
+    .map((item, index) => normalizeVoucherExpenseItem(item, index))
+    .filter(Boolean)
+    .filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    })
+    .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate) || b.amount - a.amount);
+}
+
+export function filterVoucherExpensesByDateRange(expenses = [], fromDate = "", toDate = "") {
+  const from = String(fromDate || "").trim();
+  const to = String(toDate || "").trim();
+  if (!from || !to) return [];
+  return expenses.filter((item) => item.expenseDate >= from && item.expenseDate <= to);
+}
+
+export function createVoucherExpenseId() {
+  return `exp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function getVoucherStatusLabel(status) {
   return VOUCHER_ORDER_STATUSES[status] || status || "-";
 }

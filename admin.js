@@ -1698,7 +1698,7 @@ function buildVoucherPaymentBankRowHtml(bank = {}, index = 0) {
           <input type="hidden" class="voucher-bank-logo-url" value="${escapeAttribute(logoUrl)}" />
         </div>
         <div class="voucher-bank-logo-preview-wrap${logoUrl ? "" : " hidden"}">
-          <img class="voucher-bank-logo-preview" src="${escapeAttribute(logoUrl)}" alt="Logo bank" />
+          <img class="voucher-bank-logo-preview" src="${escapeAttribute(logoUrl)}" alt="Logo bank" width="48" height="48" style="width:48px;height:48px;max-width:48px;max-height:48px;object-fit:contain;display:block;" />
         </div>
       </div>
       <label>Nama bank<input type="text" class="voucher-bank-name" value="${escapeAttribute(bank.name || bank.bankName || "")}" placeholder="BCA" /></label>
@@ -1739,7 +1739,17 @@ function bindVoucherPaymentBankRowEvents(container = document) {
         const previewWrap = row.querySelector(".voucher-bank-logo-preview-wrap");
         const preview = row.querySelector(".voucher-bank-logo-preview");
         if (logoInput) logoInput.value = payload.logoUrl || "";
-        if (preview) preview.src = payload.logoUrl || "";
+        if (preview) {
+          preview.src = payload.logoUrl || "";
+          preview.width = 48;
+          preview.height = 48;
+          preview.style.width = "48px";
+          preview.style.height = "48px";
+          preview.style.maxWidth = "48px";
+          preview.style.maxHeight = "48px";
+          preview.style.objectFit = "contain";
+          preview.style.display = "block";
+        }
         if (previewWrap) previewWrap.classList.toggle("hidden", !payload.logoUrl);
         const hint = row.querySelector(".file-upload-hint");
         if (hint) hint.textContent = "Logo sudah diupload";

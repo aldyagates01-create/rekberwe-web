@@ -12671,6 +12671,51 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   gap: 8px;
 }
 
+.voucher-expenses-card {
+  margin-bottom: 14px;
+}
+
+.voucher-expense-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.voucher-expense-form {
+  display: grid;
+  gap: 12px;
+}
+
+.voucher-expense-report-card {
+  margin: 0 0 14px;
+}
+
+.voucher-expense-table {
+  display: grid;
+  gap: 8px;
+}
+
+.voucher-expense-table-head,
+.voucher-expense-table-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 140px 90px;
+  gap: 10px;
+  align-items: center;
+}
+
+.voucher-expense-table-head {
+  font-size: 0.78rem;
+  color: #8ea2c3;
+  font-weight: 600;
+}
+
+.voucher-expense-table-row {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(143, 164, 205, 0.14);
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .voucher-cost-preview-card {
   margin: 0.5rem 0 1rem;
   padding: 0.85rem 1rem;
@@ -12741,6 +12786,12 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
 
 @media (max-width: 768px) {
   .voucher-manual-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .voucher-expense-form-grid,
+  .voucher-expense-table-head,
+  .voucher-expense-table-row {
     grid-template-columns: 1fr;
   }
 
@@ -12858,6 +12909,38 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+#voucher-payment-banks-section .voucher-payment-bank-logo-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#voucher-payment-banks-section .voucher-payment-bank-logo-upload {
+  flex: 1;
+  min-width: 0;
+}
+
+#voucher-payment-banks-section .voucher-bank-logo-preview-wrap {
+  width: 48px !important;
+  height: 48px !important;
+  max-width: 48px !important;
+  max-height: 48px !important;
+  flex: 0 0 48px !important;
+  overflow: hidden !important;
+  border-radius: 8px;
+  border: 1px solid rgba(143, 164, 205, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+#voucher-payment-banks-section img.voucher-bank-logo-preview {
+  width: 48px !important;
+  height: 48px !important;
+  max-width: 48px !important;
+  max-height: 48px !important;
+  object-fit: contain !important;
+  display: block !important;
 }
 
 .voucher-payment-bank-logo-field {

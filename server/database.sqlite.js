@@ -12,6 +12,7 @@ import {
   getVoucherStatusLabel,
   normalizeVoucherAccountPayload,
   normalizeVoucherPaymentSettings,
+  normalizeVoucherExpenses,
   parseVoucherAccountAccounts,
   applyVoucherBestsellerFlags,
   shouldRestoreVoucherProductStock,
@@ -1275,6 +1276,7 @@ function defaultFeeSettings() {
     maintenanceMode: false,
     maintenanceMessage: defaultMaintenanceMessage(),
     voucherPayment: normalizeVoucherPaymentSettings(),
+    voucherExpenses: [],
   };
 }
 
@@ -1342,6 +1344,7 @@ function normalizeFeeSettings(input) {
     maintenanceMode: Boolean(raw.maintenanceMode),
     maintenanceMessage: String(raw.maintenanceMessage || defaultMaintenanceMessage()).trim() || defaultMaintenanceMessage(),
     voucherPayment: normalizeVoucherPaymentSettings(raw.voucherPayment),
+    voucherExpenses: normalizeVoucherExpenses(raw.voucherExpenses),
   };
 }
 

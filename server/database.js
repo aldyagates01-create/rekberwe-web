@@ -12,6 +12,7 @@ import {
   generateVoucherOrderCode,
   getProductReadyState,
   normalizeVoucherPaymentSettings,
+  normalizeVoucherExpenses,
 } from "./voucher-utils.js";
 import { createVoucherPgApi } from "./voucher-pg.js";
 import { migratePlaintextVoucherCredentials } from "./voucher-credentials-crypto.js";
@@ -1623,6 +1624,7 @@ function defaultFeeSettings() {
     maintenanceMode: false,
     maintenanceMessage: defaultMaintenanceMessage(),
     voucherPayment: normalizeVoucherPaymentSettings(),
+    voucherExpenses: [],
   };
 }
 
@@ -1690,6 +1692,7 @@ function normalizeFeeSettings(input) {
     maintenanceMode: Boolean(raw.maintenanceMode),
     maintenanceMessage: String(raw.maintenanceMessage || defaultMaintenanceMessage()).trim() || defaultMaintenanceMessage(),
     voucherPayment: normalizeVoucherPaymentSettings(raw.voucherPayment),
+    voucherExpenses: normalizeVoucherExpenses(raw.voucherExpenses),
   };
 }
 

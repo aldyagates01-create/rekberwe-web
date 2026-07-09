@@ -18,7 +18,10 @@ const adminVoucherElements = {
   reportDateTo: document.getElementById("voucher-report-date-to"),
   reportLoadButton: document.getElementById("voucher-report-load-btn"),
   reportSummary: document.getElementById("voucher-report-summary"),
+  reportExpenses: document.getElementById("voucher-report-expenses"),
   reportList: document.getElementById("voucher-report-list"),
+  expenseForm: document.getElementById("voucher-expense-form"),
+  expenseDateInput: document.getElementById("voucher-expense-date"),
   voucherPaymentBanksList: document.getElementById("voucher-payment-banks-list"),
   voucherPaymentAddBank: document.getElementById("voucher-payment-add-bank"),
   voucherPaymentQrisUrl: document.getElementById("voucher-payment-qris-url"),
@@ -123,6 +126,52 @@ function scheduleCatalogCostPreview() {
   }, 350);
 }
 
+function initVoucherExpenseDateInput() {
+  const today = new Date();
+  const value = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+  if (adminVoucherElements.expenseDateInput && !adminVoucherElements.expenseDateInput.value) {
+    adminVoucherElements.expenseDateInput.value = value;
+  }
+}
+
+async function submitVoucherExpense(event) {
+  event.preventDefault();
+  const form = event.target;
+  const expenseDate = String(form.expenseDate?.value || "").trim();
+  const amount = Math.round(Number(form.amount?.value || 0));
+  const description = String(form.description?.value || "").trim();
+  if (!expenseDate || amount <= 0) {
+    showStatus("Isi tanggal dan nominal pengeluaran dengan benar.", true);
+    return;
+  }
+  await fetchJson("/api/admin/voucher/expenses", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ expenseDate, amount, description }),
+  });
+  form.amount.value = "";
+  form.description.value = "";
+  showStatus("Pengeluaran berhasil ditambahkan.");
+  if (adminVoucherState.report) {
+    await loadAdminVoucherReport();
+    return;
+  }
+  renderAdminVoucherReport();
+}
+
+async function deleteVoucherExpense(expenseId) {
+  const id = String(expenseId || "").trim();
+  if (!id) return;
+  if (!window.confirm("Hapus pengeluaran ini?")) return;
+  await fetchJson(`/api/admin/voucher/expenses/${encodeURIComponent(id)}`, { method: "DELETE" });
+  showStatus("Pengeluaran dihapus.");
+  await loadAdminVoucherReport();
+}
+
 function initVoucherReportDateInputs() {
   const defaults = getDefaultVoucherReportRange();
   if (adminVoucherElements.reportDateFrom && !adminVoucherElements.reportDateFrom.value) {
@@ -155,16 +204,59 @@ function renderAdminVoucherReport() {
   if (!adminVoucherElements.reportSummary || !adminVoucherElements.reportList) return;
   if (!report) {
     adminVoucherElements.reportSummary.innerHTML = "";
+    if (adminVoucherElements.reportExpenses) adminVoucherElements.reportExpenses.innerHTML = "";
     adminVoucherElements.reportList.innerHTML = "<p class='mini-note'>Pilih rentang tanggal lalu klik Tampilkan data.</p>";
     return;
   }
   const summary = report.summary || {};
+  const totalProfit = Number(summary.totalProfit || 0);
+  const totalExpenses = Number(summary.totalExpenses || 0);
+  const netProfit = Number.isFinite(Number(summary.netProfit))
+    ? Number(summary.netProfit)
+    : totalProfit - totalExpenses;
   adminVoucherElements.reportSummary.innerHTML = `
     <article><p class="mini-label">Order selesai</p><strong>${Number(summary.totalOrders || 0)}</strong></article>
     <article><p class="mini-label">Total penjualan</p><strong>${formatCurrency(summary.totalRevenue || 0)}</strong></article>
     <article><p class="mini-label">Total modal</p><strong>${formatCurrency(summary.totalCost || 0)}</strong></article>
-    <article><p class="mini-label">Total profit</p><strong>${formatCurrency(summary.totalProfit || 0)}</strong></article>
+    <article><p class="mini-label">Total profit</p><strong>${formatCurrency(totalProfit)}</strong></article>
+    <article><p class="mini-label">Total pengeluaran</p><strong>${formatCurrency(totalExpenses)}</strong></article>
+    <article><p class="mini-label">Net profit</p><strong>${formatCurrency(netProfit)}</strong></article>
   `;
+  const expenses = Array.isArray(report.expenses) ? report.expenses : [];
+  if (adminVoucherElements.reportExpenses) {
+    adminVoucherElements.reportExpenses.innerHTML = expenses.length
+      ? `
+        <section class="settings-section-card voucher-expense-report-card">
+          <div class="section-head compact">
+            <h4>Daftar pengeluaran (${escapeHtml(report.fromDate || "-")} s/d ${escapeHtml(report.toDate || "-")})</h4>
+            <p class="mini-note">${expenses.length} entri • Total ${formatCurrency(totalExpenses)}</p>
+          </div>
+          <div class="voucher-expense-table">
+            <div class="voucher-expense-table-head">
+              <span>Tanggal</span>
+              <span>Keterangan</span>
+              <span>Nominal</span>
+              <span>Aksi</span>
+            </div>
+            ${expenses.map((item) => `
+              <div class="voucher-expense-table-row">
+                <span>${escapeHtml(item.expenseDate || "-")}</span>
+                <span>${escapeHtml(item.description || "-")}</span>
+                <span><strong>${formatCurrency(item.amount || 0)}</strong></span>
+                <span>
+                  <button type="button" class="ghost-btn danger-btn voucher-expense-delete-btn" data-voucher-expense-delete="${escapeAttribute(item.id)}">Hapus</button>
+                </span>
+              </div>
+            `).join("")}
+          </div>
+        </section>
+      `
+      : `
+        <section class="settings-section-card voucher-expense-report-card">
+          <p class="mini-note">Belum ada pengeluaran/fee pada rentang tanggal ini.</p>
+        </section>
+      `;
+  }
   const products = Array.isArray(report.products) ? report.products : [];
   adminVoucherElements.reportList.innerHTML = products.length
     ? products.map((item) => `
@@ -886,6 +978,11 @@ function bindAdminVoucherEvents() {
       showStatus(error.message || "Gagal memuat laporan voucher.", true);
     });
   });
+  adminVoucherElements.expenseForm?.addEventListener("submit", (event) => {
+    submitVoucherExpense(event).catch((error) => {
+      showStatus(error.message || "Gagal menyimpan pengeluaran.", true);
+    });
+  });
   adminVoucherElements.manualProductSelect?.addEventListener("change", updateManualVoucherPreview);
   adminVoucherElements.manualForm?.addEventListener("submit", async (event) => {
     try {
@@ -946,6 +1043,15 @@ function bindAdminVoucherEvents() {
       }
       return;
     }
+    const expenseDeleteButton = event.target.closest("[data-voucher-expense-delete]");
+    if (expenseDeleteButton) {
+      try {
+        await deleteVoucherExpense(expenseDeleteButton.dataset.voucherExpenseDelete);
+      } catch (error) {
+        showStatus(error.message || "Gagal menghapus pengeluaran.", true);
+      }
+      return;
+    }
     const deleteOrderButton = event.target.closest("[data-admin-voucher-delete-order]");
     if (deleteOrderButton) {
       try {
@@ -998,6 +1104,7 @@ window.RekberAdminVoucher = {
     bindAdminFileUploadFields(adminVoucherElements.productForm || document);
     bindAdminFileUploadFields(adminVoucherElements.manualForm || document);
     initVoucherReportDateInputs();
+    initVoucherExpenseDateInput();
     loadCostCurrencyOptions("IDR").finally(() => {
       fillAdminVoucherProductForm();
     });

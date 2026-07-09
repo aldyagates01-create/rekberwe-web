@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260709n" />
 </head>
 <body>
   <div class="bg-orb bg-orb-a"></div>
@@ -278,7 +278,7 @@
         <div class="section-head">
           <p class="eyebrow">Laporan penjualan</p>
           <h3>Data Voucher / Gametime</h3>
-          <p class="mini-note">Hitung order voucher selesai dalam rentang tanggal. Profit = harga jual - harga modal.</p>
+          <p class="mini-note">Hitung order voucher selesai dalam rentang tanggal. Profit = harga jual - harga modal. Net profit = profit - total pengeluaran/fee.</p>
         </div>
         <div class="voucher-manual-orders-panel settings-section-card">
           <div class="section-head compact">
@@ -286,6 +286,29 @@
             <p class="mini-note">Order input manual yang belum selesai. Klik Proses, salin data ke pembeli, lalu Selesai agar masuk laporan.</p>
           </div>
           <div class="admin-list" id="voucher-manual-orders-list"></div>
+        </div>
+        <div class="settings-section-card voucher-expenses-card">
+          <div class="section-head compact">
+            <h4>Pengeluaran / Fee operasional</h4>
+            <p class="mini-note">Catat pajak, fee platform, atau pengeluaran lain per tanggal. Bisa ditambah berkali-kali. Total pengeluaran pada rentang tanggal akan mengurangi profit.</p>
+          </div>
+          <form id="voucher-expense-form" class="voucher-expense-form profile-form">
+            <div class="voucher-expense-form-grid">
+              <label>
+                Tanggal
+                <input type="date" name="expenseDate" id="voucher-expense-date" required />
+              </label>
+              <label>
+                Nominal (IDR)
+                <input type="number" name="amount" min="1" step="1" placeholder="100000" required />
+              </label>
+              <label>
+                Keterangan
+                <input type="text" name="description" placeholder="Pajak / fee platform / biaya lain" />
+              </label>
+            </div>
+            <button type="submit" class="primary-btn">+ Tambah pengeluaran</button>
+          </form>
         </div>
         <div class="admin-toolbar admin-profit-toolbar">
           <label>
@@ -299,6 +322,7 @@
           <button type="button" class="primary-btn" id="voucher-report-load-btn">Tampilkan data</button>
         </div>
         <div class="admin-summary" id="voucher-report-summary"></div>
+        <div id="voucher-report-expenses"></div>
         <div class="admin-list" id="voucher-report-list"></div>
       </section>
 
@@ -794,8 +818,8 @@
   </div>
   <script src="analytics-client.js?v=1"></script>
   <script src="push-client.js?v=1"></script>
-  <script src="voucher-chat-ui.js?v=20260709m"></script>
-  <script src="voucher-admin.js?v=20260709m"></script>
-  <script src="admin.js?v=20260709m"></script>
+  <script src="voucher-chat-ui.js?v=20260709n"></script>
+  <script src="voucher-admin.js?v=20260709n"></script>
+  <script src="admin.js?v=20260709n"></script>
 </body>
 </html>

@@ -15,6 +15,8 @@ import {
   updateVoucherOrderFields,
   updateVoucherOrderAccounts,
   updateVoucherProduct,
+  getAdminFeeSettings,
+  saveAdminFeeSettings,
 } from "./database.js";
 import {
   getVoucherStatusLabel,
@@ -27,6 +29,9 @@ import {
   isManualVoucherOrder,
   voucherOrderForViewer,
   formatVoucherAccountSubmissionMessage,
+  normalizeVoucherExpenses,
+  filterVoucherExpensesByDateRange,
+  createVoucherExpenseId,
 } from "./voucher-utils.js";
 import { resolveUploadAccessUrl, resolveVoucherOrderMediaUrls } from "./upload-url.js";
 import { resolveVoucherProductCostInput } from "./voucher-product-cost.js";
@@ -534,8 +539,22 @@ export function registerVoucherRoutes(app, {
       const fromDate = String(req.query.from || "").trim();
       const toDate = String(req.query.to || "").trim();
       const report = await getVoucherSalesReport(fromDate, toDate);
+      const settings = await getAdminFeeSettings();
+      const expenses = filterVoucherExpensesByDateRange(
+        normalizeVoucherExpenses(settings.voucherExpenses),
+        fromDate,
+        toDate,
+      );
+      const totalExpenses = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const totalProfit = Number(report.summary?.totalProfit || 0);
       const securedReport = {
         ...report,
+        expenses,
+        summary: {
+          ...report.summary,
+          totalExpenses,
+          netProfit: totalProfit - totalExpenses,
+        },
         products: (report.products || []).map((product) => ({
           ...product,
           orders: (product.orders || []).map((order) => ({
@@ -559,5 +578,55 @@ export function registerVoucherRoutes(app, {
     }
     await broadcastEvent("voucher_order_updated", code, { deleted: true, orderCode: code });
     res.json({ ok: true, orderCode: code });
+  });
+
+  app.post("/api/admin/voucher/expenses", requireAdmin, async (req, res) => {
+    try {
+      const expenseDate = String(req.body?.expenseDate || req.body?.date || "").trim().slice(0, 10);
+      const amount = Math.round(Number(req.body?.amount || 0));
+      const description = String(req.body?.description || req.body?.note || "").trim();
+      if (!expenseDate) {
+        res.status(400).json({ message: "Tanggal pengeluaran wajib diisi." });
+        return;
+      }
+      if (amount <= 0) {
+        res.status(400).json({ message: "Nominal pengeluaran harus lebih dari 0." });
+        return;
+      }
+      const settings = await getAdminFeeSettings();
+      const expenses = normalizeVoucherExpenses(settings.voucherExpenses);
+      const entry = {
+        id: createVoucherExpenseId(),
+        expenseDate,
+        amount,
+        description,
+      };
+      expenses.push(entry);
+      await saveAdminFeeSettings({ ...settings, voucherExpenses: expenses });
+      res.json({ expense: entry, expenses });
+    } catch (error) {
+      res.status(400).json({ message: error.message || "Gagal menyimpan pengeluaran." });
+    }
+  });
+
+  app.delete("/api/admin/voucher/expenses/:id", requireAdmin, async (req, res) => {
+    try {
+      const expenseId = String(req.params.id || "").trim();
+      if (!expenseId) {
+        res.status(400).json({ message: "ID pengeluaran tidak valid." });
+        return;
+      }
+      const settings = await getAdminFeeSettings();
+      const expenses = normalizeVoucherExpenses(settings.voucherExpenses);
+      const nextExpenses = expenses.filter((item) => item.id !== expenseId);
+      if (nextExpenses.length === expenses.length) {
+        res.status(404).json({ message: "Pengeluaran tidak ditemukan." });
+        return;
+      }
+      await saveAdminFeeSettings({ ...settings, voucherExpenses: nextExpenses });
+      res.json({ ok: true, expenses: nextExpenses });
+    } catch (error) {
+      res.status(400).json({ message: error.message || "Gagal menghapus pengeluaran." });
+    }
   });
 }
