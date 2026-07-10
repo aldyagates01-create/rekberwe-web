@@ -63,6 +63,11 @@ const elements = {
   voucherPaymentBanksList: document.getElementById("voucher-payment-banks-list"),
   voucherPaymentAddBank: document.getElementById("voucher-payment-add-bank"),
   voucherPaymentQrisUrl: document.getElementById("voucher-payment-qris-url"),
+  voucherPaymentQrisFile: document.getElementById("voucher-payment-qris-file"),
+  voucherPaymentQrisPreview: document.getElementById("voucher-payment-qris-preview"),
+  voucherPaymentQrisPreviewWrap: document.getElementById("voucher-payment-qris-preview-wrap"),
+  voucherPaymentQrisHint: document.getElementById("voucher-payment-qris-hint"),
+  voucherPaymentQrisUrlManual: document.getElementById("voucher-payment-qris-url-manual"),
   voucherPaymentInstructions: document.getElementById("voucher-payment-instructions"),
   voucherPaymentTerms: document.getElementById("voucher-payment-terms"),
   adminFeeForm: document.getElementById("admin-fee-form"),
@@ -255,6 +260,7 @@ document.addEventListener("click", (event) => {
   event.preventDefault();
   addVoucherPaymentBankRow();
 });
+bindVoucherQrisUpload();
 elements.saveMaintenanceSettingsBtn?.addEventListener("click", handleSaveMaintenanceSettings);
 bindSettingsFormProtection();
 elements.adminSendTestEmail?.addEventListener("click", handleAdminSendTestEmail);
@@ -1717,6 +1723,48 @@ function buildVoucherPaymentBankRowHtml(bank = {}, index = 0) {
   `;
 }
 
+function syncVoucherQrisPreview(url = "") {
+  const value = String(url || elements.voucherPaymentQrisUrl?.value || "").trim();
+  if (elements.voucherPaymentQrisPreview) {
+    elements.voucherPaymentQrisPreview.src = value || "";
+  }
+  if (elements.voucherPaymentQrisPreviewWrap) {
+    elements.voucherPaymentQrisPreviewWrap.classList.toggle("hidden", !value);
+  }
+}
+
+function bindVoucherQrisUpload() {
+  const fileInput = elements.voucherPaymentQrisFile;
+  if (!fileInput || fileInput.dataset.bound) return;
+  fileInput.dataset.bound = "1";
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("image", file);
+    try {
+      const payload = await uploadWithProgress("/api/admin/settings/voucher-qris-image", formData);
+      const qrisUrl = payload.qrisUrl || "";
+      if (elements.voucherPaymentQrisUrl) elements.voucherPaymentQrisUrl.value = qrisUrl;
+      if (elements.voucherPaymentQrisUrlManual) elements.voucherPaymentQrisUrlManual.value = qrisUrl;
+      syncVoucherQrisPreview(qrisUrl);
+      if (elements.voucherPaymentQrisHint) elements.voucherPaymentQrisHint.textContent = "Gambar QRIS sudah diupload";
+      settingsFormDirty = true;
+    } catch (error) {
+      showStatus(error.message || "Gagal upload gambar QRIS.", true);
+    }
+  });
+  if (elements.voucherPaymentQrisUrlManual && !elements.voucherPaymentQrisUrlManual.dataset.bound) {
+    elements.voucherPaymentQrisUrlManual.dataset.bound = "1";
+    elements.voucherPaymentQrisUrlManual.addEventListener("input", () => {
+      const value = String(elements.voucherPaymentQrisUrlManual.value || "").trim();
+      if (elements.voucherPaymentQrisUrl) elements.voucherPaymentQrisUrl.value = value;
+      syncVoucherQrisPreview(value);
+      settingsFormDirty = true;
+    });
+  }
+}
+
 function bindVoucherPaymentBankRowEvents(container = document) {
   container.querySelectorAll(".voucher-bank-remove-btn").forEach((button) => {
     if (button.dataset.bound) return;
@@ -1811,7 +1859,10 @@ function renderVoucherPaymentBanksInSettings(payment = {}) {
     ? banks.map((bank, index) => buildVoucherPaymentBankRowHtml(bank, index)).join("")
     : buildVoucherPaymentBankRowHtml({}, 0);
   bindVoucherPaymentBankRowEvents(elements.voucherPaymentBanksList);
-  if (elements.voucherPaymentQrisUrl) elements.voucherPaymentQrisUrl.value = payment.qrisUrl || "";
+  const qrisUrl = payment.qrisUrl || "";
+  if (elements.voucherPaymentQrisUrl) elements.voucherPaymentQrisUrl.value = qrisUrl;
+  if (elements.voucherPaymentQrisUrlManual) elements.voucherPaymentQrisUrlManual.value = qrisUrl;
+  syncVoucherQrisPreview(qrisUrl);
   if (elements.voucherPaymentInstructions) elements.voucherPaymentInstructions.value = payment.instructions || "";
   if (elements.voucherPaymentTerms) elements.voucherPaymentTerms.value = payment.termsAndConditions || "";
 }
@@ -2207,7 +2258,11 @@ async function handleSaveFeeSettings(event) {
           bankName: primary.name || "",
           bankNumber: primary.number || "",
           bankHolder: primary.holder || "",
-          qrisUrl: String(elements.voucherPaymentQrisUrl?.value || "").trim(),
+          qrisUrl: String(
+            elements.voucherPaymentQrisUrl?.value
+            || elements.voucherPaymentQrisUrlManual?.value
+            || "",
+          ).trim(),
           instructions: String(elements.voucherPaymentInstructions?.value || "").trim(),
           termsAndConditions: String(elements.voucherPaymentTerms?.value || "").trim(),
         };

@@ -47,6 +47,7 @@ export function resolveVoucherPaymentSettingsUrls(payment = {}) {
   const banks = Array.isArray(payment.banks) ? payment.banks : [];
   return {
     ...payment,
+    qrisUrl: payment.qrisUrl ? resolveUploadAccessUrl(payment.qrisUrl) : "",
     banks: banks.map((bank) => ({
       ...bank,
       logoUrl: bank.logoUrl ? resolveUploadAccessUrl(bank.logoUrl) : "",

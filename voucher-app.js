@@ -939,13 +939,29 @@ function renderVoucherProductDetail() {
   const totalPrice = Number(product.price || 0) * quantity;
   voucherElements.detailView.innerHTML = `
     <div class="voucher-detail-layout">
-      <button type="button" class="ghost-btn" data-voucher-screen="catalog">← Kembali ke katalog</button>
-      <div class="voucher-detail-hero">
-        <div class="voucher-detail-media">
+      <button type="button" class="ghost-btn voucher-detail-back-btn" data-voucher-screen="catalog">← Kembali ke katalog</button>
+      <div class="voucher-detail-main">
+        <div class="voucher-detail-media-stack">
           <div class="voucher-product-image-wrap voucher-detail-image">
             ${buildVoucherCountdownBadge(ready)}
             <img src="${voucherEscapeHtml(product.displayImage)}" alt="${voucherEscapeHtml(product.name)}" />
           </div>
+          <section class="voucher-detail-purchase card">
+            <div class="voucher-qty-control">
+              <span class="voucher-qty-label-text">Jumlah pembelian (pcs)</span>
+              <div class="voucher-qty-stepper" role="group" aria-label="Jumlah pembelian">
+                <button type="button" class="voucher-qty-step-btn" data-voucher-qty-minus aria-label="Kurangi jumlah" ${quantity <= 1 ? "disabled" : ""}>−</button>
+                <input type="text" id="voucher-detail-quantity" class="voucher-qty-value" value="${quantity}" readonly inputmode="numeric" aria-live="polite" />
+                <button type="button" class="voucher-qty-step-btn" data-voucher-qty-plus aria-label="Tambah jumlah" ${quantity >= maxQty ? "disabled" : ""}>+</button>
+              </div>
+            </div>
+            <p class="voucher-detail-total">Total bayar: <strong id="voucher-detail-total">${voucherFormatCurrency(totalPrice)}</strong></p>
+            <button type="button" class="primary-btn" data-voucher-confirm-buy="${product.id}" ${ready.canPurchase ? "" : "disabled"}>
+              ${ready.canPurchase ? "Beli" : (ready.label || "Belum Ready")}
+            </button>
+          </section>
+        </div>
+        <div class="voucher-detail-info">
           <div class="voucher-detail-copy">
             <p class="eyebrow">Detail produk</p>
             <h3>${voucherEscapeHtml(product.name)}</h3>
@@ -960,20 +976,9 @@ function renderVoucherProductDetail() {
           </div>
         </div>
       </div>
-      <section class="voucher-detail-purchase card">
-        <div class="voucher-qty-control">
-          <span class="voucher-qty-label-text">Jumlah pembelian (pcs)</span>
-          <div class="voucher-qty-stepper" role="group" aria-label="Jumlah pembelian">
-            <button type="button" class="voucher-qty-step-btn" data-voucher-qty-minus aria-label="Kurangi jumlah" ${quantity <= 1 ? "disabled" : ""}>−</button>
-            <input type="text" id="voucher-detail-quantity" class="voucher-qty-value" value="${quantity}" readonly inputmode="numeric" aria-live="polite" />
-            <button type="button" class="voucher-qty-step-btn" data-voucher-qty-plus aria-label="Tambah jumlah" ${quantity >= maxQty ? "disabled" : ""}>+</button>
-          </div>
-        </div>
-        <p class="voucher-detail-total">Total bayar: <strong id="voucher-detail-total">${voucherFormatCurrency(totalPrice)}</strong></p>
-        <button type="button" class="primary-btn" data-voucher-confirm-buy="${product.id}" ${ready.canPurchase ? "" : "disabled"}>
-          ${ready.canPurchase ? "Beli" : (ready.label || "Belum Ready")}
-        </button>
-      </section>
+      <aside class="voucher-detail-side">
+        ${buildVoucherCatalogTermsMarkup()}
+      </aside>
     </div>
   `;
   startVoucherCatalogCountdowns();

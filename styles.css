@@ -11438,6 +11438,33 @@ body.admin-locked .admin-notif-floating {
   gap: 18px;
 }
 
+.voucher-detail-main {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.voucher-detail-media-stack {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.voucher-detail-info {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.voucher-detail-side {
+  display: none;
+}
+
+.voucher-detail-side .voucher-catalog-terms {
+  margin-top: 0;
+}
+
 .voucher-detail-hero {
   display: grid;
   gap: 16px;
@@ -11815,31 +11842,37 @@ body.admin-locked .admin-notif-floating {
 }
 
 @media (min-width: 769px) {
-  .voucher-detail-hero {
-    grid-template-columns: 1fr;
-    align-items: start;
-    gap: 20px;
-  }
-
-  .voucher-detail-media,
+  .voucher-detail-media-stack,
   .voucher-detail-copy {
-    max-width: 360px;
+    max-width: 380px;
   }
 
   #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    gap: 20px;
     align-items: start;
   }
 
-  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-hero {
+  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-layout > .ghost-btn {
+    grid-column: 1 / -1;
+  }
+
+  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-main {
     grid-column: 1;
-    overflow: visible;
+    min-width: 0;
+  }
+
+  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-side {
+    display: block;
+    grid-column: 2;
+    grid-row: 2;
+    position: sticky;
+    top: 12px;
+    align-self: start;
   }
 
   #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-purchase {
-    grid-column: 2;
-    grid-row: 2;
     border-radius: 18px;
     border-bottom: 1px solid rgba(143, 164, 205, 0.14);
     box-shadow: none;
@@ -12664,8 +12697,10 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   }
 
   #workspace-dashboard-view.mobile-create-open #voucher-detail-view:not(.hidden) {
-    overflow: hidden;
-    padding-bottom: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(12px + var(--mobile-nav-clearance, 92px));
   }
 
   #workspace-dashboard-view.mobile-create-open #voucher-checkout-view:not(.hidden),
@@ -12674,34 +12709,18 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   }
 
   #workspace-voucher-panel.is-voucher-screen-detail #voucher-detail-view:not(.hidden) {
-    overflow: hidden;
-    padding-bottom: 0;
-  }
-
-  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-layout {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    overflow: hidden;
-  }
-
-  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-layout > .ghost-btn {
-    flex-shrink: 0;
-  }
-
-  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-hero {
-    flex: 1;
-    min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    padding-bottom: 8px;
+    padding-bottom: calc(12px + var(--mobile-nav-clearance, 92px));
   }
 
-  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-media {
+  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-layout {
+    display: grid;
+    gap: 12px;
+  }
+
+  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-media-stack {
     max-width: none;
   }
 
@@ -12718,20 +12737,22 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
 
   #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-purchase {
     position: static;
-    flex-shrink: 0;
-    z-index: auto;
     margin-top: 0;
-    border-radius: 18px 18px 0 0;
-    border-bottom: 0;
-    padding: 14px 14px calc(10px + env(safe-area-inset-bottom));
-    background: rgba(10, 16, 30, 0.98);
-    backdrop-filter: blur(14px);
-    box-shadow: 0 -10px 24px rgba(2, 8, 23, 0.28);
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(143, 164, 205, 0.14);
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: none;
+    box-shadow: none;
   }
 
   #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-purchase .primary-btn {
     width: 100%;
-    min-height: 46px;
+    min-height: 42px;
+  }
+
+  #workspace-voucher-panel.is-voucher-screen-detail .voucher-detail-side {
+    display: block;
   }
 
   #workspace-voucher-panel.is-voucher-screen-checkout .voucher-payment-section {
@@ -12754,7 +12775,38 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   #workspace-voucher-panel.is-voucher-screen-checkout .voucher-payment-proof-form .primary-btn,
   #workspace-dashboard-view.mobile-create-open .voucher-pay-form-actions .voucher-payment-submit-btn {
     width: 100%;
-    min-height: 46px;
+    min-height: 38px;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+  }
+
+  .voucher-pay-upload-card {
+    padding: 12px !important;
+  }
+
+  .voucher-payment-dropzone {
+    padding: 12px 10px;
+    gap: 4px;
+  }
+
+  .voucher-payment-dropzone-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 0.95rem;
+  }
+
+  .voucher-payment-dropzone-title {
+    font-size: 0.78rem;
+  }
+
+  .voucher-payment-dropzone .file-upload-hint {
+    font-size: 0.72rem;
+  }
+
+  .voucher-pay-form-actions .ghost-btn {
+    min-height: 34px;
+    font-size: 0.76rem;
+    padding: 6px 10px;
   }
 
   #workspace-dashboard-view.mobile-create-open #workspace-rekber-panel:not(.hidden) {
@@ -13201,6 +13253,31 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   max-height: 48px !important;
   object-fit: contain !important;
   display: block !important;
+}
+
+.voucher-payment-qris-field {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.voucher-qris-preview-wrap {
+  width: min(100%, 200px);
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(143, 164, 205, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.voucher-qris-preview-wrap.hidden {
+  display: none;
+}
+
+.voucher-qris-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 .voucher-payment-bank-logo-field {
@@ -13859,7 +13936,26 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   }
 
   .voucher-payment-dropzone {
-    padding: 16px 12px;
+    padding: 12px 10px;
+    gap: 4px;
+  }
+
+  .voucher-payment-dropzone-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 0.95rem;
+  }
+
+  .voucher-payment-dropzone-title {
+    font-size: 0.78rem;
+  }
+
+  .voucher-payment-dropzone .file-upload-hint {
+    font-size: 0.72rem;
+  }
+
+  .voucher-pay-upload-card {
+    padding: 12px !important;
   }
 
   .voucher-pay-form-actions {
@@ -13870,6 +13966,19 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
 
   .voucher-pay-form-actions > * {
     width: 100%;
+  }
+
+  .voucher-pay-form-actions .voucher-payment-submit-btn {
+    flex: none;
+    min-height: 38px;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+  }
+
+  .voucher-pay-form-actions .ghost-btn {
+    min-height: 34px;
+    font-size: 0.76rem;
+    padding: 6px 10px;
   }
 
   .voucher-pay-bank-card {

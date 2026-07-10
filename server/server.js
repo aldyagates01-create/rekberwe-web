@@ -1573,6 +1573,16 @@ app.post("/api/admin/settings/voucher-bank-logo", requireAdmin, uploadPostLimite
   res.json({ logoUrl: stored.fileUrl });
 });
 
+app.post("/api/admin/settings/voucher-qris-image", requireAdmin, uploadPostLimiter, avatarUpload.single("image"), async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ message: "Gambar QRIS wajib dipilih." });
+    return;
+  }
+  const stored = await persistUploadFile(file, "SETTINGS", "voucher-qris");
+  res.json({ qrisUrl: stored.fileUrl });
+});
+
 app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
   const from = String(req.query.from || "").trim();
   const to = String(req.query.to || "").trim();
