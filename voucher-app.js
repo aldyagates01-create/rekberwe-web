@@ -243,6 +243,36 @@ function bindFileUploadFields(root = document) {
     input.addEventListener("change", syncHint);
     syncHint();
   });
+  initVoucherPaymentMethodSelectors(root);
+}
+
+function isVoucherQrisImageUrl(url = "") {
+  const value = String(url || "").trim();
+  if (!value) return false;
+  return /\.(png|jpe?g|webp|gif|svg)(\?|#|$)/i.test(value)
+    || /\/uploads\//i.test(value)
+    || /\/api\//i.test(value);
+}
+
+function buildVoucherQrisPanelMarkup(payment = {}) {
+  const qrisUrl = String(payment.qrisUrl || "").trim();
+  if (!qrisUrl) return "";
+  const isImage = isVoucherQrisImageUrl(qrisUrl);
+  return `
+    <div class="voucher-pay-qris-panel">
+      <p class="mini-label">${voucherEscapeHtml(vt("voucher.scan_qris", "Scan QRIS"))}</p>
+      ${isImage
+    ? `<img class="voucher-pay-qris-image" src="${voucherEscapeHtml(qrisUrl)}" alt="QRIS Pembayaran" loading="lazy" decoding="async" />`
+    : `<a class="primary-btn voucher-pay-qris-open-btn" href="${voucherEscapeHtml(qrisUrl)}" target="_blank" rel="noreferrer">${voucherEscapeHtml(vt("voucher.open_qris", "Buka QRIS"))}</a>`}
+      <p class="mini-note voucher-pay-qris-hint">${voucherEscapeHtml(vt("voucher.qris_hint", "Scan kode QR di atas via e-wallet atau m-banking, lalu upload bukti pembayaran."))}</p>
+    </div>
+  `;
+}
+
+function initVoucherPaymentMethodSelectors(root = document) {
+  root.querySelectorAll(".voucher-pay-bank-select").forEach((select) => {
+    syncVoucherPayBankDetail(select);
+  });
 }
 
 function resetFileUploadInput(input) {
@@ -1053,10 +1083,13 @@ function refreshVoucherActiveOrderView(options = {}) {
       const historyRoom = document.getElementById("voucher-history-room");
       const renderAwaiting = () => {
         historyRoom.innerHTML = buildVoucherAwaitingPaymentMarkup(order, {
+          layoutMode: "history",
           formId: "voucher-history-payment-proof-form",
           inputId: "voucher-history-payment-proof-input",
+          showBackToCatalog: false,
           showMessages: true,
         });
+        historyRoom.classList.add("is-awaiting-payment");
         bindFileUploadFields(historyRoom);
       };
       ensureVoucherPaymentSettings().then(renderAwaiting).catch(renderAwaiting);
@@ -1158,24 +1191,32 @@ function buildVoucherPaymentBankCardMarkup(bank = {}, options = {}) {
 
 function buildVoucherPaymentBankCardsMarkup(payment = {}, options = {}) {
   const banks = getVoucherPaymentBanks(payment);
-  if (!banks.length) {
+  const qrisUrl = String(payment.qrisUrl || "").trim();
+  if (!banks.length && !qrisUrl) {
     return `<p class="mini-note">Rekening pembayaran belum dikonfigurasi admin.</p>`;
   }
-  const selectLabel = vt("voucher.select_bank", "Pilih bank");
+  const selectLabel = vt("voucher.select_bank", "Pilih metode pembayaran");
   const selectId = options.selectId || "voucher-pay-bank-select";
+  const defaultIsQris = Boolean(qrisUrl);
   return `
     <div class="voucher-pay-bank-selector">
       <label class="voucher-pay-bank-select-field">
         <span class="voucher-pay-bank-select-label">${voucherEscapeHtml(selectLabel)}</span>
         <select class="voucher-pay-bank-select" id="${voucherEscapeHtml(selectId)}" aria-label="${voucherEscapeHtml(selectLabel)}">
+          ${qrisUrl ? `<option value="qris"${defaultIsQris ? " selected" : ""}>QRIS</option>` : ""}
           ${banks.map((bank, index) => `
-            <option value="${index}">${voucherEscapeHtml(bank.name || `Bank ${index + 1}`)}</option>
+            <option value="${index}"${!defaultIsQris && index === 0 ? " selected" : ""}>${voucherEscapeHtml(bank.name || `Bank ${index + 1}`)}</option>
           `).join("")}
         </select>
       </label>
       <div class="voucher-pay-bank-detail-list">
+        ${qrisUrl ? `
+          <div class="voucher-pay-bank-detail voucher-pay-qris-detail${defaultIsQris ? "" : " hidden"}" data-payment-method="qris">
+            ${buildVoucherQrisPanelMarkup(payment)}
+          </div>
+        ` : ""}
         ${banks.map((bank, index) => `
-          <div class="voucher-pay-bank-detail${index === 0 ? "" : " hidden"}" data-bank-index="${index}">
+          <div class="voucher-pay-bank-detail${!defaultIsQris && index === 0 ? "" : " hidden"}" data-bank-index="${index}" data-payment-method="bank">
             ${buildVoucherPaymentBankCardMarkup(bank, options)}
           </div>
         `).join("")}
@@ -1187,9 +1228,13 @@ function buildVoucherPaymentBankCardsMarkup(payment = {}, options = {}) {
 function syncVoucherPayBankDetail(select) {
   const container = select?.closest(".voucher-pay-bank-selector");
   if (!container) return;
-  const index = Number(select.value);
+  const value = String(select.value || "");
+  const isQris = value === "qris";
+  container.querySelectorAll(".voucher-pay-bank-detail[data-payment-method='qris']").forEach((detail) => {
+    detail.classList.toggle("hidden", !isQris);
+  });
   container.querySelectorAll(".voucher-pay-bank-detail[data-bank-index]").forEach((detail) => {
-    detail.classList.toggle("hidden", Number(detail.dataset.bankIndex) !== index);
+    detail.classList.toggle("hidden", isQris || Number(detail.dataset.bankIndex) !== Number(value));
   });
 }
 
@@ -1242,6 +1287,7 @@ function buildVoucherAwaitingPaymentBody(order, options = {}) {
   const unitPrice = quantity ? Math.round(Number(order.price || 0) / quantity) : Number(order.price || 0);
   const formId = options.formId || "voucher-payment-proof-form";
   const inputId = options.inputId || "voucher-payment-proof-input";
+  const selectId = options.selectId || `${formId}-bank-select`;
   const productImage = order.product?.imageUrl || order.product?.displayImage || "/assets/rekberwe-logo-shield.png?v=7";
   const region = extractVoucherProductRegion(order.product);
   const showMessages = options.showMessages === true;
@@ -1270,13 +1316,12 @@ function buildVoucherAwaitingPaymentBody(order, options = {}) {
         <section class="voucher-pay-card voucher-pay-transfer-card">
           <h4>${voucherEscapeHtml(vt("voucher.make_payment", "Lakukan Pembayaran"))}</h4>
           <p class="mini-note voucher-pay-transfer-note">${voucherEscapeHtml(vt("voucher.transfer_note", "Transfer sesuai nominal ke rekening admin berikut"))}</p>
-          ${buildVoucherPaymentBankCardsMarkup(payment)}
+          ${buildVoucherPaymentBankCardsMarkup(payment, { selectId })}
           <div class="voucher-pay-total-box">
             <p class="mini-note">${voucherEscapeHtml(vt("voucher.total_transfer", "Total yang harus ditransfer"))}</p>
             <strong>${voucherEscapeHtml(voucherFormatCurrency(order.price))}</strong>
             <p class="mini-note">${voucherEscapeHtml(vt("voucher.exact_amount_note", "Pastikan nominal transfer sama persis"))}</p>
           </div>
-          ${payment.qrisUrl ? `<p class="voucher-pay-qris-link"><a href="${voucherEscapeHtml(payment.qrisUrl)}" target="_blank" rel="noreferrer">${voucherEscapeHtml(vt("voucher.open_qris", "Buka QRIS"))}</a></p>` : ""}
         </section>
 
         <section class="voucher-pay-card voucher-pay-upload-card">
@@ -1562,6 +1607,7 @@ function renderVoucherHistoryRoom(order) {
   voucherState.activeOrder = order;
   voucherState.historyRoomOrderCode = order.orderCode;
   if (order.status === "awaiting_payment") {
+    container.classList.add("is-awaiting-payment");
     const renderAwaiting = () => {
       container.innerHTML = buildVoucherAwaitingPaymentMarkup(order, {
         layoutMode: "history",
@@ -1577,6 +1623,7 @@ function renderVoucherHistoryRoom(order) {
       .catch(renderAwaiting);
     return;
   }
+  container.classList.remove("is-awaiting-payment");
 
   const activeElement = document.activeElement;
   const prevInput = document.getElementById("voucher-history-chat-input");
