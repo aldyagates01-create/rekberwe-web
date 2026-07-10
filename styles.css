@@ -7381,9 +7381,12 @@ textarea.field-invalid {
 
   .page-shell,
   .admin-shell {
-    width: calc(100vw - 24px) !important;
-    padding: 0 0 110px !important;
+    width: min(100%, calc(100vw - 24px)) !important;
+    max-width: 100% !important;
+    margin-inline: auto !important;
+    padding: 0 12px calc(118px + env(safe-area-inset-bottom)) !important;
     gap: 14px !important;
+    box-sizing: border-box;
   }
 
   .topbar-actions {
@@ -7423,7 +7426,11 @@ textarea.field-invalid {
 
   .member-area {
     gap: 0 !important;
-    padding-bottom: 100px !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+    box-sizing: border-box;
   }
 
   .member-tab-shell,
@@ -7611,6 +7618,18 @@ textarea.field-invalid {
 
   .workspace-center-view {
     min-width: 0 !important;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  body.is-member-view #ruang-transaksi.telegram-room-shell,
+  body.is-member-view #workspace-dashboard-view,
+  body.is-member-view .mobile-dashboard-shell {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   #workspace-dashboard-view:not(.hidden):not(.mobile-create-open) .workspace-dashboard-shell {
@@ -7727,7 +7746,12 @@ textarea.field-invalid {
   .mobile-dashboard-shell {
     display: grid !important;
     gap: 14px;
-    margin-bottom: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-bottom: 0;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    box-sizing: border-box;
   }
 
   .mobile-dashboard-hero-card {
@@ -7845,16 +7869,19 @@ textarea.field-invalid {
 
   .mobile-quick-actions-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .mobile-quick-action-btn {
     border: 1px solid rgba(120, 137, 173, 0.16);
     background: linear-gradient(180deg, rgba(20, 29, 49, 0.98), rgba(14, 21, 37, 0.98));
     border-radius: 12px;
-    min-height: 96px;
-    padding: 10px 7px;
+    min-height: 88px;
+    min-width: 0;
+    padding: 12px 8px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -7898,9 +7925,10 @@ textarea.field-invalid {
   }
 
   .mobile-quick-action-btn strong {
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     line-height: 1.2;
     color: #ffffff;
+    word-break: break-word;
   }
 
   .mobile-quick-action-btn small {
@@ -7911,8 +7939,10 @@ textarea.field-invalid {
 
   .mobile-dashboard-summary-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .mobile-dashboard-summary-grid article {
@@ -7922,6 +7952,13 @@ textarea.field-invalid {
     border: 1px solid rgba(120, 137, 173, 0.12);
     display: grid;
     gap: 8px;
+    min-width: 0;
+  }
+
+  .mobile-dashboard-summary-grid article:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    max-width: calc(50% - 5px);
+    justify-self: center;
   }
 
   .mobile-dashboard-summary-grid article span {
@@ -9041,8 +9078,8 @@ body.widget-dragging * {
   }
 
   .mobile-quick-action-btn {
-    min-height: 108px !important;
-    padding: 14px 10px !important;
+    min-height: 96px !important;
+    padding: 12px 8px !important;
   }
 
   /* ─── Logout button di mobile header ─── */
@@ -9969,8 +10006,11 @@ body.is-member-view .topbar {
     position: sticky;
     top: 0;
     z-index: 40;
+    width: 100%;
+    max-width: 100%;
     margin: 0 0 14px;
     padding: 12px 14px;
+    box-sizing: border-box;
     border-radius: 18px;
     background: rgba(11, 17, 31, 0.96);
     border: 1px solid rgba(120, 137, 173, 0.14);
