@@ -916,6 +916,10 @@ select {
   min-height: calc(100vh - 150px);
 }
 
+#member-transactions-workspace {
+  --sidebar-width: 400px;
+}
+
 .transactions-sidebar {
   display: grid;
   gap: 16px;
@@ -6161,7 +6165,8 @@ textarea.field-invalid {
   }
 
   .page-shell {
-    width: min(calc(100vw - 14px), 1800px);
+    width: 100% !important;
+    max-width: 100% !important;
     gap: 14px;
   }
 
@@ -7367,7 +7372,9 @@ textarea.field-invalid {
   }
 
   .topbar {
-    width: calc(100vw - 24px) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
     padding: 12px 14px 10px !important;
     background: linear-gradient(180deg, rgba(8, 17, 31, 0.98) 0%, rgba(10, 18, 32, 0.96) 100%) !important;
     border: 1px solid rgba(143, 164, 205, 0.12) !important;
@@ -7383,8 +7390,9 @@ textarea.field-invalid {
   .admin-shell {
     width: 100% !important;
     max-width: 100% !important;
-    margin-inline: auto !important;
-    padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)) !important;
+    margin: 0 !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
     padding-bottom: calc(118px + env(safe-area-inset-bottom)) !important;
     gap: 14px !important;
     box-sizing: border-box;
@@ -7496,7 +7504,7 @@ textarea.field-invalid {
   }
 
   #ruang-transaksi.workspace-room {
-    padding: 14px !important;
+    padding: 0 !important;
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
@@ -7512,7 +7520,7 @@ textarea.field-invalid {
     justify-content: space-between;
     gap: 14px;
     margin-bottom: 14px;
-    padding: 8px 2px 2px;
+    padding: 0;
   }
 
   .mobile-workspace-brand {
@@ -8321,8 +8329,8 @@ textarea.field-invalid {
 
   .mobile-bottom-nav {
     position: fixed;
-    left: max(12px, env(safe-area-inset-left));
-    right: max(12px, env(safe-area-inset-right));
+    left: 16px;
+    right: 16px;
     bottom: max(10px, env(safe-area-inset-bottom));
     z-index: 120;
     width: auto;
@@ -8477,12 +8485,12 @@ textarea.field-invalid {
   }
 
   .mobile-dashboard-hero-card {
-    grid-template-columns: minmax(0, 1fr) clamp(78px, 22vw, 96px) !important;
-    padding: 12px 14px !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 14px !important;
   }
 
   .mobile-dashboard-hero-visual {
-    min-height: 0 !important;
+    display: none !important;
   }
 
   .mobile-dashboard-hero-card h3 {
@@ -8490,7 +8498,7 @@ textarea.field-invalid {
   }
 
   .mobile-dashboard-hero-card p {
-    max-width: 170px;
+    max-width: 100% !important;
   }
 
   .transaction-progress-strip,
@@ -8534,10 +8542,10 @@ textarea.field-invalid {
   }
 
   .mobile-bottom-nav {
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-    padding-inline: 10px;
+    left: 16px !important;
+    right: 16px !important;
+    bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    padding-inline: 8px !important;
   }
 
   .mobile-bottom-nav-btn strong {
@@ -10006,8 +10014,8 @@ body.is-member-view .topbar {
     z-index: 40;
     width: 100%;
     max-width: 100%;
-    margin: 0 0 14px;
-    padding: 12px 14px;
+    margin: 0 0 12px;
+    padding: 12px 0;
     box-sizing: border-box;
     border-radius: 18px;
     background: rgba(11, 17, 31, 0.96);
@@ -14237,17 +14245,19 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right)) !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
     padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
     overflow-x: clip;
   }
 
-  body.is-member-view #member-area.page-shell {
+  body.is-member-view #member-area {
     width: 100% !important;
     max-width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
     overflow-x: clip;
+    display: block !important;
   }
 
   body.is-member-view #transactions-panel,
@@ -14264,6 +14274,20 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   body.is-member-view #member-transactions-workspace {
     display: block !important;
     grid-template-columns: none !important;
+    --sidebar-width: 0px !important;
+  }
+
+  body.is-member-view #member-transactions-workspace .transactions-sidebar,
+  body.is-member-view #member-transactions-workspace .workspace-sidebar,
+  body.is-member-view #member-transactions-workspace .panel-resizer {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
   }
 
   body.is-member-view .mobile-quick-actions-card,
@@ -14274,6 +14298,14 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
+  }
+
+  body.is-member-view .mobile-dashboard-hero-card {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  body.is-member-view .mobile-dashboard-hero-visual {
+    display: none !important;
   }
 
   body.is-member-view .mobile-quick-actions-grid {
@@ -14302,20 +14334,22 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   body.is-member-view:not(.in-room-mode) .mobile-workspace-header {
     width: 100% !important;
     max-width: 100% !important;
-    margin-inline: 0 !important;
+    margin: 0 0 12px !important;
+    padding: 0 !important;
     box-sizing: border-box;
   }
 
   body.is-member-view .mobile-bottom-nav {
-    left: max(12px, env(safe-area-inset-left)) !important;
-    right: max(12px, env(safe-area-inset-right)) !important;
+    left: 16px !important;
+    right: 16px !important;
     width: auto !important;
     max-width: none !important;
     transform: none !important;
+    margin: 0 !important;
   }
 
   body.is-member-view .support-widget {
-    right: max(12px, env(safe-area-inset-right)) !important;
+    right: 16px !important;
     bottom: calc(104px + env(safe-area-inset-bottom)) !important;
   }
 }
