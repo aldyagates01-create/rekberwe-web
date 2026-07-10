@@ -7381,12 +7381,14 @@ textarea.field-invalid {
 
   .page-shell,
   .admin-shell {
-    width: min(100%, calc(100vw - 24px)) !important;
+    width: 100% !important;
     max-width: 100% !important;
     margin-inline: auto !important;
-    padding: 0 12px calc(118px + env(safe-area-inset-bottom)) !important;
+    padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)) !important;
+    padding-bottom: calc(118px + env(safe-area-inset-bottom)) !important;
     gap: 14px !important;
     box-sizing: border-box;
+    overflow-x: clip;
   }
 
   .topbar-actions {
@@ -7756,13 +7758,13 @@ textarea.field-invalid {
 
   .mobile-dashboard-hero-card {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) clamp(88px, 24vw, 108px);
-    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
     min-height: 0;
-    padding: 14px 16px;
+    padding: 16px;
     overflow: hidden;
     position: relative;
-    align-items: center;
+    align-items: start;
     background:
       radial-gradient(circle at 80% 40%, rgba(107, 75, 255, 0.38), transparent 34%),
       linear-gradient(135deg, #141a48 0%, #121936 54%, #10162b 100%);
@@ -7794,22 +7796,14 @@ textarea.field-invalid {
 
   .mobile-dashboard-hero-card p {
     margin: 6px 0 0;
-    max-width: 190px;
+    max-width: 100%;
     font-size: clamp(0.64rem, 2.8vw, 0.74rem);
     line-height: 1.34;
     color: #bac7e1;
   }
 
   .mobile-dashboard-hero-visual {
-    display: grid;
-    place-items: center;
-    align-self: center;
-    justify-self: end;
-    width: 100%;
-    min-height: 0;
-    border-radius: 18px;
-    background: radial-gradient(circle at center, rgba(121, 83, 255, 0.34), transparent 62%);
-    color: #8e6dff;
+    display: none;
   }
 
   .mobile-hero-shield {
@@ -8327,10 +8321,14 @@ textarea.field-invalid {
 
   .mobile-bottom-nav {
     position: fixed;
-    left: clamp(8px, 3vw, 14px);
-    right: clamp(8px, 3vw, 14px);
-    bottom: clamp(8px, 2.5vw, 12px);
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
     z-index: 120;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    transform: none;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     align-items: center;
     gap: clamp(2px, 1vw, 6px);
@@ -8612,7 +8610,7 @@ body.widget-dragging * {
   }
 
   .mobile-dashboard-shell {
-    margin-bottom: 14px !important;
+    margin-bottom: 0 !important;
   }
 
   .mobile-transaction-card {
@@ -14226,5 +14224,98 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
 
   .workspace-mobile-only {
     display: inline-flex;
+  }
+}
+
+/* Mobile member workspace: prevent horizontal overflow and keep nav centered */
+@media (max-width: 768px) {
+  body.is-member-view {
+    overflow-x: clip;
+  }
+
+  body.is-member-view main.page-shell {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right)) !important;
+    padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+    overflow-x: clip;
+  }
+
+  body.is-member-view #member-area.page-shell {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow-x: clip;
+  }
+
+  body.is-member-view #transactions-panel,
+  body.is-member-view #member-transactions-workspace,
+  body.is-member-view #ruang-transaksi.telegram-room-shell,
+  body.is-member-view .workspace-center-view,
+  body.is-member-view .mobile-dashboard-shell {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: clip;
+  }
+
+  body.is-member-view #member-transactions-workspace {
+    display: block !important;
+    grid-template-columns: none !important;
+  }
+
+  body.is-member-view .mobile-quick-actions-card,
+  body.is-member-view .mobile-dashboard-summary-card,
+  body.is-member-view .mobile-dashboard-active-card,
+  body.is-member-view .mobile-dashboard-hero-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  body.is-member-view .mobile-quick-actions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  body.is-member-view .mobile-quick-action-btn {
+    min-height: 80px !important;
+    padding: 10px 6px !important;
+  }
+
+  body.is-member-view .mobile-quick-action-icon {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  body.is-member-view .mobile-quick-action-btn strong {
+    font-size: 0.68rem !important;
+  }
+
+  body.is-member-view .mobile-quick-action-btn small {
+    font-size: 0.56rem !important;
+  }
+
+  body.is-member-view:not(.in-room-mode) .mobile-workspace-header {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-inline: 0 !important;
+    box-sizing: border-box;
+  }
+
+  body.is-member-view .mobile-bottom-nav {
+    left: max(12px, env(safe-area-inset-left)) !important;
+    right: max(12px, env(safe-area-inset-right)) !important;
+    width: auto !important;
+    max-width: none !important;
+    transform: none !important;
+  }
+
+  body.is-member-view .support-widget {
+    right: max(12px, env(safe-area-inset-right)) !important;
+    bottom: calc(104px + env(safe-area-inset-bottom)) !important;
   }
 }
