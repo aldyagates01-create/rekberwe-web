@@ -2731,6 +2731,16 @@ function closeLoginModal() {
   closeAccessibleModalShell(elements.loginModal);
 }
 
+function syncMobileMemberLayout() {
+  const shell = elements.transactionShell;
+  if (!shell) return;
+  if (isMobileViewport()) {
+    shell.style.setProperty("--sidebar-width", "0px");
+  } else {
+    shell.style.removeProperty("--sidebar-width");
+  }
+}
+
 function renderMemberVisibility() {
   const showMemberArea = Boolean(state.currentUser && state.currentMemberView);
   document.body.classList.toggle("is-member-view", showMemberArea);
@@ -2739,6 +2749,7 @@ function renderMemberVisibility() {
   elements.profilePanel.classList.remove("active");
   elements.transactionsPanel.classList.toggle("active", showMemberArea);
   elements.transactionsIntroSection.classList.add("hidden");
+  syncMobileMemberLayout();
   renderTransactionScreen();
   updateWorkspaceMenuState();
 }

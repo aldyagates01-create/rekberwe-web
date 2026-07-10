@@ -6130,8 +6130,14 @@ textarea.field-invalid {
   }
 
   .home-dashboard-shell,
-  .member-transactions-workspace {
+  .member-transactions-workspace,
+  #member-transactions-workspace {
     grid-template-columns: 1fr;
+  }
+
+  body.is-member-view #member-transactions-workspace .transactions-sidebar,
+  body.is-member-view #member-transactions-workspace .panel-resizer {
+    display: none !important;
   }
 
   .home-sidebar,
@@ -14235,46 +14241,69 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
   }
 }
 
-/* Mobile member workspace: prevent horizontal overflow and keep nav centered */
+/* Mobile member workspace: mirror pre-login centering (home-area) */
 @media (max-width: 768px) {
   body.is-member-view {
     overflow-x: clip;
   }
 
   body.is-member-view main.page-shell {
+    display: block !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
     padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
     overflow-x: clip;
+    box-sizing: border-box !important;
   }
 
-  body.is-member-view #member-area {
+  body.is-member-view #member-area,
+  body.is-member-view #transactions-panel {
     width: 100% !important;
     max-width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
     overflow-x: clip;
     display: block !important;
+    box-sizing: border-box !important;
   }
 
-  body.is-member-view #transactions-panel,
   body.is-member-view #member-transactions-workspace,
+  body.is-member-view #member-transactions-workspace.transactions-shell,
+  body.is-member-view .member-transactions-workspace {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    grid-template-rows: none !important;
+    --sidebar-width: 0px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: clip;
+    box-sizing: border-box !important;
+  }
+
   body.is-member-view #ruang-transaksi.telegram-room-shell,
   body.is-member-view .workspace-center-view,
   body.is-member-view .mobile-dashboard-shell {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
+    margin: 0 !important;
     overflow-x: clip;
+    box-sizing: border-box !important;
   }
 
-  body.is-member-view #member-transactions-workspace {
-    display: block !important;
-    grid-template-columns: none !important;
-    --sidebar-width: 0px !important;
+  body.is-member-view #ruang-transaksi.telegram-room-shell {
+    display: flex !important;
+    flex-direction: column !important;
+    border-radius: 22px !important;
+    border-top-left-radius: 22px !important;
+    border-bottom-left-radius: 22px !important;
   }
 
   body.is-member-view #member-transactions-workspace .transactions-sidebar,
@@ -14284,10 +14313,15 @@ body.workspace-voucher-active #workspace-rekber-fee-card {
     width: 0 !important;
     min-width: 0 !important;
     max-width: 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
     overflow: hidden !important;
     padding: 0 !important;
     margin: 0 !important;
     border: 0 !important;
+    position: absolute !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
   }
 
   body.is-member-view .mobile-quick-actions-card,
