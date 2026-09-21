@@ -15,3 +15,5 @@ admin-desktop/node_modules/
 admin-desktop/dist/
 # TypeScript build cache
 *.tsbuildinfo
+# Catatan pindahan (bukan source)
+SUDAH DIPINDAH.txt
