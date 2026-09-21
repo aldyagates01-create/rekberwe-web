@@ -6,6 +6,7 @@ const {
   nativeImage,
   Notification,
   shell,
+  session,
 } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
@@ -14,10 +15,18 @@ const CONFIG_PATH = path.join(__dirname, "config.json");
 const FALLBACK_ICON = path.join(__dirname, "..", "assets", "rekberwe-favicon.png");
 const APP_ICON = path.join(__dirname, "assets", "icon.png");
 
+/** User-Agent mirip Chrome — Google sering menolak OAuth jika UA mengandung "Electron". */
+const CHROME_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+const SESSION_PARTITION = "persist:rekberwe-admin";
+
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 let appConfig = loadConfig();
+let recoveryTimer = null;
+let recoveryAttempts = 0;
 
 function loadConfig() {
   const defaults = {
@@ -35,31 +44,67 @@ function loadConfig() {
 
 function resolveAdminTarget() {
   const fromEnv = String(process.env.REKBER_ADMIN_URL || "").trim();
-  const adminUrl = fromEnv || String(appConfig.adminUrl || "").trim() || "https://rekberwe.id/admin";
-  const parsed = new URL(adminUrl);
+  const raw = fromEnv || String(appConfig.adminUrl || "").trim() || "https://rekberwe.id/admin";
+  // Hindari URL ganda seperti https://rekberwe.id/https://rekberwe.id/admin
+  const cleaned = raw.replace(/^(https?:\/\/[^/]+)\/https?:\/\/[^/]+/i, "$1");
+  const parsed = new URL(cleaned.startsWith("http") ? cleaned : `https://${cleaned}`);
   return {
-    adminUrl: parsed.toString().replace(/\/$/, ""),
+    adminUrl: `${parsed.origin}/admin`,
     origin: parsed.origin,
   };
 }
 
+function isOAuthHost(hostname) {
+  const host = String(hostname || "").toLowerCase();
+  return (
+    host === "accounts.google.com"
+    || host.endsWith(".google.com")
+    || host === "oauth.telegram.org"
+    || host.endsWith(".telegram.org")
+    || host === "discord.com"
+    || host.endsWith(".discord.com")
+    || host.endsWith(".discordapp.com")
+    || host === "facebook.com"
+    || host.endsWith(".facebook.com")
+  );
+}
+
 function isAllowedNavigation(url) {
   const { origin } = resolveAdminTarget();
-  if (url.startsWith(origin)) return true;
   try {
-    const host = new URL(url).hostname.toLowerCase();
-    if (host === "accounts.google.com" || host.endsWith(".google.com")) return true;
-    if (host === "oauth.telegram.org" || host.endsWith(".telegram.org")) return true;
-    if (host === "discord.com" || host.endsWith(".discord.com") || host.endsWith(".discordapp.com")) return true;
-    if (host === "facebook.com" || host.endsWith(".facebook.com")) return true;
+    const parsed = new URL(url);
+    if (parsed.origin === origin) return true;
+    if (isOAuthHost(parsed.hostname)) return true;
     return false;
   } catch {
     return false;
   }
 }
 
-function shouldOpenExternally(url) {
-  return !isAllowedNavigation(url);
+/**
+ * Perbaiki URL rusak / homepage → selalu ke /admin (kecuali sedang OAuth).
+ */
+function normalizeToAdminUrl(url) {
+  const { origin, adminUrl } = resolveAdminTarget();
+  try {
+    const parsed = new URL(url);
+    if (parsed.origin !== origin) return null;
+
+    const pathName = parsed.pathname || "/";
+    // Path seperti /https://rekberwe.id/ — URL ganda
+    if (/^\/https?:\/\//i.test(pathName)) {
+      return adminUrl;
+    }
+    const cleanPath = pathName.replace(/\/$/, "") || "/";
+    if (cleanPath === "/" || cleanPath === "") {
+      const next = new URL(adminUrl);
+      parsed.searchParams.forEach((value, key) => next.searchParams.set(key, value));
+      return next.toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function loadAppIcon() {
@@ -69,9 +114,120 @@ function loadAppIcon() {
   return image.isEmpty() ? undefined : image;
 }
 
+function clearRecoveryTimer() {
+  if (recoveryTimer) {
+    clearTimeout(recoveryTimer);
+    recoveryTimer = null;
+  }
+}
+
+function navigateInApp(url) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.loadURL(url);
+}
+
+function reloadAdminDashboard({ bustCache = true } = {}) {
+  clearRecoveryTimer();
+  const { adminUrl } = resolveAdminTarget();
+  const target = bustCache
+    ? `${adminUrl}${adminUrl.includes("?") ? "&" : "?"}desktop_reload=${Date.now()}`
+    : adminUrl;
+  navigateInApp(target);
+}
+
+function scheduleAdminRecovery(reason = "") {
+  if (recoveryAttempts >= 8) return;
+  if (recoveryTimer) return;
+  recoveryAttempts += 1;
+  const delayMs = Math.min(2500 * recoveryAttempts, 15000);
+  recoveryTimer = setTimeout(() => {
+    recoveryTimer = null;
+    reloadAdminDashboard({ bustCache: true });
+  }, delayMs);
+  if (reason) {
+    console.log(`[admin-desktop] recovery: ${reason} (attempt ${recoveryAttempts})`);
+  }
+}
+
+async function detectRailwayErrorPage() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  try {
+    const result = await mainWindow.webContents.executeJavaScript(`
+      (() => {
+        const text = String(document.body?.innerText || "").toLowerCase();
+        const title = String(document.title || "").toLowerCase();
+        const isRailway =
+          text.includes("the train has not arrived")
+          || text.includes("go to railway")
+          || (title.includes("not found") && text.includes("railway"));
+        const looksLikeAdmin =
+          Boolean(document.getElementById("admin-app")
+            || document.getElementById("admin-login-modal")
+            || document.querySelector("[data-admin-root]")
+            || document.querySelector(".admin-shell")
+            || document.querySelector("#admin-logout"));
+        return { isRailway, looksLikeAdmin, href: location.href };
+      })()
+    `, true);
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+async function recoverIfStuckOnRailway() {
+  const info = await detectRailwayErrorPage();
+  if (!info) return;
+  if (info.isRailway && !info.looksLikeAdmin) {
+    scheduleAdminRecovery("railway-not-found-page");
+    showRecoveryScreen();
+  } else if (info.looksLikeAdmin) {
+    recoveryAttempts = 0;
+    clearRecoveryTimer();
+  }
+}
+
+function showRecoveryScreen() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const { adminUrl } = resolveAdminTarget();
+  mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>RekberWE Admin</title>
+        <style>
+          body { margin:0; min-height:100vh; display:grid; place-items:center;
+            font-family:Segoe UI,sans-serif; background:#0b1220; color:#e8eefc; }
+          .card { max-width:440px; padding:28px; border-radius:16px;
+            border:1px solid rgba(148,163,184,.25); background:#111827; text-align:center; }
+          button { margin-top:16px; padding:10px 18px; border:0; border-radius:10px;
+            background:#4f6ef7; color:#fff; font-weight:600; cursor:pointer; }
+          p { color:#9db0d0; line-height:1.5; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>Server baru aktif kembali</h2>
+          <p>Aplikasi masih membuka halaman Railway lama. Klik tombol di bawah untuk masuk dashboard admin.</p>
+          <button id="retry">Buka Dashboard Admin</button>
+        </div>
+        <script>
+          document.getElementById("retry").onclick = function () {
+            location.replace(${JSON.stringify(adminUrl)});
+          };
+          setTimeout(function () { location.replace(${JSON.stringify(adminUrl)}); }, 1200);
+        </script>
+      </body>
+    </html>
+  `)}`);
+}
+
 function createMainWindow() {
   const icon = loadAppIcon();
-  const { adminUrl } = resolveAdminTarget();
+  const ses = session.fromPartition(SESSION_PARTITION);
+
+  ses.setUserAgent(CHROME_USER_AGENT);
 
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -90,9 +246,11 @@ function createMainWindow() {
       sandbox: true,
       backgroundThrottling: false,
       spellcheck: false,
-      partition: "persist:rekberwe-admin",
+      partition: SESSION_PARTITION,
     },
   });
+
+  mainWindow.webContents.setUserAgent(CHROME_USER_AGENT);
 
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
@@ -101,17 +259,84 @@ function createMainWindow() {
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isAllowedNavigation(url)) {
-      return { action: "allow" };
+      navigateInApp(url);
+      return { action: "deny" };
     }
     shell.openExternal(url);
     return { action: "deny" };
   });
 
   mainWindow.webContents.on("will-navigate", (event, url) => {
-    if (shouldOpenExternally(url)) {
+    if (!isAllowedNavigation(url)) {
       event.preventDefault();
       shell.openExternal(url);
+      return;
     }
+    const forced = normalizeToAdminUrl(url);
+    if (forced && forced !== url) {
+      event.preventDefault();
+      navigateInApp(forced);
+    }
+  });
+
+  mainWindow.webContents.on("will-redirect", (event, url) => {
+    if (!isAllowedNavigation(url)) {
+      event.preventDefault();
+      shell.openExternal(url);
+      return;
+    }
+    // Perbaiki URL ganda tanpa membatalkan redirect OAuth normal.
+    if (/\/https?:\/\//i.test(url)) {
+      event.preventDefault();
+      reloadAdminDashboard({ bustCache: false });
+    }
+  });
+
+  mainWindow.webContents.on("did-navigate", (_event, url) => {
+    const forced = normalizeToAdminUrl(url);
+    if (forced) navigateInApp(forced);
+  });
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    recoverIfStuckOnRailway();
+  });
+
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
+    if (errorCode === -3) return;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const safeMessage = String(errorDescription || "Gagal memuat halaman").replace(/</g, "");
+    const { adminUrl } = resolveAdminTarget();
+    mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>RekberWE Admin</title>
+          <style>
+            body { margin:0; min-height:100vh; display:grid; place-items:center;
+              font-family:Segoe UI,sans-serif; background:#0b1220; color:#e8eefc; }
+            .card { max-width:420px; padding:28px; border-radius:16px;
+              border:1px solid rgba(148,163,184,.25); background:#111827; text-align:center; }
+            button { margin-top:16px; padding:10px 18px; border:0; border-radius:10px;
+              background:#4f6ef7; color:#fff; font-weight:600; cursor:pointer; }
+            p { color:#9db0d0; line-height:1.5; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>Koneksi gagal</h2>
+            <p>${safeMessage}</p>
+            <button id="retry">Coba lagi ke Dashboard Admin</button>
+          </div>
+          <script>
+            document.getElementById("retry").onclick = function () {
+              location.replace(${JSON.stringify(adminUrl)});
+            };
+          </script>
+        </body>
+      </html>
+    `)}`);
+    scheduleAdminRecovery("did-fail-load");
   });
 
   mainWindow.on("close", (event) => {
@@ -126,7 +351,7 @@ function createMainWindow() {
     mainWindow.setTitle("RekberWE Admin");
   });
 
-  mainWindow.loadURL(adminUrl);
+  reloadAdminDashboard({ bustCache: true });
 }
 
 function createTray() {
@@ -139,6 +364,14 @@ function createTray() {
     {
       label: "Tampilkan Dashboard",
       click: () => showMainWindow(),
+    },
+    {
+      label: "Muat ulang Dashboard",
+      click: () => {
+        recoveryAttempts = 0;
+        reloadAdminDashboard({ bustCache: true });
+        showMainWindow();
+      },
     },
     { type: "separator" },
     {
@@ -182,7 +415,11 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on("second-instance", () => showMainWindow());
+  app.on("second-instance", () => {
+    recoveryAttempts = 0;
+    reloadAdminDashboard({ bustCache: true });
+    showMainWindow();
+  });
 
   app.whenReady().then(() => {
     appConfig = loadConfig();
@@ -206,12 +443,8 @@ if (!gotLock) {
     ipcMain.on("admin-desktop:set-badge", (_event, count) => {
       updateTrayBadge(count);
       const safeCount = Math.max(0, Number(count) || 0);
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.setOverlayIcon(null, "");
-        if (safeCount > 0 && process.platform === "win32") {
-          // Keep taskbar attention without custom badge asset.
-          mainWindow.flashFrame(true);
-        }
+      if (mainWindow && !mainWindow.isDestroyed() && safeCount > 0 && process.platform === "win32") {
+        mainWindow.flashFrame(true);
       }
     });
     ipcMain.on("admin-desktop:focus", () => showMainWindow());
@@ -219,6 +452,7 @@ if (!gotLock) {
 
   app.on("before-quit", () => {
     isQuitting = true;
+    clearRecoveryTimer();
   });
 
   app.on("window-all-closed", () => {

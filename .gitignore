@@ -13,3 +13,5 @@ yarn-error.log*
 .DS_Store
 admin-desktop/node_modules/
 admin-desktop/dist/
+# TypeScript build cache
+*.tsbuildinfo

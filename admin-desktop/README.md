@@ -1,18 +1,27 @@
 # RekberWE Admin Desktop (Windows)
 
-Aplikasi PC khusus **dashboard admin** RekberWE. Memuat halaman admin dari server (production atau lokal) dengan:
+Aplikasi PC **khusus dashboard admin** — hanya membuka `https://rekberwe.id/admin`.
 
-- Notifikasi Windows native saat ada order/chat baru
-- System tray (tutup window = minimize ke tray, tidak keluar)
-- Koneksi live event tetap aktif saat window di-minimize
-- Single instance (hanya satu app admin terbuka)
+## Alur pakai
 
-## Persyaratan
+1. Buka aplikasi → langsung ke halaman login/dashboard admin
+2. Pilih **Login Google** (atau Discord / Telegram)
+3. Login di dalam jendela aplikasi (bukan browser terpisah)
+4. Setelah sukses → **langsung kembali ke dashboard admin**
 
-- Windows 10/11
-- Node.js 20+
+Session tersimpan di aplikasi, jadi biasanya tidak perlu login ulang setiap buka.
 
-## Konfigurasi URL
+## Fitur
+
+- Khusus `/admin` (bukan website user)
+- Login Google tetap di dalam app (User-Agent Chrome)
+- Auto-redirect ke `/admin` jika OAuth sempat mendarat di homepage
+- Notifikasi Windows native untuk order/chat baru
+- System tray (tutup window = minimize ke tray)
+- Live event tetap aktif saat di-minimize
+- Single instance
+
+## Konfigurasi
 
 Edit `config.json`:
 
@@ -24,14 +33,14 @@ Edit `config.json`:
 }
 ```
 
-Atau set environment variable:
+Atau environment:
 
 ```powershell
 $env:REKBER_ADMIN_URL="http://localhost:3000/admin"
 npm start
 ```
 
-## Jalankan (development)
+## Development
 
 ```powershell
 cd admin-desktop
@@ -39,11 +48,7 @@ npm install
 npm start
 ```
 
-Pastikan server RekberWE sudah berjalan jika memakai URL lokal.
-
-## Build file .exe Windows (bisa di-install di PC lain)
-
-Di PC yang punya Node.js (biasanya PC developer):
+## Build .exe
 
 ```powershell
 cd admin-desktop
@@ -51,31 +56,11 @@ npm install
 npm run build:win
 ```
 
-Output ada di `admin-desktop/dist/`:
+Output di `admin-desktop/dist/`:
 
 | File | Kegunaan |
 |------|----------|
-| `RekberWE Admin Setup x.x.x.exe` | **Installer** — untuk install di PC lain (disarankan) |
-| `RekberWE Admin x.x.x.exe` | **Portable** — bisa langsung jalan tanpa install |
+| `RekberWE Admin Setup 1.1.0.exe` | Installer (disarankan) |
+| `RekberWE Admin 1.1.0.exe` | Portable (tanpa install) |
 
-**Cara pasang di PC lain:**
-1. Copy file `RekberWE Admin Setup x.x.x.exe` ke PC tujuan (USB, Google Drive, dll.)
-2. Double-click → Next → Install
-3. Buka dari shortcut desktop / Start Menu
-4. PC lain **tidak perlu** Node.js — cukup Windows 10/11 + internet
-
-## Alur login di aplikasi
-
-```
-Buka app → Layar login admin → Pilih Google / Telegram / Discord
-    → Dialihkan ke halaman login provider (di dalam app)
-    → Setelah sukses, kembali otomatis ke dashboard admin di app
-```
-
-Session login tersimpan di aplikasi (cookie), jadi biasanya **tidak perlu login ulang** setiap buka app.
-
-## Catatan
-
-- Login admin tetap lewat web (session cookie disimpan di app).
-- Notifikasi desktop aktif otomatis saat dibuka lewat app ini.
-- Untuk auto-start saat Windows nyala, set `"openAtLogin": true` di `config.json` lalu build ulang / jalankan ulang app.
+PC tujuan hanya butuh Windows 10/11 + internet — **tidak perlu Node.js**.
