@@ -100,6 +100,7 @@ const app = express();
 app.set("trust proxy", 1);
 const isProduction = process.env.NODE_ENV === "production";
 const port = Number(process.env.PORT || 3000);
+const host = String(process.env.HOST || '0.0.0.0').trim();
 const webNextDir = path.resolve(__dirname, "..", "web");
 const useNextFrontend = String(process.env.USE_NEXT_FRONTEND || "true").trim().toLowerCase() !== "false";
 let nextHandler = null;
@@ -2192,7 +2193,7 @@ async function startServer() {
     }
   }
 
-  app.listen(port, () => {
+  app.listen(port, host, () => {
     console.log(`RekberWE.id running on ${appBaseUrl}`);
     if (isPushEnabled()) {
       console.log("Web Push aktif");
@@ -3160,3 +3161,4 @@ async function destroyCloudinaryAsset(storedName) {
   if (!resourceType || !publicId) return;
   await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
 }
+
