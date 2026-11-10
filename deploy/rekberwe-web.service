@@ -1,0 +1,22 @@
+[Unit]
+Description=RekberWE website
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=qhead01
+WorkingDirectory=/home/qhead01/rekberwe
+Environment=NODE_ENV=production
+EnvironmentFile=/home/qhead01/rekberwe/.env
+ExecStart=/usr/bin/node --import tsx server/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
