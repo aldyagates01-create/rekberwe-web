@@ -5,10 +5,10 @@ Runtime: Node 20, systemd rekberwe-web.service, HOST=127.0.0.1, PORT=3020.
 Public origin: nginx for rekberwe.id, proxy to localhost:3020; TLS via Certbot.
 Build: npm run check; npm run build. Never copy Windows node_modules to Linux.
 
-## Migration state, 2026-11-10
+## Production state, 2026-11-10
 
 VPS upgraded to 4 GB RAM / 2 vCPU. Private staging passes HTTP checks.
-Railway remains public production until DNS cutover is explicitly verified.
+Public DNS now points to VPS; root and www HTTPS verified. Railway deployment stopped and GitHub source disconnected. Temporary Railway SSH key removed.
 Railway project steadfast-endurance / service rekberwe-web / volume rekberwe-web-volume.
 Production uses SQLite at /data/rekberwe.sqlite, uploads at /data/uploads, Cloudinary also configured.
 Secrets and online SQLite backup are saved outside this repository in the session-backups migration folder.
@@ -19,4 +19,5 @@ plus uploads snapshot. Stop staging before replacing its database. Never serve t
 independent writable copies. Verify final database counts, integrity, upload hashes,
 TLS, authentication redirects and both RekberWE and Hanzay service health.
 Do not remove Railway service or volume. Remove the temporary Railway SSH key after migration.
-After DNS points to VPS, configure unattended Certbot renewal through the nginx ACME webroot.
+Certbot renewal is configured through nginx ACME webroot for root + www; certbot.timer is active and the deploy hook reloads nginx.
+
