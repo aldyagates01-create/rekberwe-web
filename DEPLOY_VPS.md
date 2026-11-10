@@ -10,7 +10,7 @@ Build: npm run check; npm run build. Never copy Windows node_modules to Linux.
 VPS upgraded to 4 GB RAM / 2 vCPU. Private staging passes HTTP checks.
 Public DNS now points to VPS; root and www HTTPS verified. Railway deployment stopped and GitHub source disconnected. Temporary Railway SSH key removed.
 Railway project steadfast-endurance / service rekberwe-web / volume rekberwe-web-volume.
-Production uses SQLite at /data/rekberwe.sqlite, uploads at /data/uploads, Cloudinary also configured.
+Railway source used SQLite at /data/rekberwe.sqlite and uploads at /data/uploads. VPS production data is outside the web root at /home/qhead01/rekberwe-runtime/data and /home/qhead01/rekberwe-runtime/uploads; Cloudinary remains configured.
 Secrets and online SQLite backup are saved outside this repository in the session-backups migration folder.
 Preserve SESSION_SECRET, VOUCHER_CREDENTIALS_KEY, OAuth credentials and data/vapid.json.
 
@@ -20,4 +20,5 @@ independent writable copies. Verify final database counts, integrity, upload has
 TLS, authentication redirects and both RekberWE and Hanzay service health.
 Do not remove Railway service or volume. Remove the temporary Railway SSH key after migration.
 Certbot renewal is configured through nginx ACME webroot for root + www; certbot.timer is active and the deploy hook reloads nginx.
+
 
